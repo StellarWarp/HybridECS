@@ -185,5 +185,11 @@
     <ClInclude Include="src\container\generic_type.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="src\container\generic_unordered_map.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\container\ankerl\unordered_dense.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

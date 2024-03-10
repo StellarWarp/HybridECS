@@ -6,7 +6,7 @@
 #include <tuple>
 #include <type_traits>
 #include <utility>
-#include "lib/cxx20_bit_extend.h"
+#include "../../lib/cxx20_bit_extend.h"
 
 namespace entt {
 

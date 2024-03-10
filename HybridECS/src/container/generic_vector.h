@@ -1,3 +1,5 @@
+#pragma once
+
 #include "generic_type.h"
 #include <memory>
 
@@ -12,14 +14,24 @@ namespace hyecs
 		uint8_t* m_capacity_end;
 		generic::type_index_container_cached m_type;
 
+
+		void* allocate_element()
+		{
+			if (m_end == m_capacity_end)
+				capacity_extend();
+			void* addr = m_end;
+			m_end += m_type.size();
+			return addr;
+		}
+
 	public:
-		generic_vector(generic::type_index type_info, size_t inital_capacity = 4) noexcept
-			: m_type(type_info)
+		generic_vector(generic::type_index type, size_t inital_capacity = 4) noexcept
+			: m_type(type)
 		{
 			size_t capacity_byte_size = m_type.size() * inital_capacity;
 			m_begin = new uint8_t[capacity_byte_size];
 			m_end = m_begin;
-			m_capacity_end = m_end;
+			m_capacity_end = m_end + capacity_byte_size;
 		}
 
 		~generic_vector()
@@ -160,33 +172,32 @@ namespace hyecs
 	public:
 
 		template<typename T>
-		void push_back(const T& value)
+		void* push_back(const T& value)
 		{
 			assert(typeid(T).hash_code() == m_type.hash());
-			if (m_end == m_capacity_end)
-				capacity_extend();
-			*reinterpret_cast<T*>(m_end) = std::move(value);
-			m_end += m_type.size();
+			T* addr = (T*)allocate_element();
+			new(addr) T(std::forward<T>(value));
+			return addr;
 		}
 
 		template<typename T>
-		void push_back(T&& value)
+		void* push_back(T&& value)
 		{
-			assert(typeid(T).hash_code() == m_type.hash());
-			if (m_end == m_capacity_end)
-				capacity_extend();
-			*reinterpret_cast<T*>(m_end) = std::move(value);
-			m_end += m_type.size();
+			using type = std::remove_reference_t<T>;
+			using pointer = type*;
+			assert(typeid(type).hash_code() == m_type.hash());
+			pointer addr = (pointer)allocate_element();
+			new(addr) type(std::forward<T>(value));
+			return addr;
 		}
 
 		template<typename T, typename... Args>
-		void emplace_back(Args&&... args)
+		void* emplace_back(Args&&... args)
 		{
 			assert(typeid(T).hash_code() == m_type.hash());
-			if (m_end == m_capacity_end)
-				capacity_extend();
-			new(m_end) T(std::forward<Args>(args)...);
-			m_end += m_type.size();
+			T* addr = (T*)allocate_element();
+ 			new(addr) T(std::forward<Args>(args)...);
+			return addr;
 		}
 
 		void pop_back()
@@ -195,6 +206,28 @@ namespace hyecs
 			m_end -= m_type.size();
 			m_type.destructor(m_end);
 		}
+
+		void swap_back_erase(void* ptr)
+		{
+			assert(ptr >= m_begin && ptr < m_end);
+			uint8_t* erase_ptr = (uint8_t*)ptr;
+			uint8_t* last_ptr = m_end - m_type.size();
+			m_type.destructor(erase_ptr);
+			m_type.move_constructor(erase_ptr, last_ptr);
+			m_end = last_ptr;
+		}
+
+		void* front()
+		{
+			return m_begin;
+		}
+
+		void* back()
+		{
+			return m_end - m_type.size();
+		}
+
+
 
 
 		class iterator
@@ -209,7 +242,10 @@ namespace hyecs
 
 		public:
 
-			iterator(pointer ptr) : m_ptr((uint8_t*)ptr) {}
+			iterator(uint8_t* ptr, size_t type_size) noexcept
+				: m_ptr(ptr),
+				m_type_size(type_size)
+			{}
 
 			iterator& operator++()
 			{
@@ -251,12 +287,12 @@ namespace hyecs
 
 			iterator operator+(difference_type n) const
 			{
-				return iterator(m_ptr + n * m_type_size);
+				return iterator(m_ptr + n * m_type_size, m_type_size);
 			}
 
 			iterator operator-(difference_type n) const
 			{
-				return iterator(m_ptr - n * m_type_size);
+				return iterator(m_ptr - n * m_type_size, m_type_size);
 			}
 
 			difference_type operator-(const iterator& other) const
@@ -302,12 +338,22 @@ namespace hyecs
 
 		iterator begin() noexcept
 		{
-			return iterator(m_begin);
+			return iterator(m_begin, m_type.size());
 		}
 
 		iterator end() noexcept
 		{
-			return iterator(m_end);
+			return iterator(m_end, m_type.size());
+		}
+
+		const iterator begin() const noexcept
+		{
+			return iterator(m_begin, m_type.size());
+		}
+
+		const iterator end() const noexcept
+		{
+			return iterator(m_end, m_type.size());
 		}
 
 

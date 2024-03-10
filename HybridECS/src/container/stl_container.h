@@ -1,5 +1,6 @@
 #pragma once
 #include "../lib/std_lib.h"
+#include "ankerl/unordered_dense.h"
 
 namespace hyecs
 {
@@ -58,7 +59,7 @@ namespace hyecs
 		class Equal = std::equal_to<T>,
 		class Alloc = std::allocator<T>
 	>
-	using unordered_set = std::unordered_set<T, Hash, Equal, Alloc>;
+	using unordered_set = ankerl::unordered_dense::set<T, Hash, Equal, Alloc>;
 
 	template <
 		class T,
@@ -89,12 +90,12 @@ namespace hyecs
 		typename Value,
 		typename Hash = std::hash<Key>,
 		typename Equal = std::equal_to<Key>,
-		typename Alloc = std::allocator<std::pair<const Key, Value>>
+		typename Alloc = std::allocator<std::pair<Key, Value>>
 	>
 #if _HAS_CXX20
 	using unordered_map = std::unordered_map<Key, Value, Hash, Equal, Alloc>;
 #else
-	using unordered_map = cxx20_extend_for_cxx17::cxx20_unordered_map<Key, Value, Hash, Equal, Alloc>;
+	using unordered_map = ankerl::unordered_dense::map<Key, Value, Hash, Equal, Alloc>;
 #endif
 
 	template<

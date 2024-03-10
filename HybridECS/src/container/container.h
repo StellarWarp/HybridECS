@@ -2,8 +2,8 @@
 
 #include "stl_container.h"
 #include "generic_container.h"
-#include "entt/dense_map.h"
-#include "entt/dense_set.h"
+//#include "entt/dense_map.h"
+//#include "entt/dense_set.h"
 #include "vaildref_map.h"
 #include "fixed_vector.h"
 namespace hyecs
@@ -16,7 +16,7 @@ namespace hyecs
 		typename Equal = std::equal_to<Key>,
 		typename Alloc = std::allocator<std::pair<const Key, Value>>
 	>
-	using dense_map = entt::dense_map<Key, Value, Hash, Equal, Alloc>;
+	using dense_map = unordered_map<Key, Value, Hash, Equal, Alloc>;
 
 	template <
 		class T,
@@ -24,7 +24,7 @@ namespace hyecs
 		typename Equal = std::equal_to<T>,
 		typename Alloc = std::allocator<T>
 	>
-	using dense_set = entt::dense_set<T, Hash, Equal, Alloc>;
+	using dense_set = unordered_set<T, Hash, Equal, Alloc>;
 
 
 	template<typename T>
@@ -59,4 +59,6 @@ namespace hyecs
 			return static_cast<size_t>(_Last - _First);
 		}
 	};
+
+	ankerl::unordered_dense::map<int, int> dense_map2;
 }

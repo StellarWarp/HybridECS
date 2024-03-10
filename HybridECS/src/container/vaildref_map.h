@@ -16,7 +16,7 @@ namespace hyecs
 		typename Value,
 		typename Hash = std::hash<Key>,
 		typename Equal = std::equal_to<Key>,
-		typename Alloc = std::allocator<std::pair<const Key, Value*>>,
+		typename Alloc = std::allocator<std::pair<Key, Value*>>,
 		template<typename, typename, typename, typename, typename> typename MapContainer = unordered_map
 	>
 	class vaildref_map
