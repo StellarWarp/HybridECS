@@ -3,24 +3,26 @@
 
 namespace hyecs
 {
+	//using Key = int;
+	//using Value = float;
+	//using Hash = std::hash<Key>;
+	//using Equal = std::equal_to<Key>;
+	//using Alloc = std::allocator<std::pair<const Key, Value*>>;
+	//template<typename _Key, typename _Value, typename _Hash, typename _Equal, typename _Alloc>
+	//using MapContainer = unordered_map<_Key, _Value, _Hash, _Equal, _Alloc>;
+
 	template<
 		typename Key,
 		typename Value,
 		typename Hash = std::hash<Key>,
 		typename Equal = std::equal_to<Key>,
-		typename Alloc = std::allocator<std::pair<const Key, Value>>,
-		template<typename, typename, typename, typename, typename> typename MapContainer = std::unordered_map
+		typename Alloc = std::allocator<std::pair<const Key, Value*>>,
+		template<typename, typename, typename, typename, typename> typename MapContainer = unordered_map
 	>
 	class vaildref_map
 	{
-		//using Key = int;
-		//using Value = float;
-		//using Hash = std::hash<Key>;
-		//using Equal = std::equal_to<Key>;
-		//using Alloc = std::allocator<std::pair<const Key, Value>>;
-		//template<typename _Key, typename _Value, typename _Hash, typename _Equal, typename _Alloc>
-		//using MapContainer = unordered_map<_Key, _Value, _Hash, _Equal, _Alloc>;
 
+		//todo add allocator for this?
 		using ValueContainer = deque<Value>;
 		using Map = MapContainer<Key, Value*, Hash, Equal, Alloc>;
 
@@ -38,13 +40,13 @@ namespace hyecs
 		class iterator
 		{
 			friend class vaildref_map;
-			Map::iterator m_iter;
+			typename Map::iterator m_iter;
 
-			iterator(Map::iterator iter) : m_iter(iter) {}
+			iterator(typename Map::iterator iter) : m_iter(iter) {}
 
 		public:
 
-			iterator() = default;
+			//iterator() = default;
 
 			iterator& operator++()
 			{
@@ -107,7 +109,7 @@ namespace hyecs
 			if (m_free_value_iter.empty())
 			{
 				auto& ref = m_values.emplace_back(value);
-				m_key_to_index.emplace(key, m_values.end() - 1);
+				m_key_to_index.emplace(key, &*(m_values.end() - 1));
 				return ref;
 			}
 			else
@@ -115,7 +117,7 @@ namespace hyecs
 				auto iter = m_free_value_iter.top();
 				m_free_value_iter.pop();
 				*iter = value;
-				m_key_to_index.emplace(key, iter);
+				m_key_to_index.emplace(key, &*iter);
 				return *iter;
 			}
 		}
@@ -123,10 +125,11 @@ namespace hyecs
 
 		mapped_type& insert(std::pair<const key_type, mapped_type>&& value)
 		{
+			assert(!m_key_to_index.contains(value.first));
 			if (m_free_value_iter.empty())
 			{
 				auto& ref = m_values.emplace_back(std::move(value.second));
-				m_key_to_index.emplace(std::move(value.first), m_values.end() - 1);
+				m_key_to_index.emplace(std::move(value.first), &*(m_values.end() - 1));
 				return ref;
 			}
 			else
@@ -134,7 +137,7 @@ namespace hyecs
 				auto iter = m_free_value_iter.top();
 				m_free_value_iter.pop();
 				*iter = std::move(value.second);
-				m_key_to_index.emplace(std::move(value.first), iter);
+				m_key_to_index.emplace(std::move(value.first), &*iter);
 				return *iter;
 			}
 		}
@@ -158,13 +161,6 @@ namespace hyecs
 		{
 			return m_key_to_index.contains(key);
 		}
-
-
-
-
-
-
-
 
 
 

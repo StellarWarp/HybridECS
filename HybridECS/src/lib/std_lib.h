@@ -24,7 +24,6 @@
 
 #include <functional>
 
-#include <format>
 
 //meta
 #include <type_traits>
@@ -38,3 +37,10 @@
 #endif
 
 #include "../container/stl_container.h"
+
+#if _HAS_CXX20
+#include <format>
+#include <bit>
+#else
+#include "cxx20_extend_for_cxx17.h"
+#endif

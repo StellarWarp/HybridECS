@@ -41,7 +41,7 @@
     <ClInclude Include="src\container\stl_container.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="src\container\variant_array.h">
+    <ClInclude Include="src\container\generic_vector.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="src\container\variant_vector.h">
@@ -156,6 +156,33 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="src\core\discard\graph_archetype_registry.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\component_group.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lib\cxx20_extend_for_cxx17.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lib\cxx20_bit_extend.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lib\cxx20_set_extend.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lib\cxx20_unordered_map_extend.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lib\cxx20_xmemort_extend.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lib\cxx20_xutility_extend.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\container\generic_dense_map.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\container\generic_type.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

@@ -138,6 +138,45 @@ namespace hyecs
 	};
 
 
+	class ecs_registry_context;
+	struct component_group_id
+	{
+		uint32_t id;
+
+		component_group_id(const std::string& name)
+		{
+			id = std::hash<std::string>{}(name);
+		}
+		component_group_id(const char* name)
+		{
+			id = std::hash<std::string>{}(name);
+		}
+
+		static component_group_id register_group(const std::string& name, ecs_registry_context* context)
+		{
+			auto id = component_group_id(name);
+			//...
+
+			return id;
+		}
+	};
+
+	class component_type_index;
+	class component_group_info
+	{
+		component_group_id id;
+		std::string name;
+		vector<component_type_index> component_types;
+
+	};
+
+	class component_group_index
+	{
+		component_group_info* info;
+	};
+
+
+
 
 	class component_type_info
 	{
@@ -146,6 +185,7 @@ namespace hyecs
 		size_t m_size;
 		generic::move_constructor_ptr m_move_constructor;
 		generic::destructor_ptr m_destructor;
+		component_group_index m_group;
 		uint8_t m_is_tag : 1;
 
 

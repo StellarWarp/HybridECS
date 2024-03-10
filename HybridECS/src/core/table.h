@@ -50,10 +50,10 @@ namespace hyecs
 		{
 			for (auto& component : components)
 				m_types.push_back(generic::type_info{
-					.size = component.size(),
-					.copy_constructor = nullptr,
-					.move_constructor = component.move_constructor(),
-					.destructor = component.destructor()
+					component.size(),
+					nullptr,
+					component.move_constructor(),
+					component.destructor()
 					});
 			//size computation
 			for (auto& type : m_types)

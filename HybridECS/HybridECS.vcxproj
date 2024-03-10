@@ -104,9 +104,10 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>C:\Users\akihali\source\repos\HybridECS\HybridECS\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -146,10 +147,13 @@
     <ClInclude Include="src\container\entt\dense_map.h" />
     <ClInclude Include="src\container\fixed_vector.h" />
     <ClInclude Include="src\container\generic_container.h" />
+    <ClInclude Include="src\container\generic_dense_map.h" />
+    <ClInclude Include="src\container\generic_type.h" />
     <ClInclude Include="src\container\stl_container.h" />
     <ClInclude Include="src\container\vaildref_map.h" />
-    <ClInclude Include="src\container\variant_array.h" />
+    <ClInclude Include="src\container\generic_vector.h" />
     <ClInclude Include="src\container\variant_vector.h" />
+    <ClInclude Include="src\core\component_group.h" />
     <ClInclude Include="src\core\component_storage.h" />
     <ClInclude Include="src\core\cross_query.h" />
     <ClInclude Include="src\core\discard\graph_archetype_registry.h" />
@@ -176,6 +180,12 @@
     <ClInclude Include="src\core\table.h" />
     <ClInclude Include="src\core\type_hash.h" />
     <ClInclude Include="src\core\old\World.h" />
+    <ClInclude Include="src\lib\cxx20_bit_extend.h" />
+    <ClInclude Include="src\lib\cxx20_extend_for_cxx17.h" />
+    <ClInclude Include="src\lib\cxx20_set_extend.h" />
+    <ClInclude Include="src\lib\cxx20_unordered_map_extend.h" />
+    <ClInclude Include="src\lib\cxx20_xmemort_extend.h" />
+    <ClInclude Include="src\lib\cxx20_xutility_extend.h" />
     <ClInclude Include="src\lib\glm_lib.h" />
     <ClInclude Include="src\lib\Lib.h" />
     <ClInclude Include="src\lib\std_lib.h" />

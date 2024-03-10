@@ -3,6 +3,26 @@
 
 namespace hyecs
 {
+#if !_HAS_CXX20
+	namespace cxx20_extend_for_cxx17
+	{
+		template <
+			class T,
+			class Compare,
+			class Alloc
+		>
+		class cxx20_set;
+
+		template<
+			typename Key,
+			typename Value,
+			typename Hash,
+			typename Equal,
+			typename Alloc
+		>
+		class cxx20_unordered_map;
+	}
+#endif
 
 
 	template<typename T, typename Alloc = std::allocator<T>>
@@ -19,7 +39,11 @@ namespace hyecs
 		class Compare = std::less<T>,
 		class Alloc = std::allocator<T>
 	>
+#if _HAS_CXX20
 	using set = std::set<T, Compare, Alloc>;
+#else
+	using set = cxx20_extend_for_cxx17::cxx20_set<T, Compare, Alloc>;
+#endif
 
 	template <
 		class T,
@@ -67,7 +91,11 @@ namespace hyecs
 		typename Equal = std::equal_to<Key>,
 		typename Alloc = std::allocator<std::pair<const Key, Value>>
 	>
+#if _HAS_CXX20
 	using unordered_map = std::unordered_map<Key, Value, Hash, Equal, Alloc>;
+#else
+	using unordered_map = cxx20_extend_for_cxx17::cxx20_unordered_map<Key, Value, Hash, Equal, Alloc>;
+#endif
 
 	template<
 		typename Key,
