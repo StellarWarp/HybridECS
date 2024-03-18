@@ -187,6 +187,11 @@ namespace hyecs
 			return &*m_component_types.end();
 		}
 
+		bool is_tagged() const
+		{
+			return m_untaged_hash != m_hash;
+		}
+
 
 	};
 
@@ -224,6 +229,30 @@ namespace hyecs
 		const uint64_t hash(remove_component removal_components) const
 		{
 			return archetype::subtraction_hash(m_archetype->hash(), removal_components);
+		}
+
+		bool is_tagged() const
+		{
+			return m_archetype->is_tagged();
+		}
+
+		bool contains(component_type_index type) const
+		{
+			return m_archetype->contains(type);
+		}
+
+		bool operator==(const archetype_index& other) const
+		{
+			ASSERTION_CODE(
+				if (m_archetype != other.m_archetype && m_archetype != nullptr && other.m_archetype != nullptr)
+					assert(m_archetype->hash() != other.m_archetype->hash());//multiple location of same archetype
+			);
+			return m_archetype == other.m_archetype;
+		}
+
+		bool operator!=(const archetype_index& other) const
+		{
+			return m_archetype != other.m_archetype;
 		}
 
 	};

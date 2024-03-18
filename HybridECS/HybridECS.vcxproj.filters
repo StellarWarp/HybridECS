@@ -137,9 +137,6 @@
     <ClInclude Include="src\core\data_registry.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="src\core\group_registry.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="src\core\cross_archetype_storage.h">
       <Filter>头文件</Filter>
     </ClInclude>

@@ -180,11 +180,9 @@ namespace hyecs
 
 	class component_type_info
 	{
+		generic::type_index_container_cached m_type_index;
 		uint64_t m_hash;
 		bit_key m_bit_id;
-		size_t m_size;
-		generic::move_constructor_ptr m_move_constructor;
-		generic::destructor_ptr m_destructor;
 		component_group_index m_group;
 		uint8_t m_is_tag : 1;
 
@@ -197,11 +195,9 @@ namespace hyecs
 		static component_type_info from_template(bool is_tag)
 		{
 			component_type_info info;
+			info.m_type_index = generic::type_info::from_template<T>();
 			info.m_hash = typeid(T).hash_code();
 			info.m_bit_id = seqence_index_allocator.allocate();
-			info.m_size = std::is_empty_v<T> ? 0 : sizeof(T);
-			info.m_move_constructor = generic::copy_constructor<T>;
-			info.m_destructor = generic::nullable_destructor<T>();
 			info.m_is_tag = is_tag;
 			return info;
 		}
@@ -219,7 +215,7 @@ namespace hyecs
 
 		bool is_empty() const
 		{
-			return m_size == 0;
+			return m_type_index.size() == 0;
 		}
 
 
@@ -235,18 +231,29 @@ namespace hyecs
 
 		size_t size() const
 		{
-			return m_size;
+			return m_type_index.size();
 		}
 
-		generic::move_constructor_ptr move_constructor() const
+		void* copy_constructor(void* dest, const void* src) const
 		{
-			return m_move_constructor;
+			return m_type_index.copy_constructor(dest, src);
 		}
 
-		generic::destructor_ptr destructor() const
+		void* move_constructor(void* dest, void* src) const
 		{
-			return m_destructor;
+			return m_type_index.move_constructor(dest, src);
 		}
+
+		void destructor(void* addr) const
+		{
+			m_type_index.destructor(addr);
+		}
+
+		void destructor(void* addr, size_t count) const
+		{
+			m_type_index.destructor(addr, count);
+		}
+
 
 
 	};
@@ -295,14 +302,19 @@ namespace hyecs
 			return info->is_tag();
 		}
 
-		const generic::move_constructor_ptr move_constructor() const
+		void* move_constructor(void* dest, void* src) const
 		{
-			return info->move_constructor();
+			return info->move_constructor(dest, src);
 		}
 
-		const generic::destructor_ptr destructor() const
+		void destructor(void* addr) const
 		{
-			return info->destructor();
+			info->destructor(addr);
+		}
+
+		void destructor(void* addr, size_t count) const
+		{
+			info->destructor(addr, count);
 		}
 
 		operator const component_type_info& () const

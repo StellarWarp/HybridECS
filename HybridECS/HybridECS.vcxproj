@@ -166,10 +166,9 @@
     <ClInclude Include="src\core\component.h" />
     <ClInclude Include="src\core\old\CoreComponent.h" />
     <ClInclude Include="src\core\cross_archetype_storage.h" />
-    <ClInclude Include="src\core\data_registry.h" />
     <ClInclude Include="src\core\entity.h" />
     <ClInclude Include="src\core\old\EntityManager.h" />
-    <ClInclude Include="src\core\group_registry.h" />
+    <ClInclude Include="src\core\data_registry.h" />
     <ClInclude Include="src\core\old\ICompomemt.h" />
     <ClInclude Include="src\core\old\ISystem.h" />
     <ClInclude Include="src\core\old\Query.h" />
