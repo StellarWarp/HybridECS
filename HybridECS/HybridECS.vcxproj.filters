@@ -188,5 +188,17 @@
     <ClInclude Include="src\container\ankerl\unordered_dense.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="src\test_archetype_registry.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\sparse_table.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\taged_archetype_storage.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="src\NatvisFile.natvis" />
   </ItemGroup>
 </Project>

@@ -1,5 +1,6 @@
 #pragma once
 #include "vaildref_map.h"
+#include <meta/Utils.h>
 
 namespace hyecs
 {
@@ -69,21 +70,25 @@ namespace hyecs
 			move_constructor_ptr move_constructor;
 			destructor_ptr destructor;
 			uint64_t hash;
+			char* name;
 
 		private:
 			type_info() = default;
 		public:
 
 			template<typename T>
-			static type_info from_template()
+			static const type_info& from_template()
 			{
-				//wait for c++20
-				type_info info;
-				info.size = std::is_empty_v<T> ? 0 : sizeof(T);
-				info.copy_constructor = nullable_copy_constructor<T>();
-				info.move_constructor = nullable_move_constructor<T>();
-				info.destructor = nullable_destructor<T>();
-				info.hash = typeid(T).hash_code();
+				//wait c++20
+				static type_info info{
+					std::is_empty_v<T> ? 0 : sizeof(T),
+					nullable_copy_constructor<T>(),
+					nullable_move_constructor<T>(),
+					nullable_destructor<T>(),
+					typeid(T).hash_code(),
+					(char*)typeid(T).name()
+				};
+
 				return info;
 			}
 		};
@@ -109,12 +114,15 @@ namespace hyecs
 			type_info* m_info;
 
 		public:
+
+			type_index(type_info* info) : m_info(info) {}
+
+
 			const type_info* info() const noexcept
 			{
 				return m_info;
 			}
 
-			type_index(type_info* info) : m_info(info) {}
 
 			constexpr size_t size() const noexcept
 			{
@@ -124,6 +132,25 @@ namespace hyecs
 			constexpr uint64_t hash() const noexcept
 			{
 				return m_info->hash;
+			}
+
+			bool operator==(const type_index& other) const noexcept
+			{
+				ASSERTION_CODE(
+					 if (m_info != nullptr && other.m_info != nullptr && m_info != other.m_info)
+						 assert(m_info->hash != other.m_info->hash);//multiple location of same type is not allowed
+				)
+				return m_info == other.m_info;//a type should only have one instance of type_info
+			}
+
+			bool operator!=(const type_index& other) const noexcept
+			{
+				return !operator==(other);
+			}
+
+			const char* name() const noexcept
+			{
+				return m_info->name;
 			}
 
 			void* copy_constructor(void* dest, const void* src) const
@@ -181,8 +208,16 @@ namespace hyecs
 			move_constructor_ptr m_move_constructor;
 			destructor_ptr m_destructor;
 		public:
-			type_index_container_cached(type_info* info)
-				: m_index(info),
+
+			type_index_container_cached(const type_info& info)
+				: m_index((type_info*)&info),
+				m_size(info.size),
+				m_copy_constructor(info.copy_constructor),
+				m_move_constructor(info.move_constructor),
+				m_destructor(info.destructor) {}
+
+			type_index_container_cached(const type_info* info)
+				: m_index((type_info*)info),
 				m_size(info->size),
 				m_copy_constructor(info->copy_constructor),
 				m_move_constructor(info->move_constructor),
@@ -195,6 +230,11 @@ namespace hyecs
 				m_move_constructor(index.info()->move_constructor),
 				m_destructor(index.info()->destructor) {}
 
+			operator type_index() const
+			{
+				return m_index;
+			}
+
 			constexpr size_t size() const noexcept
 			{
 				return m_size;
@@ -203,6 +243,11 @@ namespace hyecs
 			constexpr uint64_t hash() const noexcept
 			{
 				return m_index.hash();
+			}
+
+			const char* name() const noexcept
+			{
+				return m_index.name();
 			}
 
 			void* copy_constructor(void* dest, const void* src) const
@@ -261,11 +306,33 @@ namespace hyecs
 				type_info info = type_info::from_template<T>();
 				if (m_type_info.contains(info.hash))
 					return type_index(&m_type_info.at(info.hash));
-				m_type_info.emplace( info.hash, info );
+				m_type_info.emplace(info.hash, info);
 				return type_index(&m_type_info.at(info.hash));
 			}
 
 		};
+
+
+		class constructor
+		{
+			type_index m_type;
+			std::function<void* (void*)> m_constructor;
+		public:
+			constructor(type_index type, std::function<void* (void*)> constructor)
+				: m_type(type), m_constructor(constructor) {}
+
+			void* operator()(void* ptr)
+			{
+				return m_constructor(ptr);
+			}
+
+			type_index type() const
+			{
+				return m_type;
+			}
+		
+		};
+
 
 
 	}

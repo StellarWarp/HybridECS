@@ -1,5 +1,6 @@
 #pragma once
-#include "table.h"
+#include "archetype_registry.h"
+#include "archetype_storage.h"
 
 namespace hyecs
 {
@@ -12,10 +13,10 @@ namespace hyecs
 	class data_registry
 	{
 		archetype_registry m_archetype_registry;
+		vaildref_map<uint64_t, component_storage> m_component_storages;
 		vaildref_map<uint64_t, archetype_storage> m_archetypes_storage;
 		vaildref_map<uint64_t, taged_archetype_storage> m_taged_archetypes_storage;
 		vaildref_map<uint64_t, table> m_tables;
-		vaildref_map<uint64_t, component_type_info> m_component_types;
 
 		dense_set<entity> m_entities;
 		//require optimisze

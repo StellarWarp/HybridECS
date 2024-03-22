@@ -1,22 +1,16 @@
 #pragma once
 #include "component.h"
 #include "../meta/Utils.h"
+#include "../lib/std_lib.h"
 namespace hyecs
 {
 
-	struct append_component :public std::initializer_list<component_type_index> {
-		append_component(std::initializer_list<component_type_index> list)
-			:std::initializer_list<component_type_index>{ list } {}
-
-		append_component(component_type_index* begin, component_type_index* end)
-			:std::initializer_list<component_type_index>(begin, end){}
+	struct append_component :public initializer_list<component_type_index> {
+		using initializer_list<component_type_index>::initializer_list;
 	};
-	struct remove_component :public std::initializer_list<component_type_index> {
-		remove_component(std::initializer_list<component_type_index> list)
-			:std::initializer_list<component_type_index>{ list } {}
-
-		remove_component(component_type_index* begin, component_type_index* end)
-			:std::initializer_list<component_type_index>(begin, end) {}
+	
+	struct remove_component :public initializer_list<component_type_index> {
+		using initializer_list<component_type_index>::initializer_list;
 	};
 
 	class archetype
@@ -24,17 +18,17 @@ namespace hyecs
 	public:
 		using hash_type = uint64_t;
 	private:
-
 		hash_type m_hash;
 		hash_type m_untaged_hash;
+		//uint32_t m_tag_count;
 		bit_set<> m_component_mask;
 		vector<component_type_index> m_component_types;
 		ASSERTION_CODE(
-			static inline unordered_map<uint64_t, bit_set<>> debug_archetype_hash;
+		static inline unordered_map<uint64_t, bit_set<>> debug_archetype_hash;
 		)
 	public:
 
-		static hash_type addition_hash(hash_type base_hash, std::initializer_list<component_type_index> addition_components)
+		static hash_type addition_hash(hash_type base_hash, append_component addition_components)
 		{
 			auto hash = base_hash;
 			for (auto& type : addition_components)
@@ -42,7 +36,7 @@ namespace hyecs
 			return hash;
 		}
 
-		static hash_type subtraction_hash(hash_type base_hash, std::initializer_list<component_type_index> removal_components)
+		static hash_type subtraction_hash(hash_type base_hash, remove_component removal_components)
 		{
 			auto hash = base_hash;
 			for (auto& type : removal_components)
@@ -54,24 +48,51 @@ namespace hyecs
 	private:
 
 #ifdef HYECS_DEBUG
+		void print_mask(bit_set<> mask) const
+		{
+			for (size_t i = 0; i < 32; i++)
+			{
+				if (mask.has(i)) printf("1");
+				else printf("0");
+			}
+			printf("\n");
+		}
+
 		void hash_collision_assertion() const
 		{
+			//full part assertion
 			if (auto it = debug_archetype_hash.find(m_hash); it != debug_archetype_hash.end()) {
 				assert(it->second == m_component_mask);// hash collision
 			}
 			else debug_archetype_hash.insert({ m_hash, m_component_mask });
-			if (auto it = debug_archetype_hash.find(m_untaged_hash); it != debug_archetype_hash.end()) {
-				assert(it->second == m_component_mask);// hash collision
-			}
-			else
+
+			//untaged part assertion
+			bit_set<> exclusive_mask = m_component_mask;
+			for (auto& type : m_component_types)
 			{
-				bit_set<> exclusive_mask = m_component_mask;
-				for (auto& type : m_component_types)
-				{
-					if (type.is_tag()) exclusive_mask.erase(type.bit_key());
-				}
-				debug_archetype_hash.insert({ m_untaged_hash, exclusive_mask });
+				if (type.is_tag()) exclusive_mask.erase(type.bit_key());
 			}
+
+			//printf("\nArchetype full: hash %uld :", m_hash);
+			//for (auto& type : m_component_types)
+			//{
+			//	printf("%s ", type.name());
+			//}
+			//printf("\n");
+			//print_mask(m_component_mask);
+			//printf("\nArchetype untaged: hash %uld :", m_untaged_hash);
+			//for (auto& type : m_component_types)
+			//{
+			//	if (!type.is_tag()) printf("%s ", type.name());
+			//}
+			//printf("\n");
+			//print_mask(exclusive_mask);
+
+			if (auto it = debug_archetype_hash.find(m_untaged_hash); it != debug_archetype_hash.end()) {
+				assert(it->second == exclusive_mask);// hash collision
+			}
+			else debug_archetype_hash.insert({ m_untaged_hash, exclusive_mask });
+
 		}
 #endif // HYECS_DEBUG
 
@@ -80,18 +101,21 @@ namespace hyecs
 			for (auto& type : addition_components)
 			{
 				m_hash += type.hash();
-				if (!type.is_tag()) m_untaged_hash += type.hash();
 				m_component_mask.insert(type.bit_key());
+				if (!type.is_tag()) m_untaged_hash += type.hash();
+				//else m_tag_count++;
 			}
 			ASSERTION_CODE(hash_collision_assertion());
+
 		}
 		void hash_removed_component(std::initializer_list<component_type_index> removal_components)
 		{
 			for (auto& type : removal_components)
 			{
 				m_hash -= type.hash();
-				if (!type.is_tag()) m_untaged_hash -= type.hash();
 				m_component_mask.erase(type.bit_key());
+				if (!type.is_tag()) m_untaged_hash -= type.hash();
+				//else m_tag_count--;
 			}
 			ASSERTION_CODE(hash_collision_assertion());
 		}
@@ -106,8 +130,8 @@ namespace hyecs
 			hash_append_component(components);
 		}
 		archetype(const archetype& base, append_component components)
-			: m_hash(base.m_hash), 
-			m_component_types(base.m_component_types), 
+			: m_hash(base.m_hash),
+			m_component_types(base.m_component_types),
 			m_untaged_hash(base.m_untaged_hash)
 		{
 			m_component_types.reserve(components.size() + m_component_types.size());
@@ -118,8 +142,8 @@ namespace hyecs
 			hash_append_component(components);
 		}
 		archetype(const archetype& base, remove_component components)
-			: m_hash(base.m_hash), 
-			m_component_types(base.m_component_types), 
+			: m_hash(base.m_hash),
+			m_component_types(base.m_component_types),
 			m_untaged_hash(base.m_untaged_hash)
 		{
 			for (auto& component : components)
@@ -184,13 +208,28 @@ namespace hyecs
 
 		const component_type_index* end() const
 		{
-			return &*m_component_types.end();
+			return m_component_types.data() + m_component_types.size();
 		}
 
 		bool is_tagged() const
 		{
 			return m_untaged_hash != m_hash;
 		}
+
+		size_t component_count() const
+		{
+			return m_component_types.size();
+		}
+
+		//size_t untaged_component_count() const
+		//{
+		//	return m_component_types.size() - m_tag_count;
+		//}
+
+		//size_t tagged_component_count() const
+		//{
+		//	return m_tag_count;
+		//}
 
 
 	};

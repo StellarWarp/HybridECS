@@ -27,38 +27,80 @@ namespace hyecs
 	using dense_set = unordered_set<T, Hash, Equal, Alloc>;
 
 
+	template<typename T, typename = void>
+	struct has_iterator : std::false_type {};
+
 	template<typename T>
-	class array_ref
+	struct has_iterator<T, std::void_t<typename T::iterator>> : std::true_type {};
+
+	template<typename T, typename = void>
+	struct iterator_of
+	{
+		using type = T*;
+	};
+
+	template<typename T>
+	struct iterator_of<T, std::enable_if_t<has_iterator<T>::value>>
+	{
+		using type = typename T::iterator;
+	};
+
+
+	template<typename T, typename Iter = typename iterator_of<T>::type>
+	class sequence_ref
 	{
 	private:
-		const T* _First;
-		const T* _Last;
+		Iter m_begin;
+		Iter m_end;
 	public:
 		using value_type = T;
-		using reference = const T&;
-		using const_reference = const T&;
+		using reference = T&;
+		using const_reference = T&;
 		using size_type = size_t;
 
-		using iterator = const T*;
-		using const_iterator = const T*;
+		using iterator = Iter;
+		//using const_iterator = Iter;
 
-		constexpr array_ref() noexcept : _First(nullptr), _Last(nullptr) {}
+		constexpr sequence_ref() noexcept : m_begin(nullptr), m_end(nullptr) {}
 
-		constexpr array_ref(const T* _First_arg, const T* _Last_arg) noexcept
-			: _First(_First_arg), _Last(_Last_arg) {}
+		constexpr sequence_ref(Iter _First_arg, Iter _Last_arg) noexcept
+			: m_begin(_First_arg), m_end(_Last_arg) {}
 
-		_NODISCARD constexpr T* begin() const noexcept {
-			return _First;
+		constexpr sequence_ref(initializer_list<T> list) noexcept
+			: m_begin(list.begin()), m_end(list.end()) {}
+
+		constexpr sequence_ref(std::initializer_list<T> list) noexcept
+			: m_begin(list.begin()), m_end(list.end()) {}
+
+		//template<typename... Args>
+		//constexpr sequence_ref(T first, Args... args) noexcept
+		//{
+		//	std::initializer_list<T> list{ first, args... };
+		//	m_begin = list.begin();
+		//	m_end = list.end();
+		//}
+
+		[[nodiscard]] constexpr Iter begin() const noexcept {
+			return m_begin;
 		}
 
-		_NODISCARD constexpr T* end() const noexcept {
-			return _Last;
+		[[nodiscard]] constexpr Iter end() const noexcept {
+			return m_end;
 		}
 
-		_NODISCARD constexpr size_t size() const noexcept {
-			return static_cast<size_t>(_Last - _First);
+		[[nodiscard]] constexpr size_t size() const noexcept {
+			return static_cast<size_t>(m_end - m_begin);
 		}
 	};
 
-	ankerl::unordered_dense::map<int, int> dense_map2;
-}
+	template<typename T, typename Iter = typename iterator_of<T>::type>
+	class sorted_sequence_ref : public sequence_ref<T, Iter>
+	{
+	public:
+		using sequence_ref<T, Iter>::sequence_ref;
+	};
+
+
+
+};
+

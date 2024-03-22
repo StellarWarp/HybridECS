@@ -141,6 +141,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClInclude Include="src\core\sparse_table.h" />
+    <ClInclude Include="src\core\taged_archetype_storage.h" />
+    <ClInclude Include="src\test_archetype_registry.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\container\container.h" />
@@ -196,6 +199,9 @@
     <ClInclude Include="src\meta\type_list.h" />
     <ClInclude Include="src\meta\Utils.h" />
     <ClInclude Include="src\pch.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="src\NatvisFile.natvis" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

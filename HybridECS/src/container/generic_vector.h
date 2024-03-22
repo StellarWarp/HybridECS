@@ -60,6 +60,11 @@ namespace hyecs
 			other.m_capacity_end = nullptr;
 		}
 
+		generic::type_index type() const noexcept
+		{
+			return m_type;
+		}
+
 		generic_vector& operator=(const generic_vector& other) noexcept
 		{
 			assert(this != &other);
@@ -200,6 +205,12 @@ namespace hyecs
 			return addr;
 		}
 
+		void* emplace_back(generic::constructor constructor)
+		{
+			assert(constructor.type() == m_type);
+			return constructor(allocate_element());
+		}
+
 		void pop_back()
 		{
 			assert(m_end > m_begin);
@@ -300,7 +311,7 @@ namespace hyecs
 				return (m_ptr - other.m_ptr) / m_type_size;
 			}
 
-			pointer operator*() const
+			operator pointer() const
 			{
 				return m_ptr;
 			}

@@ -55,7 +55,7 @@ namespace hyecs
 		return filter_args<Condition>(std::tuple<>{}, args...);
 	}
 
-	
+
 #if defined(_DEBUG) || (!defined(NDEBUG) && !defined(_NDEBUG))
 #define ASSERTION_CODE(...) __VA_ARGS__
 #define HYECS_DEBUG
@@ -64,6 +64,35 @@ namespace hyecs
 #endif 
 #define ASSERTION_CODE_BEGIN() ASSERTION_CODE(
 #define ASSERTION_CODE_END() )
+
+
+	//extension for std::initializer_list
+	template<typename T>
+	struct initializer_list :public std::initializer_list<T> {
+
+		using std::initializer_list<T>::initializer_list;
+
+		initializer_list(std::initializer_list<T> list)
+			:std::initializer_list<T>(list) {}
+
+		template<class Iter>
+		initializer_list(Iter begin, Iter end)
+			: std::initializer_list<T>(begin.operator->(), end.operator->()) {}
+
+		initializer_list(vector<T>& vec)
+			: std::initializer_list<T>(vec.data(), vec.data() + vec.size()) {}
+
+		template<size_t N>
+		initializer_list(std::array<T, N>& arr)
+			: std::initializer_list<T>(arr.data(), arr.data() + N) {}
+
+//#ifdef _MSC_VER //hack for MSVC in case for error, not advice to use this
+//		initializer_list(typename std::vector<T>::iterator begin, typename std::vector<T>::iterator end)
+//			: std::initializer_list<T>(
+//				*((T**)&(begin)+2),
+//				*((T**)&(end)+2)) {}
+//#endif
+	};
 
 
 

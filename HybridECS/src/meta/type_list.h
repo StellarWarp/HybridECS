@@ -19,14 +19,14 @@ namespace hyecs {
 		};
 		template <size_t I, typename U, typename... Us>
 		struct get_helper<I, U, Us...> {
-			using type = get_helper<I - 1, Us...>::type;
+			using type = typename get_helper<I - 1, Us...>::type;
 		};
 
 	public:
-		template <size_t I> using get = get_helper<I, T...>::type;
+		template <size_t I> using get = typename get_helper<I, T...>::type;
 
 		using remove_ref = type_list<std::remove_reference_t<T>...>;
-		using raw_type = type_list<std::remove_cvref_t<T>...>;
+		using raw_type = typename type_list<std::remove_cvref_t<T>...>;
 
 	private:
 		template <typename U>
@@ -71,7 +71,7 @@ namespace hyecs {
 		};
 		template <typename... T1s, typename T2, typename... T2s>
 		struct pop_back_helper<type_list<T1s...>, type_list<T2, T2s...>> {
-			using type =
+			using type = typename
 				pop_back_helper<type_list<T1s..., T2>, type_list<T2s...>>::type;
 		};
 
@@ -102,24 +102,23 @@ namespace hyecs {
 		};
 		template <typename... T1s, typename T2, typename... T2s, size_t Remove>
 		struct remove_helper<type_list<T1s...>, type_list<T2, T2s...>, Remove> {
-			using type = remove_helper<type_list<T1s..., T2>, type_list<T2s...>,
-				Remove - 1>::type;
+			using type = typename remove_helper<type_list<T1s..., T2>, type_list<T2s...>,Remove - 1>::type;
 		};
 
 	public:
 		template <typename... List>
-		using cat = cat_helper<type_list<T...>, List...>::type;
+		using cat = typename cat_helper<type_list<T...>, List...>::type;
 
-		using pop_front = pop_front_helper<T...>::type;
+		using pop_front = typename pop_front_helper<T...>::type;
 
-		using pop_back = pop_back_helper<type_list<>, type_list<T...>>::type;
+		using pop_back = typename pop_back_helper<type_list<>, type_list<T...>>::type;
 
 		template <typename... U> using push_back = type_list<T..., U...>;
 
 		template <typename... U> using push_front = type_list<U..., T...>;
 
 		template <size_t I>
-		using remove = remove_helper<type_list<>, type_list<T...>, I>::type;
+		using remove = typename remove_helper<type_list<>, type_list<T...>, I>::type;
 
 		// template <size_t I, typename... Result, typename... U>
 		// static constexpr auto remove_index(type_list<Result...> result,
@@ -146,8 +145,9 @@ namespace hyecs {
 
 	public:
 		template <typename... Tuple>
-		using from_tuple = cat_helper<
-			typename from_tuple_helper<std::remove_cvref_t<Tuple>>::type...>::type;
+		using from_tuple = typename cat_helper<
+			typename from_tuple_helper<std::remove_cvref_t<Tuple>>::type...
+		>::type;
 
 	private:
 		template <template <typename> typename Condition, bool TargetCondition,
@@ -176,9 +176,9 @@ namespace hyecs {
 			type_list<type_list<T1s...>, type_list<T2, T2s...>>> {
 			using filtered = type_list<T1s...>;
 			using unfiltered = type_list<T2, T2s...>;
-			using f = filter_helper_branch<Condition<T2>::value == TargetCondition,
+			using f = typename filter_helper_branch<Condition<T2>::value == TargetCondition,
 				filtered, unfiltered>::type;
-			using type = filter_helper<Condition, TargetCondition, f>::type;
+			using type = typename filter_helper<Condition, TargetCondition, f>::type;
 		};
 
 		// template <template <typename> typename Condition, typename... Result,
@@ -204,11 +204,11 @@ namespace hyecs {
 		// type_list<T...>{})) > ;
 
 		template <template <typename> typename Condition>
-		using filter_with =
+		using filter_with = typename
 			filter_helper<Condition, true,
 			type_list<type_list<>, type_list<T...>>>::type;
 		template <template <typename> typename Condition>
-		using filter_without =
+		using filter_without = typename
 			filter_helper<Condition, false,
 			type_list<type_list<>, type_list<T...>>>::type;
 
@@ -229,7 +229,7 @@ namespace hyecs {
 		};
 
 	public:
-		using unique = unique_helper<T...>::type;
+		using unique = typename unique_helper<T...>::type;
 
 	private:
 		template <typename Target, size_t I, typename...> struct index_of_helper;

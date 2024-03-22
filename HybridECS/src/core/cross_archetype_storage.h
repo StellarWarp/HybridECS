@@ -11,7 +11,7 @@ namespace hyecs
 		{
 			archetype_storage* storage;
 			taged_archetype_storage* taged_storage;
-			dense_set<sort_key> m_sort_keys;
+			dense_set<storage_key> m_sort_keys;
 		};
 
 		vector<group_info> m_groups;

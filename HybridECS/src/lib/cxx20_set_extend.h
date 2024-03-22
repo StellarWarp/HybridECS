@@ -23,7 +23,7 @@ namespace hyecs
 #ifdef _MSC_VER
 		public:
 			_NODISCARD bool contains(const _base::key_type& _Keyval) const {
-				return _Lower_bound_duplicate(_Find_lower_bound(_Keyval)._Bound, _Keyval);
+				return _base::_Lower_bound_duplicate(_base::_Find_lower_bound(_Keyval)._Bound, _Keyval);
 			}
 
 #else
