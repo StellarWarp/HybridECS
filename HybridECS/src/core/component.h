@@ -1,7 +1,6 @@
 #pragma once
-#include "rtref.h"
-
-
+#include "../lib/std_lib.h"
+#include "../container/generic_type.h"
 namespace hyecs
 {
 	struct bit_key
@@ -73,13 +72,13 @@ namespace hyecs
 		{
 			if (other.size > size)
 			{
-				for (int i = size; i < other.size; i++)
+				for (uint32_t i = size; i < other.size; i++)
 				{
 					if (other.data[i] != 0)
 						return false;
 				}
 			}
-			for (int i = 0; i < std::min(size, other.size); i++)
+			for (uint32_t i = 0; i < std::min(size, other.size); i++)
 			{
 				if ((data[i] & other.data[i]) != other.data[i])
 					return false;
@@ -93,15 +92,15 @@ namespace hyecs
 			{
 				//make sure the extra data is 0
 				if (size < other.size)
-					for (int i = size; i < other.size; i++)
+					for (uint32_t i = size; i < other.size; i++)
 						if (other.data[i] != 0)
 							return false;
 						else
-							for (int i = other.size; i < size; i++)
+							for (uint32_t i = other.size; i < size; i++)
 								if (data[i] != 0)
 									return false;
 			}
-			for (int i = 0; i < size; i++)
+			for (uint32_t i = 0; i < size; i++)
 			{
 				if (data[i] != other.data[i])
 					return false;
@@ -148,11 +147,11 @@ namespace hyecs
 
 		component_group_id(const std::string& name)
 		{
-			id = std::hash<std::string>{}(name);
+			id = static_cast<uint32_t>(std::hash<std::string>{}(name));
 		}
 		component_group_id(const char* name)
 		{
-			id = std::hash<std::string>{}(name);
+			id = static_cast<uint32_t>(std::hash<std::string>{}(name));
 		}
 
 		static component_group_id register_group(const std::string& name, ecs_registry_context* context)
@@ -187,7 +186,7 @@ namespace hyecs
 		uint64_t m_hash;
 		bit_key m_bit_id;
 		uint8_t m_is_tag : 1;
-		component_group_index m_group;
+		component_group_index m_group;//todo
 
 
 		static inline seqence_allocator<component_type_info, uint32_t> seqence_index_allocator;
@@ -223,10 +222,6 @@ namespace hyecs
 			return from_template<T>(std::is_empty_v<T>);
 		}
 
-		generic::type_index_container_cached type_index() const
-		{
-			return m_type_index;
-		}
 
 		const char* name() const
 		{
@@ -278,9 +273,9 @@ namespace hyecs
 		{
 			m_type_index.destructor(addr, count);
 		}
-
-
-
+		const generic::type_index_container_cached& type_index() const { return m_type_index; }
+		operator const generic::type_index_container_cached& () const { return m_type_index; }
+		operator const generic::type_index() const { return m_type_index; }
 	};
 
 	class component_type_index
@@ -302,86 +297,52 @@ namespace hyecs
 			return *this;
 		}
 
-		generic::type_index type_index() const
-		{
-			return info->type_index();
-		}
+		generic::type_index type_index() const{return info->type_index();}
+		const component_type_info& get_info() const{return *info;}
+		const char* name() const{return info->name();}
+		uint64_t hash() const{return info->hash();}
+		bit_key bit_key() const{return info->bit_key();}
+		size_t size() const{return info->size();}
+		bool is_tag() const{return info->is_tag();}
 
-		const component_type_info& get_info() const
-		{
-			return *info;
-		}
+		void* move_constructor(void* dest, void* src) const{return info->move_constructor(dest, src);}
+		void* copy_constructor(void* dest, const void* src) const{return info->copy_constructor(dest, src);}
+		void destructor(void* addr) const{info->destructor(addr);}
+		void destructor(void* addr, size_t count) const{info->destructor(addr, count);}
 
-		const char* name() const
-		{
-			return info->name();
-		}
-
-		uint64_t hash() const
-		{
-			return info->hash();
-		}
-
-		bit_key bit_key() const
-		{
-			return info->bit_key();
-		}
-
-		size_t size() const
-		{
-			return info->size();
-		}
-
-		bool is_tag() const
-		{
-			return info->is_tag();
-		}
-
-		void* move_constructor(void* dest, void* src) const
-		{
-			return info->move_constructor(dest, src);
-		}
-
-		void* copy_constructor(void* dest, const void* src) const
-		{
-			return info->copy_constructor(dest, src);
-		}
-
-		void destructor(void* addr) const
-		{
-			info->destructor(addr);
-		}
-
-		void destructor(void* addr, size_t count) const
-		{
-			info->destructor(addr, count);
-		}
-
-		operator const component_type_info& () const
-		{
-			return *info;
-		}
-
-		bool operator == (const component_type_index& other) const
-		{
-			return info->hash() == other.info->hash();
-		}
-
-		bool operator != (const component_type_index& other) const
-		{
-			return !(*this == other);
-		}
-
-		bool operator < (const component_type_index& other) const
-		{
-			return info->hash() < other.info->hash();
-		}
-
-		bool operator > (const component_type_index& other) const
-		{
-			return info->hash() > other.info->hash();
-		}
+		operator const component_type_info& () const{return *info;}
+		operator const generic::type_index_container_cached& () const{return info->type_index();}
+		operator const generic::type_index () const{return info->type_index();}
+		bool operator == (const component_type_index& other) const{return info->hash() == other.info->hash();}
+		bool operator != (const component_type_index& other) const{return !(*this == other);}
+		bool operator < (const component_type_index& other) const{return info->hash() < other.info->hash();}
+		bool operator > (const component_type_index& other) const{return info->hash() > other.info->hash();}
 	};
+
+	class cached_component_type_index
+	{
+	protected:
+		component_type_index index;
+		generic::type_index_container_cached type_index_cache;
+	public:
+		cached_component_type_index(component_type_index type_index_cache)
+			: index(type_index_cache), type_index_cache(type_index_cache)
+		{
+		}
+
+		size_t size() const { return type_index_cache.size(); }
+		void* move_constructor(void* dest, void* src) const { return type_index_cache.move_constructor(dest, src); }
+		void* copy_constructor(void* dest, const void* src) const { return type_index_cache.copy_constructor(dest, src); }
+		void destructor(void* addr) const { return type_index_cache.destructor(addr); }
+		void destructor(void* addr, size_t count) const { return type_index_cache.destructor(addr, count); }
+		operator component_type_index() const { return index; }
+		operator generic::type_index() const { return index; }
+		bool operator==(const cached_component_type_index& other) const { return type_index_cache == other.type_index_cache; }
+		bool operator!=(const cached_component_type_index& other) const { return type_index_cache != other.type_index_cache; }
+		bool operator<(const cached_component_type_index& other) const { return type_index_cache < other.type_index_cache; }
+		bool operator>(const cached_component_type_index& other) const { return type_index_cache > other.type_index_cache; }
+	};
+
 }
 
 template<>

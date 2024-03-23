@@ -1,6 +1,6 @@
 #pragma once
 #include "vaildref_map.h"
-#include <meta/Utils.h>
+#include "../meta/meta_utils.h"
 
 namespace hyecs
 {
@@ -117,57 +117,26 @@ namespace hyecs
 
 			type_index(type_info* info) : m_info(info) {}
 
-
-			const type_info* info() const noexcept
-			{
-				return m_info;
-			}
-
-
-			constexpr size_t size() const noexcept
-			{
-				return m_info->size;
-			}
-
-			constexpr uint64_t hash() const noexcept
-			{
-				return m_info->hash;
-			}
+			const type_info* info() const noexcept { return m_info; }
+			constexpr size_t size() const noexcept { return m_info->size; }
+			constexpr uint64_t hash() const noexcept { return m_info->hash; }
 
 			bool operator==(const type_index& other) const noexcept
 			{
 				ASSERTION_CODE(
-					 if (m_info != nullptr && other.m_info != nullptr && m_info != other.m_info)
-						 assert(m_info->hash != other.m_info->hash);//multiple location of same type is not allowed
+					if (m_info != nullptr && other.m_info != nullptr && m_info != other.m_info)
+						assert(m_info->hash != other.m_info->hash);//multiple location of same type is not allowed
 				)
-				return m_info == other.m_info;//a type should only have one instance of type_info
+					return m_info == other.m_info;//a type should only have one instance of type_info
 			}
 
-			bool operator!=(const type_index& other) const noexcept
-			{
-				return !operator==(other);
-			}
+			bool operator!=(const type_index& other) const noexcept { return !operator==(other); }
 
-			const char* name() const noexcept
-			{
-				return m_info->name;
-			}
+			const char* name() const noexcept { return m_info->name; }
 
-			void* copy_constructor(void* dest, const void* src) const
-			{
-				return m_info->copy_constructor(dest, src);
-			}
-
-			void* move_constructor(void* dest, void* src) const
-			{
-				return m_info->move_constructor(dest, src);
-			}
-
-			void destructor(void* addr) const
-			{
-				m_info->destructor(addr);
-			}
-
+			void* copy_constructor(void* dest, const void* src) const { return m_info->copy_constructor(dest, src); }
+			void* move_constructor(void* dest, void* src) const { return m_info->move_constructor(dest, src); }
+			void destructor(void* addr) const { m_info->destructor(addr); }
 			void destructor(void* addr, size_t count) const
 			{
 				if (m_info->destructor == nullptr)
@@ -189,14 +158,13 @@ namespace hyecs
 				}
 			}
 
-
-
-
 			[[nodiscard]] bool is_trivially_destructible() const noexcept
 			{
 				return m_info->destructor == nullptr;
 			}
 
+			bool operator<(const type_index& other) const noexcept { return m_info->hash < other.m_info->hash; }
+			bool operator>(const type_index& other) const noexcept { return m_info->hash > other.m_info->hash; }
 		};
 
 		class type_index_container_cached
@@ -230,25 +198,9 @@ namespace hyecs
 				m_move_constructor(index.info()->move_constructor),
 				m_destructor(index.info()->destructor) {}
 
-			operator type_index() const
-			{
-				return m_index;
-			}
-
-			constexpr size_t size() const noexcept
-			{
-				return m_size;
-			}
-
-			constexpr uint64_t hash() const noexcept
-			{
-				return m_index.hash();
-			}
-
-			const char* name() const noexcept
-			{
-				return m_index.name();
-			}
+			constexpr size_t size() const noexcept { return m_size; }
+			constexpr uint64_t hash() const noexcept { return m_index.hash(); }
+			const char* name() const noexcept { return m_index.name(); }
 
 			void* copy_constructor(void* dest, const void* src) const
 			{
@@ -288,10 +240,16 @@ namespace hyecs
 			}
 
 
-			[[nodiscard]] bool is_trivially_destructible() const noexcept
+			bool is_trivially_destructible() const noexcept
 			{
 				return m_destructor == nullptr;
 			}
+
+			operator generic::type_index() const { return m_index; }
+			bool operator==(const type_index_container_cached& other) const noexcept { return m_index == other.m_index; }
+			bool operator!=(const type_index_container_cached& other) const noexcept { return m_index != other.m_index; }
+			bool operator<(const type_index_container_cached& other) const noexcept { return m_index < other.m_index; }
+			bool operator>(const type_index_container_cached& other) const noexcept { return m_index > other.m_index; }
 		};
 
 		class type_registry
@@ -321,16 +279,8 @@ namespace hyecs
 			constructor(type_index type, std::function<void* (void*)> constructor)
 				: m_type(type), m_constructor(constructor) {}
 
-			void* operator()(void* ptr)
-			{
-				return m_constructor(ptr);
-			}
-
-			type_index type() const
-			{
-				return m_type;
-			}
-		
+			void* operator()(void* ptr) { return m_constructor(ptr); }
+			type_index type() const { return m_type; }
 		};
 
 

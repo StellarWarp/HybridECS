@@ -1,6 +1,7 @@
 #pragma once
 #include "pch.h"
 #include "core/archetype_registry.h"
+#include "container/container.h"
 //#include "container/stl_container.h"
 
 using namespace hyecs;

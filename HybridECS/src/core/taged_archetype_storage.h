@@ -34,21 +34,18 @@ namespace hyecs
 			auto constructors_iter = taged_adding_constructors.begin();
 			for (; src_taged_storages_iter != src_end; ++src_taged_storages_iter, ++dest_taged_storages_iter)
 			{
-				if ((*src_taged_storages_iter)->component_type() < (*dest_taged_storages_iter)->component_type())
+				auto& src_taged_storages = **src_taged_storages_iter;
+				auto& dest_taged_storages = **dest_taged_storages_iter;
+				if (src_taged_storages.component_type() < dest_taged_storages.component_type())
 				{
 					//remove
-					(*src_taged_storages_iter)->erase(entities);
+					src_taged_storages.erase(entities);
 				}
-				else if (src_taged_storages_iter->component_type() > dest_taged_storages_iter->component_type())
+				else if (src_taged_storages.component_type() > dest_taged_storages.component_type())
 				{
 					//add
-					(*dest_taged_storages_iter)->emplace(entities, *constructors_iter);
+					dest_taged_storages.emplace(entities, *constructors_iter);
 					constructors_iter++;
-				}
-				else
-				{
-					//move
-					(*src_taged_storages_iter)->move(entities, *dest_taged_storages_iter);
 				}
 					
 			}

@@ -1,6 +1,5 @@
 #pragma once
 #include "../lib/Lib.h"
-#include "../meta/Utils.h"
 
 namespace hyecs
 {
@@ -9,12 +8,12 @@ namespace hyecs
 		uint64_t hash;
 	public:
 
-		type_hash(const type_info& info) noexcept
+		type_hash(const std::type_info& info)  noexcept
 		{
 			hash = info.hash_code();
 		}
 
-		type_hash(const type_hash& other) noexcept
+		type_hash(const type_hash& other) noexcept 
 		{
 			hash = other.hash;
 		}
@@ -24,7 +23,7 @@ namespace hyecs
 			hash = other.hash;
 		}
 
-		type_hash& operator=(const type_hash& other)
+		type_hash& operator=(const type_hash& other) 
 		{
 			hash = other.hash;
 			return *this;
@@ -46,7 +45,7 @@ namespace hyecs
 			return hash < other.hash;
 		}
 
-		operator uint64_t() const
+		explicit operator uint64_t() const 
 		{
 			return hash;
 		}

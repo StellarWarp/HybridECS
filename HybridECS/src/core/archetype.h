@@ -1,6 +1,6 @@
 #pragma once
 #include "component.h"
-#include "../meta/Utils.h"
+#include "../meta/meta_utils.h"
 #include "../lib/std_lib.h"
 namespace hyecs
 {
@@ -50,7 +50,7 @@ namespace hyecs
 #ifdef HYECS_DEBUG
 		void print_mask(bit_set<> mask) const
 		{
-			for (size_t i = 0; i < 32; i++)
+			for (uint32_t i = 0; i < 32; i++)
 			{
 				if (mask.has(i)) printf("1");
 				else printf("0");
@@ -122,7 +122,7 @@ namespace hyecs
 
 	public:
 
-		archetype() : m_hash(0) {}
+		archetype() : m_hash(0), m_untaged_hash(0){}
 		archetype(std::initializer_list<component_type_index> components)
 			: m_hash(0), m_component_types(components), m_untaged_hash(0)
 		{
@@ -292,6 +292,16 @@ namespace hyecs
 		bool operator!=(const archetype_index& other) const
 		{
 			return m_archetype != other.m_archetype;
+		}
+
+		auto begin() const
+		{
+			return m_archetype->begin();
+		}
+
+		auto end() const
+		{
+			return m_archetype->end();
 		}
 
 	};

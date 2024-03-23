@@ -14,16 +14,6 @@ namespace hyecs
 		uint8_t* m_capacity_end;
 		generic::type_index_container_cached m_type;
 
-
-		void* allocate_element()
-		{
-			if (m_end == m_capacity_end)
-				capacity_extend();
-			void* addr = m_end;
-			m_end += m_type.size();
-			return addr;
-		}
-
 	public:
 		generic_vector(generic::type_index type, size_t inital_capacity = 4) noexcept
 			: m_type(type)
@@ -176,6 +166,15 @@ namespace hyecs
 		}
 	public:
 
+		void* allocate_element()
+		{
+			if (m_end == m_capacity_end)
+				capacity_extend();
+			void* addr = m_end;
+			m_end += m_type.size();
+			return addr;
+		}
+
 		template<typename T>
 		void* push_back(const T& value)
 		{
@@ -201,7 +200,7 @@ namespace hyecs
 		{
 			assert(typeid(T).hash_code() == m_type.hash());
 			T* addr = (T*)allocate_element();
- 			new(addr) T(std::forward<Args>(args)...);
+			new(addr) T(std::forward<Args>(args)...);
 			return addr;
 		}
 
@@ -367,7 +366,12 @@ namespace hyecs
 			return iterator(m_end, m_type.size());
 		}
 
+		iterator get_iterator(void* ptr) noexcept
+		{
+			return iterator((uint8_t*)ptr, m_type.size());
+		}
 
-		
+
+
 	};
 }

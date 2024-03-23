@@ -122,7 +122,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
     </ClCompile>
@@ -142,7 +142,11 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClInclude Include="src\core\sparse_table.h" />
+    <ClInclude Include="src\core\storage_key_registry.h" />
     <ClInclude Include="src\core\taged_archetype_storage.h" />
+    <ClInclude Include="src\meta\assertion.h" />
+    <ClInclude Include="src\meta\meta_utils.h" />
+    <ClInclude Include="src\meta\operator_test.h" />
     <ClInclude Include="src\test_archetype_registry.h" />
   </ItemGroup>
   <ItemGroup>
@@ -182,7 +186,7 @@
     <ClInclude Include="src\core\rtref.h" />
     <ClInclude Include="src\core\old\SystemManager.h" />
     <ClInclude Include="src\core\table.h" />
-    <ClInclude Include="src\core\type_hash.h" />
+    <ClInclude Include="src\container\type_hash.h" />
     <ClInclude Include="src\core\old\World.h" />
     <ClInclude Include="src\lib\cxx20_bit_extend.h" />
     <ClInclude Include="src\lib\cxx20_extend_for_cxx17.h" />

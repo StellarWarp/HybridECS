@@ -1,5 +1,7 @@
 #pragma once
-#include "archetype_storage.h"
+#include "entity.h"
+#include "component.h"
+#include "../container/container.h"
 
 namespace hyecs
 {
@@ -11,31 +13,36 @@ namespace hyecs
 
 		component_storage(component_type_index index) :
 			m_component_type(index),
-			m_storage(generic::hash_function<entity>, index.type_index()) {}
+			m_storage(index.type_index()) {}
 
 		component_type_index component_type() const
 		{
 			return m_component_type;
 		}
 
-
-		template<typename T>
-		T& get(entity e)
+		void* at(entity e)
 		{
-			assert(m_storage.contains(&e));
-			return *(T*)m_storage.at(&e);
+			assert(m_storage.contains(e));
+			return m_storage.at(e);
 		}
+		template<typename T>
+		T& at(entity e)
+		{
+			return *(T*)at(e);
+		}
+
+
 
 		void erase(entity e)
 		{
-			m_storage.erase(&e);
+			m_storage.erase(e);
 		}
 
 		void erase(sequence_ref<entity> entities)
 		{
 			for (auto e : entities)
 			{
-				m_storage.erase(&e);
+				m_storage.erase(e);
 			}
 		}
 
@@ -49,8 +56,13 @@ namespace hyecs
 		{
 			for (auto e : entities)
 			{
-				auto ptr = m_storage.emplace(&e, constructor);
+				auto ptr = m_storage.emplace(e, constructor);
 			}
+		}
+
+		void* allocate_component(entity e)
+		{
+			return m_storage.allocate_value(e);
 		}
 
 

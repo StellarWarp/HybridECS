@@ -1,6 +1,5 @@
 #pragma once
-#include "archetype_storage.h"
-#include <variant>
+#include "archetype.h"
 
 namespace hyecs
 {
@@ -197,7 +196,7 @@ namespace hyecs
 
 	class query_node : public query_notify
 	{
-		uint64_t m_iterate_version;
+		uint64_t m_iterate_version = std::numeric_limits<uint64_t>::max();
 		archetype m_all_component_condition;//seperate from world's archetype pool
 		set<archetype_node*> m_fit_archetypes;
 		vector<query*> m_child_queries;///todo 
@@ -258,7 +257,7 @@ namespace hyecs
 
 	class taged_query_node : public query_notify
 	{
-		uint64_t m_iterate_version;
+		uint64_t m_iterate_version = std::numeric_limits<uint64_t>::max();
 		archetype m_all_component_condition;//seperate from world's archetype pool
 		set<taged_archetype_node*> m_fit_archetypes;
 		vector<query*> m_child_queries;///todo
@@ -383,7 +382,7 @@ namespace hyecs
 
 			//single layer iteraton
 			uint64_t iterate_version = seqence_allocator<query_node>::allocate();
-			for (auto component : adding)
+			for (decltype(auto) component : adding)
 			{
 				auto com_node_hash = archetype::addition_hash(0, { component });
 				component_node* com_node_index;
@@ -421,10 +420,10 @@ namespace hyecs
 				query_node(all_components));
 			//init iteration
 			uint64_t iterate_version = seqence_allocator<query_node>::allocate();
-			int min_archetype_count = std::numeric_limits<int>::max();
+			size_t min_archetype_count = std::numeric_limits<int>::max();
 			component_node* inital_match_set = nullptr;
 			vector<component_node*> filter_component_nodes(all_components.size() - 1, nullptr);
-			for (auto component : all_components)
+			for (decltype(auto) component : all_components)
 			{
 				auto com_node_hash = archetype::addition_hash(0, { component });
 				component_node* com_node_index;
@@ -435,7 +434,7 @@ namespace hyecs
 
 				com_node_index->add_child(&new_query_node);
 				//get the min set of archetype
-				int related_archetype_count = com_node_index->related_archetypes().size();
+				size_t related_archetype_count = com_node_index->related_archetypes().size();
 				if (related_archetype_count < min_archetype_count)
 				{
 					min_archetype_count = related_archetype_count;
@@ -448,6 +447,10 @@ namespace hyecs
 					filter_component_nodes.push_back(com_node_index);
 				}
 			}
+			ASSERTION_CODE(
+			assert(inital_match_set != nullptr);
+			if (!inital_match_set) return (component_node*)nullptr;
+			)
 			//union operation
 			//inverse iteration order might be better
 			for (auto archetype_node : inital_match_set->related_archetypes())
@@ -513,13 +516,13 @@ namespace hyecs
 			//todo fix
 
 			vector<component_type_index> untaged_removings_vec;
-			for (auto comp : removings)
+			for (decltype(auto) comp : removings)
 			{
 				if (!comp.is_tag()) untaged_removings_vec.push_back(comp);
 			}
 			vector<component_type_index> taged_adding_vec;
 			vector<component_type_index> untaged_adding_vec;
-			for (auto comp : adding)
+			for (decltype(auto) comp : adding)
 			{
 				if (comp.is_tag()) taged_adding_vec.push_back(comp);
 				else untaged_adding_vec.push_back(comp);
@@ -577,7 +580,7 @@ namespace hyecs
 				//todo duplicate for taged part and untaged part
 				//try match all taged component related query
 				auto iterate_version = seqence_allocator<taged_query_node>::allocate();
-				for (auto component : taged_adding_vec)
+				for (decltype(auto) component : taged_adding_vec)
 				{
 					auto com_node_hash = archetype::addition_hash(0, { component });
 					taged_component_node* taged_node;
@@ -597,7 +600,7 @@ namespace hyecs
 					}
 				}
 				//try match all untaged component related query
-				for (auto component : untaged_adding_vec)
+				for (decltype(auto) component : untaged_adding_vec)
 				{
 					auto com_node_hash = archetype::addition_hash(0, { component });
 					component_node* untaged_node;
@@ -655,11 +658,11 @@ namespace hyecs
 
 			//init iteration
 			uint64_t iterate_version = seqence_allocator<taged_query_node>::allocate();
-			int min_archetype_count = std::numeric_limits<int>::max();
+			size_t min_archetype_count = std::numeric_limits<size_t>::max();
 			set<taged_archetype_node*> const* inital_match_set = nullptr;
 			vector<set<taged_archetype_node*> const*> filter_set(all_components.size() - 1, nullptr);
 
-			for (auto component : untaged_components)
+			for (decltype(auto) component : untaged_components)
 			{
 				auto com_node_hash = archetype::addition_hash(0, { component });
 				component_node* com_node_index;
@@ -685,7 +688,7 @@ namespace hyecs
 				//}
 			}
 
-			for (auto component : taged_components)
+			for (decltype(auto) component : taged_components)
 			{
 				auto com_node_hash = archetype::addition_hash(0, { component });
 				taged_component_node* com_node_index;
@@ -696,7 +699,7 @@ namespace hyecs
 
 				com_node_index->add_child(&new_query_node);
 				//get the min set of archetype
-				int related_archetype_count = com_node_index->related_archetypes().size();
+				size_t related_archetype_count = com_node_index->related_archetypes().size();
 				if (related_archetype_count < min_archetype_count)
 				{
 					min_archetype_count = related_archetype_count;
@@ -727,7 +730,10 @@ namespace hyecs
 			//	//try match is required as untaged component do not store for related taged archetype
 			//	//need try match to filter out the unrelated archetype
 			//}
-
+			ASSERTION_CODE(
+				assert(inital_match_set != nullptr);
+				if (!inital_match_set) return (query_node*)nullptr;
+			)
 			//alternative method for union operation
 			for (auto archetype_node : *inital_match_set) new_query_node.try_match(archetype_node);
 
@@ -740,7 +746,7 @@ namespace hyecs
 		{
 			vector<component_type_index> untaged_components;
 			vector<component_type_index> taged_components;
-			for (auto comp : all_components)
+			for (decltype(auto) comp : all_components)
 			{
 				if (comp.is_tag()) taged_components.push_back(comp);
 				else untaged_components.push_back(comp);

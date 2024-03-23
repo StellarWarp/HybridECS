@@ -13,70 +13,92 @@ namespace hyecs
 			return *reinterpret_cast<const HashValueType*>(key);
 		}
 	}
+
+	//template<typename Key>
 	class generic_dense_map
 	{
+		using Key = uint64_t;
 	public:
 
 		using hash_function_type = uint64_t(*)(const void*);
 
 	private:
-		hash_function_type m_hash_function;
-		unordered_map<uint64_t, void*> m_map;
+		unordered_map<Key, void*> m_map;
 		generic_vector m_values;
 
 
 	public:
 
-		generic_dense_map(hash_function_type hash_function, generic::type_index value_type)
-			: m_hash_function(hash_function),
-			m_values(value_type)
+		generic_dense_map(generic::type_index value_type)
+			: m_values(value_type)
 		{
 
 		}
+
+		using iterator = generic_vector::iterator;
+
+		iterator begin() { return m_values.begin(); }
+
+		iterator end() { return m_values.end(); }
+
+		const iterator begin() const { return m_values.begin(); }
+
+		const iterator end() const { return m_values.end(); }
+
+
 
 		generic::type_index value_type() const
 		{
 			return m_values.type();
 		}
 
-		template <typename T,typename... Args, typename Key>
-		std::pair<void*, bool> emplace(Key&& key, Args&&... args)
+		void* allocate_value(Key key)
 		{
-			uint64_t hash = m_hash_function(&key);
-			auto it = m_map.find(hash);
+			auto it = m_map.find(key);
 			if (it != m_map.end())
 			{
-				return { it->second, false };
+				return it->second;
 			}
-			void* value_ptr = m_values.emplace_back<T>(std::forward<Args>(args)...);
-			m_map.emplace(hash, value_ptr);
-			return { value_ptr, true };
+			void* value_ptr = m_values.allocate_element();
+			m_map.emplace(key, value_ptr);
+			return value_ptr;
 		}
 
-		std::pair<void*, bool> emplace(const void* key, generic::constructor constructor)
+		template <typename T, typename... Args, typename Key>
+		std::pair<iterator, bool> emplace(Key&& key, Args&&... args)
 		{
-			uint64_t hash = m_hash_function(key);
-			auto it = m_map.find(hash);
+			auto it = m_map.find(key);
 			if (it != m_map.end())
 			{
-				return { it->second, false };
+				return { m_values.get_iterator(it->second), false };
+			}
+			void* value_ptr = m_values.emplace_back<T>(std::forward<Args>(args)...);
+			m_map.emplace(key, value_ptr);
+			return { m_values.get_iterator(value_ptr), true };
+		}
+
+		std::pair<iterator, bool> emplace(const Key& key, generic::constructor constructor)
+		{
+			auto it = m_map.find(key);
+			if (it != m_map.end())
+			{
+				return { m_values.get_iterator(it->second), false };
 			}
 			void* value_ptr = m_values.emplace_back(constructor);
-			m_map.emplace(hash, value_ptr);
-			return { value_ptr, true };
+			m_map.emplace(key, value_ptr);
+			return { m_values.get_iterator(value_ptr), true };
 		}
 
 		template<typename Key, typename Value>
-		std::pair<void*, bool> insert(std::pair<const Key, Value> pair)
+		std::pair<iterator, bool> insert(std::pair<const Key, Value> pair)
 		{
 			return emplace<Value>(pair.first, pair.second);
 		}
- 
 
-		void erase(const void* key)
+
+		void erase(const Key& key)
 		{
-			uint64_t hash = m_hash_function(key);
-			auto it = m_map.find(hash);
+			auto it = m_map.find(key);
 			if (it != m_map.end())
 			{
 				m_values.swap_back_erase(it->second);
@@ -84,10 +106,9 @@ namespace hyecs
 			}
 		}
 
-		void* find(const void* key)
+		void* find(const Key& key)
 		{
-			uint64_t hash = m_hash_function(key);
-			auto it = m_map.find(hash);
+			auto it = m_map.find(key);
 			if (it != m_map.end())
 			{
 				return it->second;
@@ -95,10 +116,9 @@ namespace hyecs
 			return nullptr;
 		}
 
-		void* at(const void* key)
+		void* at(const Key& key)
 		{
-			uint64_t hash = m_hash_function(key);
-			auto it = m_map.find(hash);
+			auto it = m_map.find(key);
 			if (it != m_map.end())
 			{
 				return it->second;
@@ -106,10 +126,9 @@ namespace hyecs
 			throw std::out_of_range("Key not found");
 		}
 
-		[[nodiscard]] bool contains(const void* key)
+		bool contains(const Key& key)
 		{
-			uint64_t hash = m_hash_function(key);
-			return m_map.contains(hash);
+			return m_map.contains(key);
 		}
 
 		void clear()
@@ -118,27 +137,7 @@ namespace hyecs
 			m_values.clear();
 		}
 
-		using iterator = generic_vector::iterator;
 
-		iterator begin()
-		{
-			return m_values.begin();
-		}
-
-		iterator end()
-		{
-			return m_values.end();
-		}
-
-		const iterator begin() const
-		{
-			return m_values.begin();
-		}
-
-		const iterator end() const
-		{
-			return m_values.end();
-		}
 
 
 
