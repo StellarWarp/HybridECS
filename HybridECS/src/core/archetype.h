@@ -13,6 +13,11 @@ namespace hyecs
 		using initializer_list<component_type_index>::initializer_list;
 	};
 
+	//enum class archetype_hash_t : uint64_t
+	//{
+	//	empty = 0,
+	//};
+
 	class archetype
 	{
 	public:
@@ -304,6 +309,10 @@ namespace hyecs
 			return m_archetype->end();
 		}
 
+		uint32_t component_count() const
+		{
+			return m_archetype->component_count();
+		}
 	};
 }
 
@@ -315,3 +324,14 @@ struct std::hash<hyecs::archetype>
 		return arch.hash();
 	}
 };
+
+template<>
+struct std::hash<hyecs::archetype_index>
+{
+	size_t operator()(const hyecs::archetype_index& arch) const
+	{
+		return arch.hash();
+	}
+};
+
+

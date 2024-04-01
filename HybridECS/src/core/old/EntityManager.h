@@ -109,7 +109,7 @@ namespace hyecs
 			//add entity to free list
 			m_freeEntities.push(entity);
 			//update entity sort key
-			//m_entitySortKeys[entity.id] = { 0,0 };
+			//m_entitySortKeys[entity.m_id] = { 0,0 };
 			//update all query
 			//for (auto query : m_queries)
 			//{
@@ -252,7 +252,7 @@ namespace hyecs
 
 	public:
 		template<typename Callable>
-		void ProcessEntities(Callable f)//auto query version
+		void ProcessEntities(Callable f)//auto query m_version
 		{
 			using args_list = function_traits<Callable>::args::template modify_with<raw_component_to_const_ref_t>;
 			using component_list = args_list::template filter_with<is_component_ref>::raw_type;

@@ -659,8 +659,8 @@ namespace hyecs
 			//init iteration
 			uint64_t iterate_version = seqence_allocator<taged_query_node>::allocate();
 			size_t min_archetype_count = std::numeric_limits<size_t>::max();
-			set<taged_archetype_node*> const* inital_match_set = nullptr;
-			vector<set<taged_archetype_node*> const*> filter_set(all_components.size() - 1, nullptr);
+			const set<taged_archetype_node*>* inital_match_set = nullptr;
+			vector<const set<taged_archetype_node*>*> filter_set(all_components.size() - 1, nullptr);
 
 			for (decltype(auto) component : untaged_components)
 			{
@@ -769,7 +769,7 @@ namespace hyecs
 		}
 
 
-		archetype_index register_archetype(archetype_index origin_arch, append_component adding, remove_component removings)
+		archetype_index get_archetype(archetype_index origin_arch, append_component adding, remove_component removings)
 		{
 			auto arch_node = get_ingroup_archetype_node(origin_arch, adding, removings);
 			archetype_index index;
@@ -777,23 +777,23 @@ namespace hyecs
 			return index;
 		}
 
-		archetype_index register_archetype(archetype_index origin_arch, append_component adding)
+		archetype_index get_archetype(archetype_index origin_arch, append_component adding)
 		{
-			return register_archetype(origin_arch, adding, {});
+			return get_archetype(origin_arch, adding, {});
 		}
 
-		archetype_index register_archetype(archetype_index origin_arch, remove_component removings)
+		archetype_index get_archetype(archetype_index origin_arch, remove_component removings)
 		{
-			return register_archetype(origin_arch, {}, removings);
+			return get_archetype(origin_arch, {}, removings);
 		}
 
-		archetype_index register_archetype(append_component components)
+		archetype_index get_archetype(append_component components)
 		{
-			return register_archetype(archetype_index::empty_archetype, components, {});
+			return get_archetype(archetype_index::empty_archetype, components, {});
 		}
 
 
-		void register_query(append_component condition_all, query_notify::Callback&& callback)
+		void get_query(append_component condition_all, query_notify::Callback&& callback)
 		{
 			auto query_node = add_ingroup_query(condition_all);
 			std::visit([&](auto&& arg) {arg->add_callback(std::move(callback)); }, query_node);

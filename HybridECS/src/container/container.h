@@ -38,7 +38,7 @@ namespace hyecs
 	//{
 	//	using type = typename T::iterator;
 	//};
-	
+
 
 	template<typename T, typename Iter = T*, typename = void>
 	class sequence_ref;
@@ -57,7 +57,8 @@ namespace hyecs
 	private:
 		struct empty_t { empty_t() {} empty_t(size_t) {} };
 		//reqiured for non-contiguous iterators whith has no operator-()
-		using optional_size = std::conditional_t<has_operator_minus_v<iterator>, empty_t, size_t>;
+		static const bool is_contiguous = has_operator_minus_v<iterator> && has_operator_plus_v<iterator,uint32_t>;
+		using optional_size = std::conditional_t<is_contiguous, empty_t, size_t>;
 	private:
 		iterator m_begin;
 		iterator m_end;
@@ -65,6 +66,10 @@ namespace hyecs
 	public:
 
 		constexpr sequence_ref() noexcept : m_begin(nullptr), m_end(nullptr) {}
+
+		template<typename U, typename UIter>
+		constexpr sequence_ref(sequence_ref<U, UIter> other) noexcept
+			: m_begin(other.begin()), m_end(other.end()), m_size(other.size()) {}
 
 		constexpr sequence_ref(iterator _First_arg, iterator _Last_arg) noexcept
 			: m_begin(_First_arg), m_end(_Last_arg), m_size(_Last_arg - _First_arg) {}
@@ -99,11 +104,33 @@ namespace hyecs
 		}
 
 		[[nodiscard]] constexpr size_t size() const noexcept {
-			if constexpr (has_operator_minus_v<iterator>)
+			if constexpr (is_contiguous)
 				return m_end - m_begin;
 			else
 				return m_size;
 		}
+
+		const T& operator[](size_t index) const {
+			static_assert(is_contiguous, "operator[] is only available for contiguous iterators");
+			return *(m_begin + index);
+		}
+
+		T& operator[](size_t index) {
+			static_assert(is_contiguous, "operator[] is only available for contiguous iterators");
+			return *(m_begin + index);
+		}
+
+		operator initializer_list<T>() const {
+			if constexpr (is_contiguous)
+				return { m_begin, m_end };
+			else
+				static_assert(is_contiguous, "operator initializer_list<T>() is only available for contiguous iterators");
+		}
+
+		//operator sequence_ref<const T>() const {
+		//	return { m_begin, m_end };
+		//}
+
 	};
 
 	template<typename T, typename Container>

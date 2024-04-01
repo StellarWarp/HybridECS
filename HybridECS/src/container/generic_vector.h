@@ -175,6 +175,15 @@ namespace hyecs
 			return addr;
 		}
 
+		void deallocate_element(void* ptr)
+		{
+			assert(ptr >= m_begin && ptr < m_end);
+			uint8_t* erase_ptr = (uint8_t*)ptr;
+			uint8_t* last_ptr = m_end - m_type.size();
+			m_type.move_constructor(erase_ptr, last_ptr);
+			m_end = last_ptr;
+		}
+
 		template<typename T>
 		void* push_back(const T& value)
 		{

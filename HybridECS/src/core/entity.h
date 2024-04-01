@@ -4,17 +4,20 @@ namespace hyecs
 	struct entity
 	{
 	private:
-		uint32_t id;
-		uint32_t version;
+		uint32_t m_id;
+		uint32_t m_version;
 
 	public:
 
-		entity() : id(0), version(0) {}
-		entity(uint32_t id, uint32_t version) : id(id), version(version) {}
+		entity() : m_id(0), m_version(0) {}
+		entity(uint32_t m_id, uint32_t version) : m_id(m_id), m_version(version) {}
+
+		uint32_t id() const { return m_id; }
+		uint32_t version() const { return m_version; }
 
 		bool operator==(const entity& other) const
 		{
-			return id == other.id && version == other.version;
+			return m_id == other.m_id && m_version == other.m_version;
 		}
 
 		bool operator!=(const entity& other) const
@@ -24,12 +27,12 @@ namespace hyecs
 
 		bool operator<(const entity& other) const
 		{
-			return id < other.id || (id == other.id && version < other.version);
+			return m_id < other.m_id || (m_id == other.m_id && m_version < other.m_version);
 		}
 
 		bool operator>(const entity& other) const
 		{
-			return id > other.id || (id == other.id && version > other.version);
+			return m_id > other.m_id || (m_id == other.m_id && m_version > other.m_version);
 		}
 
 

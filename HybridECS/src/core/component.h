@@ -161,10 +161,12 @@ namespace hyecs
 
 			return id;
 		}
+
+		bool operator == (const component_group_id& other) const { return id == other.id; }
 	};
 
 	class component_type_index;
-	class component_group_info
+	struct component_group_info
 	{
 		component_group_id id;
 		std::string name;
@@ -175,6 +177,31 @@ namespace hyecs
 	class component_group_index
 	{
 		component_group_info* info;
+
+	public:
+		component_group_index()
+			: info(nullptr)
+		{}
+
+		component_group_index(component_group_info* info)
+			: info(info)
+		{}
+
+		component_group_index(const component_group_index& other)
+			: info(other.info)
+		{}
+
+		component_group_index& operator = (const component_group_index& other)
+		{
+			info = other.info;
+			return *this;
+		}
+
+		component_group_id id() const { return info->id; }
+		const std::string& name() const { return info->name; }
+		const vector<component_type_index>& component_types() const { return info->component_types; }
+		bool operator == (const component_group_index& other) const { return info->id == other.info->id; }
+		bool operator != (const component_group_index& other) const { return !operator==(other); }
 	};
 
 
@@ -216,63 +243,18 @@ namespace hyecs
 			return info;
 		}
 
-		template<typename T>
-		static component_type_info from_template()
-		{
-			return from_template<T>(std::is_empty_v<T>);
-		}
-
-
-		const char* name() const
-		{
-			return m_type_index.name();
-		}
-
-		bool is_tag() const
-		{
-			return m_is_tag;
-		}
-
-		bool is_empty() const
-		{
-			return m_type_index.size() == 0;
-		}
-
-
-		uint64_t hash() const
-		{
-			return m_hash;
-		}
-
-		bit_key bit_key() const
-		{
-			return m_bit_id;
-		}
-
-		size_t size() const
-		{
-			return m_type_index.size();
-		}
-
-		void* copy_constructor(void* dest, const void* src) const
-		{
-			return m_type_index.copy_constructor(dest, src);
-		}
-
-		void* move_constructor(void* dest, void* src) const
-		{
-			return m_type_index.move_constructor(dest, src);
-		}
-
-		void destructor(void* addr) const
-		{
-			m_type_index.destructor(addr);
-		}
-
-		void destructor(void* addr, size_t count) const
-		{
-			m_type_index.destructor(addr, count);
-		}
+        template<typename T> static component_type_info from_template() { return from_template<T>(std::is_empty_v<T>); }
+        const char* name() const { return m_type_index.name(); }
+        bool is_tag() const { return m_is_tag; }
+        bool is_empty() const { return m_type_index.size() == 0; }
+        uint64_t hash() const { return m_hash; }
+        bit_key bit_key() const { return m_bit_id; }
+        size_t size() const { return m_type_index.size(); }
+		component_group_index group() const { return m_group; }
+        void* copy_constructor(void* dest, const void* src) const { return m_type_index.copy_constructor(dest, src); }
+        void* move_constructor(void* dest, void* src) const { return m_type_index.move_constructor(dest, src); }
+        void destructor(void* addr) const { m_type_index.destructor(addr); }
+        void destructor(void* addr, size_t count) const { m_type_index.destructor(addr, count); }
 		const generic::type_index_container_cached& type_index() const { return m_type_index; }
 		operator const generic::type_index_container_cached& () const { return m_type_index; }
 		operator const generic::type_index() const { return m_type_index; }
@@ -297,26 +279,27 @@ namespace hyecs
 			return *this;
 		}
 
-		generic::type_index type_index() const{return info->type_index();}
-		const component_type_info& get_info() const{return *info;}
-		const char* name() const{return info->name();}
-		uint64_t hash() const{return info->hash();}
-		bit_key bit_key() const{return info->bit_key();}
-		size_t size() const{return info->size();}
-		bool is_tag() const{return info->is_tag();}
+		generic::type_index type_index() const { return info->type_index(); }
+		const component_type_info& get_info() const { return *info; }
+		const char* name() const { return info->name(); }
+		uint64_t hash() const { return info->hash(); }
+		bit_key bit_key() const { return info->bit_key(); }
+		size_t size() const { return info->size(); }
+		bool is_tag() const { return info->is_tag(); }
+		component_group_index group() const { return info->group(); }
 
-		void* move_constructor(void* dest, void* src) const{return info->move_constructor(dest, src);}
-		void* copy_constructor(void* dest, const void* src) const{return info->copy_constructor(dest, src);}
-		void destructor(void* addr) const{info->destructor(addr);}
-		void destructor(void* addr, size_t count) const{info->destructor(addr, count);}
+		void* move_constructor(void* dest, void* src) const { return info->move_constructor(dest, src); }
+		void* copy_constructor(void* dest, const void* src) const { return info->copy_constructor(dest, src); }
+		void destructor(void* addr) const { info->destructor(addr); }
+		void destructor(void* addr, size_t count) const { info->destructor(addr, count); }
 
-		operator const component_type_info& () const{return *info;}
-		operator const generic::type_index_container_cached& () const{return info->type_index();}
-		operator const generic::type_index () const{return info->type_index();}
-		bool operator == (const component_type_index& other) const{return info->hash() == other.info->hash();}
-		bool operator != (const component_type_index& other) const{return !(*this == other);}
-		bool operator < (const component_type_index& other) const{return info->hash() < other.info->hash();}
-		bool operator > (const component_type_index& other) const{return info->hash() > other.info->hash();}
+		operator const component_type_info& () const { return *info; }
+		operator const generic::type_index_container_cached& () const { return info->type_index(); }
+		operator const generic::type_index() const { return info->type_index(); }
+		bool operator == (const component_type_index& other) const { return info->hash() == other.info->hash(); }
+		bool operator != (const component_type_index& other) const { return !(*this == other); }
+		bool operator < (const component_type_index& other) const { return info->hash() < other.info->hash(); }
+		bool operator > (const component_type_index& other) const { return info->hash() > other.info->hash(); }
 	};
 
 	class cached_component_type_index
@@ -341,6 +324,28 @@ namespace hyecs
 		bool operator!=(const cached_component_type_index& other) const { return type_index_cache != other.type_index_cache; }
 		bool operator<(const cached_component_type_index& other) const { return type_index_cache < other.type_index_cache; }
 		bool operator>(const cached_component_type_index& other) const { return type_index_cache > other.type_index_cache; }
+	};
+
+
+	class component_constructor
+	{
+		component_type_index type_index;
+		std::function<void* (void*)> constructor;
+
+	public:
+		component_constructor(component_type_index type_index, std::function<void* (void*)> constructor)
+			: type_index(type_index), constructor(constructor)
+		{}
+
+		void* operator()(void* src) const
+		{
+			return constructor(src);
+		}
+
+		component_type_index type() const
+		{
+			return type_index;
+		}
 	};
 
 }

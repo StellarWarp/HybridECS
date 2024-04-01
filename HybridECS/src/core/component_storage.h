@@ -25,13 +25,12 @@ namespace hyecs
 			assert(m_storage.contains(e));
 			return m_storage.at(e);
 		}
+
 		template<typename T>
 		T& at(entity e)
 		{
 			return *(T*)at(e);
 		}
-
-
 
 		void erase(entity e)
 		{
@@ -52,7 +51,7 @@ namespace hyecs
 			m_storage.emplace(e, std::forward<Args>(args)...);
 		}
 
-		void emplace(sequence_ref<entity> entities, generic::constructor constructor)
+		void emplace(sequence_ref<const entity> entities, generic::constructor constructor)
 		{
 			for (auto e : entities)
 			{
@@ -64,6 +63,25 @@ namespace hyecs
 		{
 			return m_storage.allocate_value(e);
 		}
+
+		void deallocate_component(entity e)
+		{
+			m_storage.deallocate_value(e);
+		}
+
+		void allocate_components(sequence_ref<const entity> entities, sequence_ref<void*> addrs)
+		{
+			auto e_iter = entities.begin();
+			auto a_iter = addrs.begin();
+			while (e_iter != entities.end())
+			{
+				*a_iter = m_storage.allocate_value(*e_iter);
+				++e_iter;
+				++a_iter;
+			}
+		}
+
+
 
 
 
@@ -88,7 +106,7 @@ namespace hyecs
 		template<typename T>
 		class accessor
 		{
-			generic_dense_map const* m_storage;
+			const generic_dense_map * m_storage;
 
 		public:
 			accessor(const generic_dense_map& storage) : m_storage(&storage) {
@@ -141,8 +159,37 @@ namespace hyecs
 			return accessor<T>(m_storage);
 		}
 
+		class component_allocate_accessor
+		{
+			generic_dense_map* m_storage;
+			sequence_ref<const entity> m_entities;
+			vector<void*> m_components;
 
+		public:
+			component_allocate_accessor(generic_dense_map& storage, sequence_ref<const entity> entities) :
+				m_storage(&storage),
+				m_entities(entities),
+				m_components(entities.size())
+			{
+				auto e_iter = entities.begin();
+				auto a_iter = m_components.begin();
+				while (e_iter != entities.end())
+				{
+					*a_iter = m_storage->allocate_value(*e_iter);
+					++e_iter;
+					++a_iter;
+				}
+			}
 
+			using iterator = typename vector<void*>::iterator;
+			iterator begin() { return m_components.begin(); }
+			iterator end() { return m_components.end(); }
+		};
+
+		component_allocate_accessor get_component_allocate_accessor(sequence_ref<const entity> entities)
+		{
+			return component_allocate_accessor(m_storage, entities);
+		}
 
 
 

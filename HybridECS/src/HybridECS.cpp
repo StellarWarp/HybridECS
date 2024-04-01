@@ -42,6 +42,12 @@ int main()
 	std::cout << sizeof(seq5) << std::endl;
 	std::cout << sizeof(seq6) << std::endl;
 
+	auto seq7 = make_sequence_ref(set.begin(), set.end(), set.size());
+
+	initializer_list<int> il1 = seq2;
+
+
+	sequence_ref<const int> seq8 = seq2;
 
 
 

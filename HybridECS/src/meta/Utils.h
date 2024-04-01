@@ -68,9 +68,9 @@ namespace hyecs
 		initializer_list(std::initializer_list<T> list)
 			:std::initializer_list<T>(list) {}
 
-		template<class Iter>
-		initializer_list(Iter begin, Iter end)
-			: std::initializer_list<T>(begin.operator->(), end.operator->()) {}
+		//template<class Iter>
+		//initializer_list(Iter begin, Iter end)
+		//	: std::initializer_list<T>(begin.operator->(), end.operator->()) {}
 
 		initializer_list(vector<T>& vec)
 			: std::initializer_list<T>(vec.data(), vec.data() + vec.size()) {}

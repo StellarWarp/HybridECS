@@ -10,7 +10,7 @@
 ///
 /// Fast but less accurate implementations of square root based functions.
 /// - Sqrt optimisation based on Newton's method,
-/// www.gamedev.net/community/forums/topic.asp?topic id=139956
+/// www.gamedev.net/community/forums/topic.asp?topic m_id=139956
 
 #pragma once
 

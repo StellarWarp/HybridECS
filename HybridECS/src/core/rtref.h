@@ -12,18 +12,18 @@
 //
 //		template<typename... Args>
 //		static func_id from_hash(uint64_t ret, Args... args) {
-//			func_id id;
-//			id.hash = ret;
-//			((id.hash += args), ...);
-//			return id;
+//			func_id m_id;
+//			m_id.hash = ret;
+//			((m_id.hash += args), ...);
+//			return m_id;
 //		}
 //
 //		template<typename Ret, typename... Args>
 //		static func_id from_template() {
-//			func_id id;
-//			id.hash = typeid(Ret).hash_code();
-//			((id.hash += typeid(Args).hash_code()), ...);
-//			return id;
+//			func_id m_id;
+//			m_id.hash = typeid(Ret).hash_code();
+//			((m_id.hash += typeid(Args).hash_code()), ...);
+//			return m_id;
 //		}
 //
 //		bool operator==(const func_id& other) const
@@ -38,9 +38,9 @@
 //template<>
 //struct std::hash<hyecs::func_id>
 //{
-//	size_t operator()(const hyecs::func_id& id) const
+//	size_t operator()(const hyecs::func_id& m_id) const
 //	{
-//		return id.hash;
+//		return m_id.hash;
 //	}
 //};
 //

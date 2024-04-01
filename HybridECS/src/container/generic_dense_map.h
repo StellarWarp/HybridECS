@@ -64,6 +64,19 @@ namespace hyecs
 			return value_ptr;
 		}
 
+		void deallocate_value(Key key)
+		{
+			auto it = m_map.find(key);
+			if (it != m_map.end())
+			{
+				m_values.deallocate_element(it->second);
+				m_map.erase(it);
+			}
+		}
+
+
+
+
 		template <typename T, typename... Args, typename Key>
 		std::pair<iterator, bool> emplace(Key&& key, Args&&... args)
 		{
