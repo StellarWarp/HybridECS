@@ -30,7 +30,7 @@ namespace hyecs
 
 	public:
 		template<typename... Ts>
-		constexpr type_indexed_array(Ts... args) : arr{ (T)args... } {}
+		constexpr type_indexed_array(Ts... args) : arr{ std::forward<Ts>(args)... } {}
 
 		constexpr type_indexed_array(const std::array<T, sizeof...(Us)>& arr) : arr{ arr } {}
 

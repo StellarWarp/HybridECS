@@ -25,7 +25,7 @@ namespace hyecs {
 		template <size_t I> using get = typename get_helper<I, T...>::type;
 
 		using remove_ref = type_list<std::remove_reference_t<T>...>;
-		using raw_type = typename type_list<std::remove_cvref_t<T>...>;
+		using decay_type = typename type_list<std::decay_t<T>...>;
 
 	private:
 		template <typename U>

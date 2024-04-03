@@ -1,6 +1,7 @@
 #pragma once
 #include "entity.h"
 #include "component_storage.h"
+#include "storage_key_registry.h"
 namespace hyecs
 {
 	class sparse_table
@@ -15,9 +16,9 @@ namespace hyecs
 		sparse_table(vector<component_storage*> component_storages)
 			: m_component_storages(component_storages), m_types(component_storages.size())
 		{
-			for (auto storage : m_component_storages)
+			for(uint64_t i = 0; i < m_component_storages.size(); ++i)
 			{
-				m_types.push_back(storage->component_type());
+				m_types[i] = m_component_storages[i]->component_type();
 			}
 		}
 
@@ -53,6 +54,12 @@ namespace hyecs
 
 			raw_accessor(sparse_table& in_table, entity_seq entities)
 				: m_table(in_table), m_entities(entities)
+			{
+			}
+
+			raw_accessor(const raw_accessor&) = default;
+			raw_accessor& operator=(const raw_accessor&) = default;
+			raw_accessor(raw_accessor&& other) : m_table(other.m_table), m_entities(std::move(other.m_entities))
 			{
 			}
 
@@ -131,15 +138,27 @@ namespace hyecs
 
 		};
 
+		template<typename SeqParam = const entity*>
 		class allocate_accessor
 		{
+			using entity_seq = sequence_ref<const entity, SeqParam>;
 			sparse_table& m_table;
-			sequence_ref<const entity> m_entities;
+			entity_seq m_entities;
 			std::function<void(entity, storage_key)> m_storage_key_builder;
 		public:
-			allocate_accessor(sparse_table& in_table, sequence_ref<const entity> entities,
+			allocate_accessor(sparse_table& in_table, entity_seq entities,
 				std::function<void(entity, storage_key)>&& builder)
-				: m_table(in_table), m_entities(entities), m_storage_key_builder(std::move(builder))
+				: m_table(in_table),
+				m_entities(entities),
+				m_storage_key_builder(std::move(builder))
+			{
+			}
+			allocate_accessor(const allocate_accessor&) = default;
+			allocate_accessor& operator=(const allocate_accessor&) = default;
+			allocate_accessor(allocate_accessor&& other)
+				: m_table(other.m_table),
+				m_entities(std::move(other.m_entities)),
+				m_storage_key_builder(std::move(other.m_storage_key_builder))
 			{
 			}
 
@@ -173,9 +192,11 @@ namespace hyecs
 				void operator++()
 				{
 					m_component_index++;
-					m_type = m_accessor->m_table.m_types[m_component_index];
 					if (operator!=(end_iterator{}))
+					{
+						m_type = m_accessor->m_table.m_types[m_component_index];
 						allocate_for_index(m_component_index);
+					}
 				}
 				component_array_accessor& operator++(int) { component_array_accessor copy = *this; ++(*this); return copy; }
 				auto comparable() const { return m_type; }
@@ -204,49 +225,38 @@ namespace hyecs
 			return raw_accessor(*this, entities);
 		}
 
-		template<typename StorageKeyBuilder>
-		allocate_accessor get_allocate_accessor(sequence_ref<const entity> entities, StorageKeyBuilder&& builder)
+		raw_accessor get_raw_accessor()
 		{
-			return allocate_accessor(*this, entities, std::move(builder));
+			auto entity_seq = make_sequence_ref(m_entities.begin(), m_entities.end());
+			return raw_accessor(*this, entity_seq);
+		}
+
+
+		template<typename SeqParam, typename StorageKeyBuilder>
+		auto get_allocate_accessor(sequence_ref<const entity, SeqParam> entities, StorageKeyBuilder&& builder)
+		{
+			return allocate_accessor<SeqParam>(*this, entities, std::forward<StorageKeyBuilder>(builder));
 		}
 
 		class deallocate_accessor : public raw_accessor
 		{
 		public:
 			using raw_accessor::raw_accessor;
-#pragma warning(push)
-			//#pragma warning(disable: 4834)
-			class component_array_accessor : public raw_accessor::component_array_accessor
+			~deallocate_accessor()
 			{
-			public:
-				using raw_accessor::component_array_accessor::component_array_accessor;
-				class iterator : public raw_accessor::component_array_accessor::iterator
-				{
-					using super = raw_accessor::component_array_accessor::iterator;
-				public:
-					using super::iterator;
-					//cover original operator++
-
-					iterator operator++()
-					{
-						super::m_storage->deallocate_component(*m_entity_iter);
-						raw_accessor::component_array_accessor::iterator::operator++();
-						return *this;
-					}
-					
-
-				};
-				iterator begin() { return iterator(m_component_index, static_cast<deallocate_accessor*>(m_accessor), static_cast<deallocate_accessor*>(m_accessor)->m_entities.begin()); }
-				//dont need to cover end
-			};
-			component_array_accessor begin() { return component_array_accessor(0u, this); }
-			//dont need to cover end
-#pragma warning(pop)
+				for (auto entity : m_entities)
+					for (auto storage : m_table.m_component_storages)
+						storage->deallocate_component(entity);
+			}
 
 		};
-	}
+
+		deallocate_accessor get_deallocate_accessor(sequence_ref<const entity> entities)
+		{
+			return deallocate_accessor(*this, entities);
+		}
+	};
 
 
 
 };
-}

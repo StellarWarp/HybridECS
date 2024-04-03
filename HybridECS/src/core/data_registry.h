@@ -24,6 +24,9 @@ namespace hyecs
 		//vaildref_map <archetype::hash_type, storage_variant> m_storages;
 		vaildref_map<uint64_t, table> m_tables;
 
+		vaildref_map<uint64_t, component_type_info> m_component_type_infos;
+		vaildref_map<component_group_id, component_group_info> m_component_group_infos;
+
 		dense_set<entity> m_entities;
 
 		class entity_allocator
@@ -82,18 +85,109 @@ namespace hyecs
 			}
 		}
 
-		entity emplace(
+
+		void add_untaged_archetype(archetype_index arch)
+		{
+			vector<component_storage*> storages;
+			storages.reserve(arch.component_count());
+			for (auto& component : arch)
+			{
+				storages.push_back(&m_component_storages.at(component.hash()));
+			}
+			m_archetypes_storage.emplace(arch.hash(), archetype_storage(arch, storages, m_storage_key_registry.get_group_key_accessor()));
+		}
+
+		void add_taged_archetype(archetype_index arch, archetype_index base_arch)
+		{
+			assert(m_archetypes_storage.contains(base_arch.hash()));
+			archetype_storage* base_storage = &m_archetypes_storage.at(base_arch.hash());
+			vector<component_storage*> taged_storages;
+			for (auto& component : arch)
+			{
+				if (component.is_tag()) taged_storages.push_back(&m_component_storages.at(component.hash()));
+			}
+			m_taged_archetypes_storage.emplace(arch.hash(), taged_archetype_storage(arch, base_storage, taged_storages));
+		}
+
+		component_group_info& register_component_group(component_group_id id ,std::string name)
+		{
+			return m_component_group_infos.emplace(id, component_group_info{ id, name , {} });
+		}
+
+		component_type_index register_component_type(generic::type_index type, component_group_info& group, bool is_tag)
+		{
+			component_type_index component_index = m_component_type_infos.emplace(type.hash(), component_type_info(type, group, is_tag));
+
+			group.component_types.push_back(component_index);
+			m_archetype_registry.register_component(component_index);
+			m_component_storages.emplace(type.hash(), component_storage(component_index));
+			return component_index;
+		}
+
+	public:
+
+		void register_type(const ecs_type_register_context& context)
+		{
+			for (auto& [_,group] : context.groups())
+			{
+				component_group_info&  group_info = register_component_group(group.id, group.name);
+
+				for (auto&[_,component] : group.components)
+				{
+					register_component_type(component.type, group_info, component.is_tag);
+				}
+			}
+		}
+
+		data_registry()
+		{
+			m_archetype_registry.bind_untaged_archetype_addition_callback(
+				[this](archetype_index arch) {
+					add_untaged_archetype(arch);
+				}
+			);
+			m_archetype_registry.bind_taged_archetype_addition_callback(
+				[this](archetype_index arch, archetype_index base_arch) {
+					add_taged_archetype(arch, base_arch);
+				}
+			);
+
+		}
+
+		data_registry(const ecs_type_register_context& context) : data_registry()
+		{
+			register_type(context);
+		}
+
+
+		~data_registry()
+		{
+
+		}
+
+		template <typename... T>
+		std::array<component_type_index, sizeof...(T)> get_component_types()
+		{
+			static type_indexed_array<uint64_t,T...> type_hashes = sorted_array<uint64_t, sizeof...(T)>{typeid(T).hash_code()...};
+			static std::array<component_type_index, sizeof...(T)> cached = { m_component_type_infos.at(type_hashes.get<T>())... };//T is only repersent an order here
+			return cached;
+		}
+
+
+
+
+		void emplace(
 			sorted_sequence_ref<const component_type_index> components,
 			sorted_sequence_ref<const generic::constructor> constructors,
-			uint32_t count = 1)
+			sequence_ref<entity> entities)
 		{
 			auto group_begin = components.begin();
 			auto group_end = components.begin();
 
-			vector<entity> entities(count);
+			//vector<entity> entities(count);
 			allocate_entity(entities);
 
-			while(group_begin != components.end())
+			while (group_begin != components.end())
 			{
 				group_end = std::adjacent_find(group_begin, components.end(),
 					[](const component_type_index& lhs, const component_type_index& rhs) {
@@ -101,30 +195,50 @@ namespace hyecs
 					});
 
 				archetype_index arch = m_archetype_registry.get_archetype(append_component(group_begin, group_end));
-				
-				if (arch.is_tagged())
+
+				if (arch.component_count() == 1)
 				{
-					auto& storage = m_taged_archetypes_storage.at(arch.hash());
-					storage.emplace_entity(entities, constructors);
+					auto& storage = m_component_storages.at(arch[0].hash());
+					auto component_accessor = storage.allocate(entities);
+					for (void* addr : component_accessor)
+					{
+						constructors[0](addr);
+					}
 				}
 				else
 				{
-					if (arch.component_count() != 1)
+					auto construct_process = [&](auto allocate_accessor) {
+						auto constructor_iter = constructors.begin();
+
+						auto component_accessor = allocate_accessor.begin();
+						while (component_accessor != allocate_accessor.end())
+						{
+							assert((generic::type_index)component_accessor.component_type() == constructor_iter->type());
+							for (void* addr : component_accessor)
+							{
+								(*constructor_iter)(addr);
+							}
+							++constructor_iter;
+							++component_accessor;
+						}
+						};
+					if (arch.is_tagged())
 					{
-						auto& storage = m_archetypes_storage.at(arch.hash());
-						storage.emplace_entity(entities, constructors);
+						auto& storage = m_taged_archetypes_storage.at(arch.hash());
+						construct_process(storage.allocate(entities));
 					}
 					else
 					{
-						auto& storage = m_component_storages.at(arch.hash());
-						storage.emplace_entity(entities, constructors);
+						auto& storage = m_archetypes_storage.at(arch.hash());
+						construct_process(storage.get_allocate_accessor(entities.as_const()));
 					}
 				}
-
 
 				group_begin = group_end;
 			}
 		}
+
+
 
 
 

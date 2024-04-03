@@ -31,6 +31,7 @@ namespace hyecs
 			bool is_sparse_storage() const { return m_is_sparse; }
 			uint32_t group_index() const { return m_group_index; }
 			uint32_t table_index() const { return m_table_index; }
+
 		};
 
 
@@ -55,6 +56,7 @@ namespace hyecs
 		bool is_sparse_storage() const { return !table_index.is_sparse_storage(); }
 		table_index_t get_table_index() const { return table_index; }
 		table_offset_t get_table_offset() const { return table_offset; }
+		uint64_t hash() const { return key; }
 	};
 
 
@@ -73,6 +75,7 @@ namespace hyecs
 				return m_registry.m_entity_storage_keys;
 			}
 		public:
+			group_key_accessor(storage_key_registry& registry) : m_registry(registry) {}
 			void insert(entity e, storage_key key)
 			{
 				storage_map().insert({ e, key });
@@ -93,9 +96,24 @@ namespace hyecs
 				return storage_map().contains(e);
 			}
 		};
+
+		group_key_accessor get_group_key_accessor()
+		{
+			return group_key_accessor{ *this };
+		}
 	};
 
 
 	using storage_key_accessor = storage_key_registry::group_key_accessor;
 
 }
+
+
+template<>
+struct std::hash<hyecs::storage_key>
+{
+	std::size_t operator()(const hyecs::storage_key& key) const
+	{
+		return key.hash();
+	}
+};

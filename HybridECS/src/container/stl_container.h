@@ -25,7 +25,7 @@ namespace hyecs
 	}
 #endif
 
-
+#define HYECS_USING_STD_VECTOR
 	template<typename T, typename Alloc = std::allocator<T>>
 	using vector = std::vector<T, Alloc>;
 

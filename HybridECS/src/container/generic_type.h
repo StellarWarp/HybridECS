@@ -1,6 +1,7 @@
 #pragma once
 #include "vaildref_map.h"
 #include "../meta/meta_utils.h"
+#include "type_hash.h"
 
 namespace hyecs
 {
@@ -70,7 +71,7 @@ namespace hyecs
 			move_constructor_ptr move_constructor;
 			destructor_ptr destructor;
 			uint64_t hash;
-			char* name;
+			const char* name;
 
 		private:
 			type_info() = default;
@@ -86,12 +87,17 @@ namespace hyecs
 					nullable_move_constructor<T>(),
 					nullable_destructor<T>(),
 					typeid(T).hash_code(),
-					(char*)typeid(T).name()
+					typeid(T).name()
 				};
 
 				return info;
 			}
 		};
+		template<typename T>
+		const type_info& type_of()
+		{
+			return type_info::from_template<T>();
+		}
 
 		template<typename... Args>
 		using constructor_pointer = void* (*)(void*, Args...);
@@ -111,11 +117,11 @@ namespace hyecs
 
 		class type_index
 		{
-			type_info* m_info;
+			const type_info* m_info;
 
 		public:
-
-			type_index(type_info* info) : m_info(info) {}
+			type_index() : m_info(nullptr) {}
+			type_index(const type_info& info) : m_info(&info) {}
 
 			const type_info* info() const noexcept { return m_info; }
 			constexpr size_t size() const noexcept { return m_info->size; }
@@ -178,18 +184,11 @@ namespace hyecs
 		public:
 
 			type_index_container_cached(const type_info& info)
-				: m_index((type_info*)&info),
+				: m_index(info),
 				m_size(info.size),
 				m_copy_constructor(info.copy_constructor),
 				m_move_constructor(info.move_constructor),
 				m_destructor(info.destructor) {}
-
-			type_index_container_cached(const type_info* info)
-				: m_index((type_info*)info),
-				m_size(info->size),
-				m_copy_constructor(info->copy_constructor),
-				m_move_constructor(info->move_constructor),
-				m_destructor(info->destructor) {}
 
 			type_index_container_cached(type_index index)
 				: m_index(index),
@@ -279,7 +278,7 @@ namespace hyecs
 			constructor(type_index type, std::function<void* (void*)> constructor)
 				: m_type(type), m_constructor(constructor) {}
 
-			void* operator()(void* ptr) { return m_constructor(ptr); }
+			void* operator()(void* ptr) const { return m_constructor(ptr); }
 			type_index type() const { return m_type; }
 		};
 
@@ -287,4 +286,13 @@ namespace hyecs
 
 	}
 }
+
+template<>
+struct std::hash<hyecs::generic::type_index>
+{
+	size_t operator()(const hyecs::generic::type_index& index) const noexcept
+	{
+		return index.hash();
+	}
+};
 

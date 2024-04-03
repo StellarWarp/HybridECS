@@ -33,6 +33,7 @@ namespace hyecs
 			size_t size() const { return m_size; }
 			byte* data() { return m_data.data(); }
 			auto& entities() { return m_entities; }
+			const auto& entities() const { return m_entities; }
 
 			void increase_size(size_t size) { m_size += size; }
 			void decrease_size(size_t size) { m_size -= size; }
@@ -195,7 +196,7 @@ namespace hyecs
 			}
 		}
 	private:
-		byte* component_address(chunk* chunk, uint32_t chunk_offset, uint32_t comp_offset, uint32_t comp_size)
+		static byte* component_address(chunk* chunk, uint32_t chunk_offset, uint32_t comp_offset, uint32_t comp_size)
 		{
 			return chunk->data() + comp_offset + chunk_offset * comp_size;
 		}
@@ -203,7 +204,7 @@ namespace hyecs
 		{
 			return component_address(m_chunks[index.chunk_index], index.chunk_offset, comp_offset, comp_size);
 		}
-		byte* component_address(chunk* chunk, uint32_t chunk_offset, const table_comp_type_info& type)
+		static byte* component_address(chunk* chunk, uint32_t chunk_offset, const table_comp_type_info& type)
 		{
 			return chunk->data() + type.offset() + chunk_offset * type.size();
 		}
@@ -250,12 +251,12 @@ namespace hyecs
 			}
 		}
 
-
 	public:
 
 		//template<typename SeqIter = uint32_t*>
 
 		using end_iterator = nullptr_t;
+
 
 		class raw_accessor
 		{
@@ -269,6 +270,13 @@ namespace hyecs
 				: m_table(in_table), table_offsets(offsets)
 			{
 			}
+
+			raw_accessor(const raw_accessor&) = default;
+			raw_accessor& operator=(const raw_accessor&) = default;
+			raw_accessor(raw_accessor&& other) : m_table(other.m_table), table_offsets(other.table_offsets)
+			{
+				other.table_offsets = table_offset_seq{};
+			}
 			//template<typename SeqParam>
 			//raw_accessor(table& in_table, sequence_ref<entity, SeqParam> entities)
 			//	: m_table(in_table)
@@ -281,26 +289,27 @@ namespace hyecs
 			{
 			protected:
 				raw_accessor* m_accessor;
-				table_comp_type_info& m_type;
+				const table_comp_type_info* m_type;
 				uint32_t m_component_index;
 				uint32_t m_table_component_count;
 
 			public:
 
 				component_array_accessor(uint32_t index, raw_accessor* accessor)
-					: m_type(accessor->m_table.m_notnull_components[index]),
+					: m_type(&accessor->m_table.m_notnull_components[index]),
 					m_component_index(index),
 					m_table_component_count(accessor->m_table.m_notnull_components.size()),
 					m_accessor(accessor)
 				{
 				}
 
-				component_type_index component_type() const { return m_type; }
+				component_type_index component_type() const { return *m_type; }
 
 				component_array_accessor& operator++()
 				{
 					m_component_index++;
-					m_type = m_accessor->m_table.m_notnull_components[m_component_index];
+					m_type = &m_accessor->m_table.m_notnull_components[m_component_index];
+					return *this;
 				}
 
 				component_array_accessor operator++(int)
@@ -312,10 +321,10 @@ namespace hyecs
 
 				auto comparable() const
 				{
-					return m_type;
+					return *m_type;
 				}
 
-				bool operator==(const component_array_accessor& other) const { return m_type == other.m_type; }
+				bool operator==(const component_array_accessor& other) const { return *m_type == *other.m_type; }
 				bool operator!=(const component_array_accessor& other) const { return !(*this == other); }
 				bool operator==(const end_iterator& other) const { return m_component_index == m_table_component_count; }
 				bool operator!=(const end_iterator& other) const { return !(*this == other); }
@@ -324,7 +333,6 @@ namespace hyecs
 				class iterator
 				{
 				protected:
-					table_comp_type_info& m_type;
 					uint32_t m_comp_offset;
 					uint32_t m_type_size;
 					raw_accessor* m_accessor;
@@ -391,125 +399,214 @@ namespace hyecs
 			}
 
 		};
+
 		raw_accessor get_raw_accessor(sequence_ref<const table_offset_t> entities_table_offsets)
 		{
 			return raw_accessor(*this, entities_table_offsets);
 		}
-		template<typename SeqParam>
-		raw_accessor get_raw_accessor(sequence_ref<entity, SeqParam> entities)
-		{
-			return raw_accessor(*this, entities);
-		}
 
+
+
+		class complete_raw_accessor
+		{
+			const table* m_table;
+		public:
+			complete_raw_accessor(const table* table) : m_table(table) {}
+			complete_raw_accessor(const complete_raw_accessor&) = default;
+			complete_raw_accessor& operator=(const complete_raw_accessor&) = default;
+			complete_raw_accessor(complete_raw_accessor&& other) = default;
+
+			class component_array_accessor
+			{
+				using chunk_seq = sequence_ref<chunk* const>;
+			protected:
+				const table* m_table;
+				const table_comp_type_info* m_type;
+				uint32_t m_component_index;
+				uint32_t m_table_component_count;
+
+			public:
+				using value_type = entity;
+				component_array_accessor(const table* table, uint32_t index) :
+					m_table(table),
+					m_type(&table->m_notnull_components[index]),
+					m_component_index(index),
+					m_table_component_count(table->m_notnull_components.size())
+				{
+				}
+				const component_type_index component_type() const { return *m_type; }
+				auto comparable() const { return *m_type; }
+				component_array_accessor& operator++()
+				{
+					m_component_index++;
+					m_type = &m_table->m_notnull_components[m_component_index];
+					return *this;
+				}
+
+				component_array_accessor operator++(int)
+				{
+					component_array_accessor copy = *this;
+					++(*this);
+					return copy;
+				}
+				bool operator==(const component_array_accessor& other) const { return *m_type == *other.m_type; }
+				bool operator!=(const component_array_accessor& other) const { return !(*this == other); }
+				bool operator==(const end_iterator& other) const { return m_component_index == m_table_component_count; }
+				bool operator!=(const end_iterator& other) const { return !(*this == other); }
+
+				class iterator
+				{
+				protected:
+					const table_comp_type_info& m_type;
+					chunk_seq::iterator m_chunk_iter;
+					chunk_seq::iterator m_chunk_end;
+					chunk* m_chunk;
+					uint32_t m_offset;
+
+				public:
+					iterator(chunk_seq::iterator chunk_iter, chunk_seq::iterator chunk_end, const table_comp_type_info& type) :
+						m_chunk_iter(chunk_iter),
+						m_chunk_end(chunk_end),
+						m_chunk(*chunk_iter),
+						m_offset(0),
+						m_type(type)
+					{
+					}
+
+					iterator& operator++()
+					{
+						m_offset++;
+						if (m_offset == m_chunk->size())
+						{
+							m_chunk_iter++;
+							if (m_chunk_iter == m_chunk_end)
+							{
+								m_chunk = nullptr;
+								return *this;
+							}
+							m_chunk = *m_chunk_iter;
+							m_offset = 0;
+						}
+						return *this;
+					}
+
+					iterator operator++(int)
+					{
+						iterator copy = *this;
+						++(*this);
+						return copy;
+					}
+
+					void* operator*()
+					{
+						return table::component_address(m_chunk, m_offset, m_type);
+					}
+
+					bool operator==(const iterator& other) const { return m_chunk == other.m_chunk && m_offset == other.m_offset; }
+					bool operator!=(const iterator& other) const { return !operator==(other); }
+					bool operator==(const end_iterator& other) const { return m_chunk_iter == m_chunk_end; }
+					bool operator!=(const end_iterator& other) const { return !operator==(other); }
+				};
+
+				iterator begin() const
+				{
+					chunk_seq chunks = make_sequence_ref(m_table->m_chunks);
+					return iterator(chunks.begin(), chunks.end(), *m_type);
+				}
+
+				end_iterator end() const
+				{
+					return end_iterator{};
+				}
+			};
+
+			component_array_accessor begin() { return component_array_accessor(m_table, 0u); }
+			end_iterator end() { return end_iterator{}; }
+
+		};
+
+		complete_raw_accessor get_raw_accessor()
+		{
+			return complete_raw_accessor(this);
+		}
+		//template<typename SeqParam>
+		//raw_accessor get_raw_accessor(sequence_ref<const entity, SeqParam> entities)
+		//{
+		//	return raw_accessor(*this, entities);
+		//}
+		template<typename SeqParam = const entity*>
 		class allocate_accessor : public raw_accessor
 		{
-			sequence_ref<entity> entities;
-			vector<entity_table_index> entity_table_indices;
+			using entity_seq = sequence_ref<const entity, SeqParam>;
+			entity_seq entities;
+			vector<table_offset_t> entity_table_offsets;
 		public:
 			template<typename StorageKeyBuilder>
-			allocate_accessor(table& in_table, sequence_ref<entity> entities, StorageKeyBuilder builder) :
-				raw_accessor(in_table), entities(entities)
+			allocate_accessor(table& in_table, entity_seq entities, StorageKeyBuilder builder) :
+				raw_accessor(in_table,{}), entities(entities)
 			{
 				uint32_t count = entities.size();
 				auto entity_iter = entities.begin();
-				entity_table_indices.reserve(count);
+				entity_table_offsets.reserve(count);
 				for (uint32_t i = 0; i < count; i++, entity_iter++)
 				{
-					entity_table_indices.push_back(m_table.allocate_entity());
-					auto chunk_index_offset = entity_table_indices.back();
+					auto chunk_index_offset = m_table.allocate_entity();
 					auto& [chunk_index, chunk_offset] = chunk_index_offset;
 					chunk* chunk = m_table.m_chunks[chunk_index];
 					chunk->entities()[chunk_offset] = *entity_iter;
-					builder(*entity_iter, table_offset(chunk_index_offset));
+					auto table_offset = m_table.table_offset(chunk_index_offset);
+					entity_table_offsets.push_back(table_offset);
+					builder(*entity_iter, storage_key{ m_table.m_table_index, table_offset });
 				}
-
+				raw_accessor::table_offsets = make_sequence_ref(entity_table_offsets);
 			}
 		};
 
-		template<typename StorageKeyBuilder>
-		allocate_accessor get_allocate_accessor(sequence_ref<entity> entities, StorageKeyBuilder builder)
+		template<typename SeqParam, typename StorageKeyBuilder>
+		auto get_allocate_accessor(sequence_ref<const entity, SeqParam> entities, StorageKeyBuilder builder)
 		{
-			static_assert(std::is_invocable_v<StorageKeyBuilder, entity, table_offset_t>);
+			static_assert(std::is_invocable_v<StorageKeyBuilder, entity, storage_key>);
 			return allocate_accessor(*this, entities, builder);
 		}
 
 		class deallocate_accessor : public raw_accessor
 		{
 		public:
+			using raw_accessor::raw_accessor;
 
-			deallocate_accessor(table& in_table, table_offset_seq offsets) : raw_accessor(in_table, offsets)
+			~deallocate_accessor()
 			{
-				for (auto& offset : offsets) m_table.deallocate_entity(offset);
+				for (auto& offset : table_offsets) m_table.deallocate_entity(offset);
 			}
-//#pragma warning(push) //covering original function
-//			//#pragma warning(disable: 4834)
-//			class component_array_accessor : public raw_accessor::component_array_accessor
-//			{
-//			public:
-//				using raw_accessor::component_array_accessor::component_array_accessor;
-//
-//				class iterator : public raw_accessor::component_array_accessor::iterator
-//				{
-//					using super = raw_accessor::component_array_accessor::iterator;
-//					table_comp_type_info& m_type;
-//					void* m_ptr;
-//				public:
-//					iterator(uint32_t component_index,
-//						destruct_accessor* accessor,
-//						typename table_offset_seq::iterator offset_iter)
-//						:
-//						super(component_index, accessor, offset_iter),
-//						m_type(accessor->m_table.m_notnull_components[component_index]),
-//						m_ptr(super::operator*())
-//					{
-//					}
-//
-//					iterator& operator++()
-//					{
-//					
-//						super::operator++();
-//						m_ptr = super::operator*();
-//						return *this;
-//					}
-//					iterator operator++(int) { iterator copy = *this; ++(*this); return copy; }
-//					void* operator*() { return m_ptr; }
-//
-//				};
-//
-//				iterator begin() const
-//				{
-//					return iterator(m_component_index, static_cast<destruct_accessor*>(m_accessor), static_cast<destruct_accessor*>(m_accessor)->table_offsets.begin());
-//				}
-//				//dont need to cover end
-//			};
-//
-//			component_array_accessor begin(){return component_array_accessor(0u, this);}
-//			//dont need to cover end
-//#pragma warning(pop)
+
 
 		};
 
-
-		[[nodiscard]]
-		table_offset_t emplace(entity e, sorted_sequence_ref<generic::constructor> constructors)
+		deallocate_accessor get_deallocate_accessor(sequence_ref<const table_offset_t> entities_table_offsets)
 		{
-			auto [chunk_index, chunk_offset] = allocate_entity();
-			chunk* chunk = m_chunks[chunk_index];
-			chunk->entities()[chunk_offset] = e;
-			int type_index = 0;
-			for (auto& constructor : constructors)
-			{
-				if (constructor.type() != m_notnull_components[type_index])
-				{
-					type_index++;
-					continue;
-				}
-				byte* data = component_address(chunk, chunk_offset, type_index);
-				constructor(data);
-				type_index++;
-			}
-			return table_offset({ chunk_index, chunk_offset });
+			return deallocate_accessor(*this, entities_table_offsets);
 		}
+
+		//[[nodiscard]]
+		//table_offset_t emplace(entity e, sorted_sequence_ref<const generic::constructor> constructors)
+		//{
+		//	auto [chunk_index, chunk_offset] = allocate_entity();
+		//	chunk* chunk = m_chunks[chunk_index];
+		//	chunk->entities()[chunk_offset] = e;
+		//	int type_index = 0;
+		//	for (auto& constructor : constructors)
+		//	{
+		//		if (constructor.type() != m_notnull_components[type_index])
+		//		{
+		//			type_index++;
+		//			continue;
+		//		}
+		//		byte* data = component_address(chunk, chunk_offset, type_index);
+		//		constructor(data);
+		//		type_index++;
+		//	}
+		//	return table_offset({ chunk_index, chunk_offset });
+		//}
 
 
 		void delete_entity(table_offset_t table_offset)
@@ -628,18 +725,19 @@ namespace hyecs
 
 		}
 
-		struct entity_accessor
+		class entity_accessor
 		{
 			using chunk_seq = sequence_ref<const chunk* const>;
-		private:
+		protected:
 			chunk_seq m_chunks;
 
 		public:
 			using value_type = entity;
-			entity_accessor(chunk_seq chunks) : m_chunks(chunks) {}
+			entity_accessor(const table* table) : m_chunks(make_sequence_ref(table->m_chunks)) {}
 
 			class iterator
 			{
+			protected:
 				chunk_seq::iterator m_chunk_iter;
 				chunk_seq::iterator m_chunk_end;
 				const chunk* m_chunk;
@@ -663,11 +761,12 @@ namespace hyecs
 						if (m_chunk_iter == m_chunk_end)
 						{
 							m_chunk = nullptr;
-							return;
+							return *this;
 						}
 						m_chunk = *m_chunk_iter;
 						m_offset = 0;
 					}
+					return *this;
 				}
 
 				iterator operator++(int)
@@ -676,6 +775,12 @@ namespace hyecs
 					++(*this);
 					return copy;
 				}
+
+				entity operator*()
+				{
+					return m_chunk->entities()[m_offset];
+				}
+
 
 				bool operator==(const iterator& other) const { return m_chunk == other.m_chunk && m_offset == other.m_offset; }
 				bool operator!=(const iterator& other) const { return !operator==(other); }
@@ -692,10 +797,57 @@ namespace hyecs
 			{
 				return end_iterator{};
 			}
+
+			size_t size() const
+			{
+				size_t size = 0;
+				for (auto& chunk : m_chunks)
+				{
+					size += chunk->size();
+				}
+				return size;
+			}
 		};
+
+		class table_offset_accessor : public entity_accessor
+		{
+			const table* m_table;
+		public:
+			table_offset_accessor(const table* table) : entity_accessor(table), m_table(table) {}
+			class iterator : public entity_accessor::iterator
+			{
+				const table* m_table;
+			public:
+				iterator(chunk_seq::iterator chunk_iter, chunk_seq::iterator chunk_end, const table* table) :
+					entity_accessor::iterator(chunk_iter, chunk_end), m_table(table)
+				{
+				}
+
+				table_offset_t operator*()
+				{
+					return m_table->table_offset({ (uint32_t)(m_chunk_iter - m_table->m_chunks.data()), m_offset });
+				}
+			};
+			iterator begin() const
+			{
+				return iterator(m_chunks.begin(), m_chunks.end(), m_table);
+			}
+			end_iterator end() const
+			{
+				return end_iterator{};
+			}
+
+		};
+
+
 		entity_accessor get_entities()
 		{
-			return entity_accessor(make_sequence_ref(m_chunks));
+			return entity_accessor(this);
+		}
+
+		table_offset_accessor get_table_offsets()
+		{
+			return table_offset_accessor(this);
 		}
 
 	};

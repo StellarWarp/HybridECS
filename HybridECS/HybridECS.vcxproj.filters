@@ -212,6 +212,12 @@
     <ClInclude Include="src\core\hybrid_component_storage.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="src\test_seq.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\container\bit_set.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="src\NatvisFile.natvis" />

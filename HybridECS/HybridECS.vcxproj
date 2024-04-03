@@ -135,6 +135,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="src\container\ankerl\unordered_dense.h" />
+    <ClInclude Include="src\container\bit_set.h" />
     <ClInclude Include="src\container\entt\dense_set.h" />
     <ClCompile Include="src\HybridECS.cpp" />
     <ClCompile Include="src\pch.cpp">
@@ -149,6 +150,7 @@
     <ClInclude Include="src\meta\meta_utils.h" />
     <ClInclude Include="src\meta\operator_test.h" />
     <ClInclude Include="src\test_archetype_registry.h" />
+    <ClInclude Include="src\test_seq.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\container\container.h" />

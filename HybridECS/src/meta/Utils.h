@@ -56,8 +56,32 @@ namespace hyecs
 	}
 
 
+	//hack
+	template<typename T>
+	T* pointer_from_vector_iterator(typename vector<T>::iterator& it)
+	{
+#ifdef HYECS_USING_STD_VECTOR
+#ifdef _DEBUG
+#ifdef _MSC_VER
+		return *((T**)&(it)+2);
+#endif
+#endif
+#endif
+		return it.operator->();
+	}
 
-
+	template<typename T>
+	const T* pointer_from_vector_iterator(typename vector<T>::const_iterator& it)
+	{
+#ifdef HYECS_USING_STD_VECTOR
+#ifdef _DEBUG
+#ifdef _MSC_VER
+		return *((T**)&(it)+2);
+#endif
+#endif
+#endif
+		return it.operator->();
+	}
 
 	//extension for std::initializer_list
 	template<typename T>
@@ -79,14 +103,14 @@ namespace hyecs
 		initializer_list(std::array<T, N>& arr)
 			: std::initializer_list<T>(arr.data(), arr.data() + N) {}
 
-//#ifdef _MSC_VER //hack for MSVC in case for error, not advice to use this
-//		initializer_list(typename std::vector<T>::iterator begin, typename std::vector<T>::iterator end)
-//			: std::initializer_list<T>(
-//				*((T**)&(begin)+2),
-//				*((T**)&(end)+2)) {}
-//#endif
+#ifdef _MSC_VER //hack for MSVC in case for error, not advice to use this
+		initializer_list(typename std::vector<T>::iterator begin, typename std::vector<T>::iterator end)
+			: std::initializer_list<T>(
+				pointer_from_vector_iterator<T>(begin),
+				pointer_from_vector_iterator<T>(end)) {}
+#endif
 	};
 
 
 
-}
+	}

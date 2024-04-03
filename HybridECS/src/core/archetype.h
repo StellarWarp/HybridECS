@@ -250,40 +250,13 @@ namespace hyecs
 		archetype_index() : m_archetype(&empty_archetype) {}
 		archetype_index(const archetype& archetype) : m_archetype(&archetype) {}
 
-		const archetype& get_info() const
-		{
-			return *m_archetype;
-		}
-
-		const uint64_t hash() const
-		{
-			return m_archetype->hash();
-		}
-
-		const uint64_t exclusive_hash() const
-		{
-			return m_archetype->excludsive_hash();
-		}
-
-		const uint64_t hash(append_component addition_components) const
-		{
-			return archetype::addition_hash(m_archetype->hash(), addition_components);
-		}
-
-		const uint64_t hash(remove_component removal_components) const
-		{
-			return archetype::subtraction_hash(m_archetype->hash(), removal_components);
-		}
-
-		bool is_tagged() const
-		{
-			return m_archetype->is_tagged();
-		}
-
-		bool contains(component_type_index type) const
-		{
-			return m_archetype->contains(type);
-		}
+        const archetype& get_info() const { return *m_archetype; }
+        const uint64_t hash() const { return m_archetype->hash(); }
+        const uint64_t exclusive_hash() const { return m_archetype->excludsive_hash(); }
+        const uint64_t hash(append_component addition_components) const { return archetype::addition_hash(m_archetype->hash(), addition_components); }
+        const uint64_t hash(remove_component removal_components) const { return archetype::subtraction_hash(m_archetype->hash(), removal_components); }
+        bool is_tagged() const { return m_archetype->is_tagged(); }
+        bool contains(component_type_index type) const { return m_archetype->contains(type); }
 
 		bool operator==(const archetype_index& other) const
 		{
@@ -294,25 +267,12 @@ namespace hyecs
 			return m_archetype == other.m_archetype;
 		}
 
-		bool operator!=(const archetype_index& other) const
-		{
-			return m_archetype != other.m_archetype;
-		}
+        bool operator!=(const archetype_index& other) const { return m_archetype != other.m_archetype; }
+        auto begin() const { return m_archetype->begin(); }
+        auto end() const { return m_archetype->end(); }
+        uint32_t component_count() const { return m_archetype->component_count(); }
 
-		auto begin() const
-		{
-			return m_archetype->begin();
-		}
-
-		auto end() const
-		{
-			return m_archetype->end();
-		}
-
-		uint32_t component_count() const
-		{
-			return m_archetype->component_count();
-		}
+		component_type_index operator[](size_t index) const { return (*m_archetype)[index]; }
 	};
 }
 

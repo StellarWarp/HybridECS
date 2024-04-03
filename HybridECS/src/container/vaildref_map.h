@@ -116,7 +116,8 @@ namespace hyecs
 			{
 				auto iter = m_free_value_iter.top();
 				m_free_value_iter.pop();
-				*iter = value;
+				new(iter) mapped_type(value);
+				//*iter = value;
 				m_key_to_index.emplace(key, &*iter);
 				return *iter;
 			}

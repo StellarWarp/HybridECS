@@ -174,7 +174,31 @@ namespace hyecs
 	DECLATE_MEMBER_TYPE_TEST(allocator_arg);
 
 
+#define DECLATE_MEMBER_VARIABLE_TEST(VARIABLE_NAME) \
+	template <typename T> \
+	struct has_member_variable_##VARIABLE_NAME \
+	{ \
+		template <typename T> \
+		static auto test(T*) -> decltype(std::declval<T>().VARIABLE_NAME, std::true_type()); \
+		template <typename> \
+		static auto test(...) -> std::false_type; \
+		static constexpr bool value = decltype(test<T>(nullptr))::value; \
+	}; \
+	template <typename T> \
+	constexpr bool has_member_variable_##VARIABLE_NAME##_v = has_member_variable_##VARIABLE_NAME<T>::value;
 
+#define DECLATE_MEMBER_STATIC_VARIABLE_TEST(VARIABLE_NAME) \
+	template <typename T> \
+	struct has_member_static_variable_##VARIABLE_NAME \
+	{ \
+		template <typename T> \
+		static auto test(T*) -> decltype(T::VARIABLE_NAME, std::true_type()); \
+		template <typename> \
+		static auto test(...) -> std::false_type; \
+		static constexpr bool value = decltype(test<T>(nullptr))::value; \
+	}; \
+	template <typename T> \
+	constexpr bool has_member_static_variable_##VARIABLE_NAME##_v = has_member_static_variable_##VARIABLE_NAME<T>::value;
 
 
 

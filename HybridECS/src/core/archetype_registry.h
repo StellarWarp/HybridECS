@@ -338,6 +338,19 @@ namespace hyecs
 		vaildref_map<uint64_t, taged_query_node> m_taged_query_nodes;
 		vaildref_map<uint64_t, cross_query_node> m_cross_query_nodes;
 
+		std::function<void(archetype_index)> m_untaged_archetype_addition_callback;
+		std::function<void(archetype_index, archetype_index)> m_taged_archetype_addition_callback;
+
+	public:
+		void bind_untaged_archetype_addition_callback(std::function<void(archetype_index)>&& callback)
+		{
+			m_untaged_archetype_addition_callback = callback;
+		}
+
+		void bind_taged_archetype_addition_callback(std::function<void(archetype_index, archetype_index)>&& callback)
+		{
+			m_taged_archetype_addition_callback = callback;
+		}
 
 	private:
 
@@ -378,6 +391,7 @@ namespace hyecs
 						component->add_related(&arch_node);
 				}
 			}
+			m_untaged_archetype_addition_callback(arch);
 
 
 			//single layer iteraton
@@ -448,25 +462,25 @@ namespace hyecs
 				}
 			}
 			ASSERTION_CODE(
-			assert(inital_match_set != nullptr);
+				assert(inital_match_set != nullptr);
 			if (!inital_match_set) return (component_node*)nullptr;
 			)
-			//union operation
-			//inverse iteration order might be better
-			for (auto archetype_node : inital_match_set->related_archetypes())
-			{
-				bool is_match = true;
-				for (auto filter_node : filter_component_nodes)
+				//union operation
+				//inverse iteration order might be better
+				for (auto archetype_node : inital_match_set->related_archetypes())
 				{
-					if (!filter_node->related_archetypes().contains(archetype_node))
+					bool is_match = true;
+					for (auto filter_node : filter_component_nodes)
 					{
-						is_match = false;
-						break;
+						if (!filter_node->related_archetypes().contains(archetype_node))
+						{
+							is_match = false;
+							break;
+						}
 					}
+					if (is_match)
+						new_query_node.add_matched(archetype_node);
 				}
-				if (is_match)
-					new_query_node.add_matched(archetype_node);
-			}
 
 			//alternative method for union operation
 			//for (auto archetype_node : inital_match_set->related_archetypes())
@@ -576,6 +590,7 @@ namespace hyecs
 							component->add_related(&arch_node);
 					}
 				}
+				m_taged_archetype_addition_callback(arch, base_arch_node->archetype());
 
 				//todo duplicate for taged part and untaged part
 				//try match all taged component related query
@@ -732,10 +747,10 @@ namespace hyecs
 			//}
 			ASSERTION_CODE(
 				assert(inital_match_set != nullptr);
-				if (!inital_match_set) return (query_node*)nullptr;
+			if (!inital_match_set) return (query_node*)nullptr;
 			)
-			//alternative method for union operation
-			for (auto archetype_node : *inital_match_set) new_query_node.try_match(archetype_node);
+				//alternative method for union operation
+				for (auto archetype_node : *inital_match_set) new_query_node.try_match(archetype_node);
 
 
 
@@ -772,9 +787,7 @@ namespace hyecs
 		archetype_index get_archetype(archetype_index origin_arch, append_component adding, remove_component removings)
 		{
 			auto arch_node = get_ingroup_archetype_node(origin_arch, adding, removings);
-			archetype_index index;
-			std::visit([&](auto&& arg) {index = arg->archetype(); }, arch_node);
-			return index;
+			return std::visit([&](auto&& arg) {return arg->archetype(); }, arch_node);
 		}
 
 		archetype_index get_archetype(archetype_index origin_arch, append_component adding)

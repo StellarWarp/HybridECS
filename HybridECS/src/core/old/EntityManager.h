@@ -255,7 +255,7 @@ namespace hyecs
 		void ProcessEntities(Callable f)//auto query m_version
 		{
 			using args_list = function_traits<Callable>::args::template modify_with<raw_component_to_const_ref_t>;
-			using component_list = args_list::template filter_with<is_component_ref>::raw_type;
+			using component_list = args_list::template filter_with<is_component_ref>::decay_type;
 			using access_list = args_list::template filter_with<is_accessable>;
 			using singleton_list = args_list::template filter_with<is_singleton>;
 

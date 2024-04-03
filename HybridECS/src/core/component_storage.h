@@ -37,7 +37,7 @@ namespace hyecs
 			m_storage.erase(e);
 		}
 
-		void erase(sequence_ref<entity> entities)
+		void erase(sequence_ref<const entity> entities)
 		{
 			for (auto e : entities)
 			{
@@ -69,7 +69,8 @@ namespace hyecs
 			m_storage.deallocate_value(e);
 		}
 
-		void allocate_components(sequence_ref<const entity> entities, sequence_ref<void*> addrs)
+		template<typename SeqParam = const entity*>
+		void allocate_components(sequence_ref<const entity, SeqParam> entities, sequence_ref<void*> addrs)
 		{
 			auto e_iter = entities.begin();
 			auto a_iter = addrs.begin();
@@ -186,7 +187,7 @@ namespace hyecs
 			iterator end() { return m_components.end(); }
 		};
 
-		component_allocate_accessor get_component_allocate_accessor(sequence_ref<const entity> entities)
+		component_allocate_accessor allocate(sequence_ref<const entity> entities)
 		{
 			return component_allocate_accessor(m_storage, entities);
 		}
