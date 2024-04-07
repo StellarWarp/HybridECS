@@ -164,7 +164,7 @@ namespace hyecs
 
 			class component_array_accessor
 			{
-				allocate_accessor* m_accessor;
+				const allocate_accessor* const m_accessor;
 				vector<void*> m_components;
 				component_type_index m_type;
 				uint32_t m_component_index;

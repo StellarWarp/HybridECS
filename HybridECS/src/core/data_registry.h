@@ -14,6 +14,8 @@ namespace hyecs
 
 	class data_registry
 	{
+	public:
+
 		archetype_registry m_archetype_registry;
 		storage_key_registry m_storage_key_registry;
 
@@ -109,7 +111,7 @@ namespace hyecs
 			m_taged_archetypes_storage.emplace(arch.hash(), taged_archetype_storage(arch, base_storage, taged_storages));
 		}
 
-		component_group_info& register_component_group(component_group_id id ,std::string name)
+		component_group_info& register_component_group(component_group_id id, std::string name)
 		{
 			return m_component_group_infos.emplace(id, component_group_info{ id, name , {} });
 		}
@@ -128,11 +130,11 @@ namespace hyecs
 
 		void register_type(const ecs_type_register_context& context)
 		{
-			for (auto& [_,group] : context.groups())
+			for (auto& [_, group] : context.groups())
 			{
-				component_group_info&  group_info = register_component_group(group.id, group.name);
+				component_group_info& group_info = register_component_group(group.id, group.name);
 
-				for (auto&[_,component] : group.components)
+				for (auto& [_, component] : group.components)
 				{
 					register_component_type(component.type, group_info, component.is_tag);
 				}
@@ -166,10 +168,15 @@ namespace hyecs
 		}
 
 		template <typename... T>
-		std::array<component_type_index, sizeof...(T)> get_component_types()
+		auto get_component_types()
 		{
-			static type_indexed_array<uint64_t,T...> type_hashes = sorted_array<uint64_t, sizeof...(T)>{typeid(T).hash_code()...};
-			static std::array<component_type_index, sizeof...(T)> cached = { m_component_type_infos.at(type_hashes.get<T>())... };//T is only repersent an order here
+			using input_sequence = type_list<T...>;
+			using type_order = sorted_type_list<T...>;
+			constexpr auto type_hashes = type_hash_array(type_order{});
+
+			auto cached = type_indexed_array<component_type_index, type_order>{
+				m_component_type_infos.at(type_hashes[input_sequence::template index_of<T>])...
+			};
 			return cached;
 		}
 
@@ -184,7 +191,6 @@ namespace hyecs
 			auto group_begin = components.begin();
 			auto group_end = components.begin();
 
-			//vector<entity> entities(count);
 			allocate_entity(entities);
 
 			while (group_begin != components.end())
@@ -237,6 +243,19 @@ namespace hyecs
 				group_begin = group_end;
 			}
 		}
+
+		template<typename... T>
+		void emplace_static(
+			sequence_ref<entity> entities,
+			T&&... components
+		)
+		{
+			static auto component_types = get_component_types<T...>();
+			static auto constructors = type_indexed_array<generic::constructor, type_list<T...>>{ generic::constructor(components)... };
+			emplace(component_types.as_array(), constructors.as_array(), entities);
+		}
+
+
 
 
 

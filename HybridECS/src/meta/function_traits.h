@@ -37,12 +37,12 @@ template <typename ReturnType, typename ClassType, typename... Args>\
 struct function_traits<ReturnType(ClassType::*)(Args...) __VA_ARGS__> : function_traits<ReturnType(Args...)>{};\
 
 	FUNCTION_TRAITS()
-		FUNCTION_TRAITS(const)
-		FUNCTION_TRAITS(volatile)
-		FUNCTION_TRAITS(const volatile)
+	FUNCTION_TRAITS(const)
+	FUNCTION_TRAITS(volatile)
+	FUNCTION_TRAITS(const volatile)
 
-		// 函数对象
-		template<typename Callable>
+	// 函数对象
+	template<typename Callable>
 	struct function_traits : function_traits<decltype(&Callable::operator())> {};
 }
 

@@ -68,7 +68,7 @@ int main()
 
 
 
-	test_func<const int*>(seq2);
+	test_func(seq2.as_const());
 
 	//sequence_ref<const int>::raw_type;
 

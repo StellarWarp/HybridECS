@@ -187,7 +187,7 @@ namespace hyecs
 		template<typename T>
 		void* push_back(const T& value)
 		{
-			assert(typeid(T).hash_code() == m_type.hash());
+			assert(type_hash::of<T> == m_type.hash());
 			T* addr = (T*)allocate_element();
 			new(addr) T(std::forward<T>(value));
 			return addr;
@@ -198,7 +198,7 @@ namespace hyecs
 		{
 			using type = std::remove_reference_t<T>;
 			using pointer = type*;
-			assert(typeid(type).hash_code() == m_type.hash());
+			assert(type_hash::of<type> == m_type.hash());
 			pointer addr = (pointer)allocate_element();
 			new(addr) type(std::forward<T>(value));
 			return addr;
@@ -207,7 +207,7 @@ namespace hyecs
 		template<typename T, typename... Args>
 		void* emplace_back(Args&&... args)
 		{
-			assert(typeid(T).hash_code() == m_type.hash());
+			assert(type_hash::of<T> == m_type.hash());
 			T* addr = (T*)allocate_element();
 			new(addr) T(std::forward<Args>(args)...);
 			return addr;

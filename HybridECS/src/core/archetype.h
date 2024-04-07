@@ -37,7 +37,7 @@ namespace hyecs
 		{
 			auto hash = base_hash;
 			for (auto& type : addition_components)
-				hash += type.hash();
+				hash += (uint64_t)type.hash();
 			return hash;
 		}
 
@@ -45,7 +45,7 @@ namespace hyecs
 		{
 			auto hash = base_hash;
 			for (auto& type : removal_components)
-				hash -= type.hash();
+				hash -= (uint64_t)type.hash();
 			return hash;
 		}
 
@@ -78,21 +78,6 @@ namespace hyecs
 				if (type.is_tag()) exclusive_mask.erase(type.bit_key());
 			}
 
-			//printf("\nArchetype full: hash %uld :", m_hash);
-			//for (auto& type : m_component_types)
-			//{
-			//	printf("%s ", type.name());
-			//}
-			//printf("\n");
-			//print_mask(m_component_mask);
-			//printf("\nArchetype untaged: hash %uld :", m_untaged_hash);
-			//for (auto& type : m_component_types)
-			//{
-			//	if (!type.is_tag()) printf("%s ", type.name());
-			//}
-			//printf("\n");
-			//print_mask(exclusive_mask);
-
 			if (auto it = debug_archetype_hash.find(m_untaged_hash); it != debug_archetype_hash.end()) {
 				assert(it->second == exclusive_mask);// hash collision
 			}
@@ -105,9 +90,9 @@ namespace hyecs
 		{
 			for (auto& type : addition_components)
 			{
-				m_hash += type.hash();
+				m_hash += (uint64_t)type.hash();
 				m_component_mask.insert(type.bit_key());
-				if (!type.is_tag()) m_untaged_hash += type.hash();
+				if (!type.is_tag()) m_untaged_hash += (uint64_t)type.hash();
 				//else m_tag_count++;
 			}
 			ASSERTION_CODE(hash_collision_assertion());
@@ -117,9 +102,9 @@ namespace hyecs
 		{
 			for (auto& type : removal_components)
 			{
-				m_hash -= type.hash();
+				m_hash -= (uint64_t)type.hash();
 				m_component_mask.erase(type.bit_key());
-				if (!type.is_tag()) m_untaged_hash -= type.hash();
+				if (!type.is_tag()) m_untaged_hash -= (uint64_t)type.hash();
 				//else m_tag_count--;
 			}
 			ASSERTION_CODE(hash_collision_assertion());

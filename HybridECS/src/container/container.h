@@ -115,7 +115,7 @@ namespace hyecs
 			: m_begin(vec.data()), m_end(vec.data() + vec.size()) {}
 
 		template<typename U = decay_type>
-		constexpr sequence_ref(const vector<std::remove_cv_t<U>>& vec) noexcept
+		constexpr sequence_ref(const vector<U>& vec) noexcept
 			: m_begin(vec.data()), m_end(vec.data() + vec.size()) {}
 
 		template<typename U = decay_type, size_t N>
@@ -123,7 +123,7 @@ namespace hyecs
 			: m_begin(arr.data()), m_end(arr.data() + arr.size()) {}
 
 		template<typename U = decay_type, size_t N>
-		constexpr sequence_ref(const std::array<std::remove_cv_t<U>, N>& arr) noexcept
+		constexpr sequence_ref(const std::array<U, N>& arr) noexcept
 			: m_begin(arr.data()), m_end(arr.data() + arr.size()) {}
 
 
@@ -184,6 +184,8 @@ namespace hyecs
 
 	};
 
+
+
 	template<typename T, typename Container>
 	class sequence_ref<T, Container, std::enable_if_t<
 		has_member_type_iterator_v<Container> && !has_operator_dereference_v<Container>>>
@@ -237,6 +239,9 @@ namespace hyecs
 			return sequence_ref<value_type, Container>(container);
 	}
 
+	//template<typename T, typename...Us>
+	//sequence_ref(type_indexed_array<T, type_list<Us...>>& arr) -> sequence_ref<T, T*>;
+
 	template<class Iter, typename = std::enable_if_t<has_operator_minus_v<Iter>>>
 	auto make_sequence_ref(Iter begin, Iter end) {
 		static_assert(has_operator_minus_v<Iter>, "contiguous iterator must have operator-()");
@@ -256,11 +261,6 @@ namespace hyecs
 	auto make_sequence_ref(Iter begin, Iter end, size_t size) {
 		static_assert(!has_operator_minus_v<Iter>, "use make_sequence_ref(Iter begin, Iter end) for contiguous iterators");
 		return sequence_ref<typename Iter::value_type, Iter>(begin, end, size);
-	}
-
-	template<typename T, typename SeqParam>
-	auto sequence_ref_const_convert(sequence_ref<T, SeqParam> seq) {
-		return sequence_ref<const T, const SeqParam>(seq);
 	}
 
 

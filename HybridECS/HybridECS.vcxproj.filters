@@ -23,7 +23,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\meta\Utils.h">
+    <ClInclude Include="src\meta\others.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="src\container\entt\compressed_pair.h">
@@ -216,6 +216,15 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="src\container\bit_set.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\test_type.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\container\static_string.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\utils\utils.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

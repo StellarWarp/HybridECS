@@ -101,7 +101,7 @@ namespace hyecs {
 		};
 		template <typename... T1s, typename T2, typename... T2s, size_t Remove>
 		struct remove_helper<type_list<T1s...>, type_list<T2, T2s...>, Remove> {
-			using type = typename remove_helper<type_list<T1s..., T2>, type_list<T2s...>,Remove - 1>::type;
+			using type = typename remove_helper<type_list<T1s..., T2>, type_list<T2s...>, Remove - 1>::type;
 		};
 
 	public:
@@ -245,6 +245,22 @@ namespace hyecs {
 	public:
 		template <typename U>
 		static constexpr size_t index_of = index_of_helper<U, 0, T...>::type::value;
+
+	public:
+
+		template<template <typename> typename Caster>
+		using cast = type_list<Caster<T>...>;
+
+
 	};
+
+
+
+	template<typename T>
+	struct type_wrapper
+	{
+		using type = T;
+	};
+
 
 } // namespace hyecs

@@ -142,6 +142,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClInclude Include="src\container\static_string.h" />
     <ClInclude Include="src\core\hybrid_component_storage.h" />
     <ClInclude Include="src\core\sparse_table.h" />
     <ClInclude Include="src\core\storage_key_registry.h" />
@@ -151,6 +152,8 @@
     <ClInclude Include="src\meta\operator_test.h" />
     <ClInclude Include="src\test_archetype_registry.h" />
     <ClInclude Include="src\test_seq.h" />
+    <ClInclude Include="src\test_type.h" />
+    <ClInclude Include="src\utils\utils.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\container\container.h" />
@@ -204,7 +207,7 @@
     <ClInclude Include="src\meta\function_traits.h" />
     <ClInclude Include="src\meta\type_indexed_array.h" />
     <ClInclude Include="src\meta\type_list.h" />
-    <ClInclude Include="src\meta\Utils.h" />
+    <ClInclude Include="src\meta\others.h" />
     <ClInclude Include="src\pch.h" />
   </ItemGroup>
   <ItemGroup>

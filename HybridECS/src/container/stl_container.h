@@ -92,11 +92,7 @@ namespace hyecs
 		typename Equal = std::equal_to<Key>,
 		typename Alloc = std::allocator<std::pair<Key, Value>>
 	>
-#if _HAS_CXX20
-	using unordered_map = std::unordered_map<Key, Value, Hash, Equal, Alloc>;
-#else
 	using unordered_map = ankerl::unordered_dense::map<Key, Value, Hash, Equal, Alloc>;
-#endif
 
 	template<
 		typename Key,

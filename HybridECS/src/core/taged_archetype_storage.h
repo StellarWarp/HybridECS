@@ -69,12 +69,15 @@ namespace hyecs
 			using end_iterator = nullptr_t;
 			using taged_component_iterator = vector<component_storage*>::iterator;
 			using entity_seq = sequence_ref<const entity, SeqParam>;
+
 			taged_archetype_storage& m_archetype;
+			archetype_storage::allocate_accessor<SeqParam> m_untaged_accessor;
 			entity_seq m_entities;
 		public:
 			allocate_accessor(taged_archetype_storage& archetype, entity_seq entities) :
 				m_archetype(archetype),
-				m_entities(entities)
+				m_entities(entities),
+				m_untaged_accessor(m_archetype.m_untaged_storage->get_allocate_accessor(m_entities))
 			{
 
 			}
@@ -110,7 +113,7 @@ namespace hyecs
 					}
 					else
 					{
-						(*m_taged_storages_iter)->component_type();
+						return (*m_taged_storages_iter)->component_type();
 					}
 				}
 
@@ -163,9 +166,8 @@ namespace hyecs
 
 			component_array_accessor begin()
 			{
-				auto untaged_accessor = m_archetype.m_untaged_storage->get_allocate_accessor(m_entities);
 				return component_array_accessor(
-					untaged_accessor.begin(),
+					m_untaged_accessor.begin(),
 					m_archetype.m_taged_storages.begin(),
 					m_archetype.m_taged_storages.end(),
 					m_entities

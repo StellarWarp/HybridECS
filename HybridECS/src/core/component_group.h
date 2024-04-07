@@ -46,15 +46,10 @@ namespace hyecs
 			id = static_cast<uint32_t>(std::hash<std::string>{}(name));
 		}
 		component_group_id(const volatile component_group_id& other) : id(other.id) {}
-		//component_group_id(uint32_t id) : id(id) {}
-		//component_group_id(const component_group_id& other) : id(other.id) {}
-		//component_group_id(component_group_id&& other) : id(other.id) { other.id = 0; }
-		//component_group_id& operator = (const component_group_id& other)
-		//{
-		//	id = other.id;
-		//	return *this;
-		//}
 		bool operator == (const component_group_id& other) const { return id == other.id; }
+		bool operator != (const component_group_id& other) const { return id != other.id; }
+		bool operator < (const component_group_id& other) const { return id < other.id; }
+		bool operator > (const component_group_id& other) const { return id > other.id; }
 	};
 }
 
@@ -115,7 +110,7 @@ namespace hyecs
 		template<typename T>
 		void add_component(component_group_id group_id, bool is_tag)
 		{
-			add_component(group_id, generic::type_info::from_template<T>(), is_tag);
+			add_component(group_id, generic::type_info::of<T>(), is_tag);
 		}
 		template<typename T>
 		void add_component(component_group_id group_id)
@@ -202,6 +197,8 @@ namespace internal_component_register { \
 		const vector<component_type_index>& component_types() const { return info->component_types; }
 		bool operator == (const component_group_index& other) const { return info->id == other.info->id; }
 		bool operator != (const component_group_index& other) const { return !operator==(other); }
+		bool operator < (const component_group_index& other) const { return info->id < other.info->id; }
+		bool operator > (const component_group_index& other) const { return info->id > other.info->id; }
 	};
 };
 

@@ -111,7 +111,7 @@ namespace hyecs
 
 		public:
 			accessor(const generic_dense_map& storage) : m_storage(&storage) {
-				assert(storage.value_type().hash() == typeid(T).hash_code());
+				assert(storage.value_type().hash() == type_hash::of<T>);
 			}
 
 			class iterator

@@ -9,7 +9,7 @@ namespace hyecs
 	class component_type_info
 	{
 		generic::type_index_container_cached m_type_index;
-		uint64_t m_hash;
+		type_hash m_hash;
 		bit_key m_bit_id;
 		component_group_index m_group;//todo
 		uint8_t m_is_tag : 1;
@@ -30,25 +30,11 @@ namespace hyecs
 			m_is_tag(is_tag),
 			m_group(group)
 		{}
-		
-		//template<typename T>
-		//static const component_type_info& from_template(bool is_tag)
-		//{
-		//	static component_type_info info(
-		//		generic::type_index_container_cached{ generic::type_info::from_template<T>() },
-		//		seqence_index_allocator.allocate(),
-		//		is_tag
-		//	);
-
-		//	return info;
-		//}
-  //      template<typename T> static component_type_info from_template() { return from_template<T>(std::is_empty_v<T>); }
-
 
         const char* name() const { return m_type_index.name(); }
         bool is_tag() const { return m_is_tag; }
         bool is_empty() const { return m_type_index.size() == 0; }
-        uint64_t hash() const { return m_hash; }
+		type_hash hash() const { return m_hash; }
         bit_key bit_key() const { return m_bit_id; }
         size_t size() const { return m_type_index.size(); }
 		component_group_index group() const { return m_group; }
@@ -83,7 +69,7 @@ namespace hyecs
 		generic::type_index type_index() const { return info->type_index(); }
 		const component_type_info& get_info() const { return *info; }
 		const char* name() const { return info->name(); }
-		uint64_t hash() const { return info->hash(); }
+		type_hash hash() const { return info->hash(); }
 		bit_key bit_key() const { return info->bit_key(); }
 		size_t size() const { return info->size(); }
 		bool is_tag() const { return info->is_tag(); }
@@ -99,7 +85,8 @@ namespace hyecs
 		operator const generic::type_index() const { return info->type_index(); }
 		bool operator == (const component_type_index& other) const { return info->hash() == other.info->hash(); }
 		bool operator != (const component_type_index& other) const { return !(*this == other); }
-		bool operator < (const component_type_index& other) const { return info->hash() < other.info->hash(); }
+		bool operator < (const component_type_index& other) const {
+			return info->group() < other.info->group() || info->hash() < other.info->hash(); }
 		bool operator > (const component_type_index& other) const { return info->hash() > other.info->hash(); }
 	};
 
@@ -156,6 +143,6 @@ struct std::hash<hyecs::component_type_index>
 {
 	size_t operator()(const hyecs::component_type_index& index) const
 	{
-		return index.get_info().hash();
+		return (size_t)index.get_info().hash();
 	}
 };

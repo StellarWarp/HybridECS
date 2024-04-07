@@ -70,48 +70,31 @@ namespace hyecs
 			copy_constructor_ptr copy_constructor;
 			move_constructor_ptr move_constructor;
 			destructor_ptr destructor;
-			uint64_t hash;
+			type_hash hash;
 			const char* name;
 
 		private:
-			type_info() = default;
+			type_info() = delete;
+			type_info(const type_info&) = delete;
+			type_info(type_info&&) = delete;
+			type_info& operator=(const type_info&) = delete;
 		public:
-
 			template<typename T>
-			static const type_info& from_template()
+			static const type_info& of()
 			{
+				static_assert(std::is_same_v<T, std::decay_t<T>>, "T must be a decayed type");
 				//wait c++20
-				static type_info info{
-					std::is_empty_v<T> ? 0 : sizeof(T),
-					nullable_copy_constructor<T>(),
-					nullable_move_constructor<T>(),
-					nullable_destructor<T>(),
-					typeid(T).hash_code(),
-					typeid(T).name()
+				const static type_info info{
+				   std::is_empty_v<T> ? 0 : sizeof(T),
+				   nullable_copy_constructor<T>(),
+				   nullable_move_constructor<T>(),
+				   nullable_destructor<T>(),
+				   type_hash::of<T>,
+				   type_name<T>
 				};
-
 				return info;
 			}
-		};
-		template<typename T>
-		const type_info& type_of()
-		{
-			return type_info::from_template<T>();
-		}
-
-		template<typename... Args>
-		using constructor_pointer = void* (*)(void*, Args...);
-
-		template<typename... Args>
-		struct construct_param
-		{
-			constructor_pointer<Args...> constructor;
-			std::tuple<Args...> args;
-
-			void* operator()(void* ptr)
-			{
-				return constructor(ptr, std::get<Args>(args)...);
-			}
+	
 		};
 
 
@@ -125,7 +108,7 @@ namespace hyecs
 
 			const type_info* info() const noexcept { return m_info; }
 			constexpr size_t size() const noexcept { return m_info->size; }
-			constexpr uint64_t hash() const noexcept { return m_info->hash; }
+			constexpr type_hash hash() const noexcept { return m_info->hash; }
 
 			bool operator==(const type_index& other) const noexcept
 			{
@@ -198,7 +181,7 @@ namespace hyecs
 				m_destructor(index.info()->destructor) {}
 
 			constexpr size_t size() const noexcept { return m_size; }
-			constexpr uint64_t hash() const noexcept { return m_index.hash(); }
+			constexpr type_hash hash() const noexcept { return m_index.hash(); }
 			const char* name() const noexcept { return m_index.name(); }
 
 			void* copy_constructor(void* dest, const void* src) const
@@ -260,7 +243,7 @@ namespace hyecs
 			template<typename T>
 			static type_index register_type()
 			{
-				type_info info = type_info::from_template<T>();
+				type_info info = type_info::of<T>();
 				if (m_type_info.contains(info.hash))
 					return type_index(&m_type_info.at(info.hash));
 				m_type_info.emplace(info.hash, info);
@@ -278,8 +261,21 @@ namespace hyecs
 			constructor(type_index type, std::function<void* (void*)> constructor)
 				: m_type(type), m_constructor(constructor) {}
 
+			template<typename T, std::enable_if_t<!std::is_same_v<std::decay_t<T>, constructor>, int> = 0>
+			constructor(T&& src)
+				: m_type(type_info::of<std::decay_t<T>>()), m_constructor(
+					[src](void* ptr)
+					{ return new (ptr) std::decay_t <T>(src); }
+				) {}
+
 			void* operator()(void* ptr) const { return m_constructor(ptr); }
 			type_index type() const { return m_type; }
+
+			template<typename T, typename... Args>
+			static constructor of(Args&& ... args)
+			{
+				return constructor(type_info::of<T>(), [args...](void* ptr) { return new (ptr) T(args...); });
+			}
 		};
 
 
@@ -292,7 +288,7 @@ struct std::hash<hyecs::generic::type_index>
 {
 	size_t operator()(const hyecs::generic::type_index& index) const noexcept
 	{
-		return index.hash();
+		return index.hash().operator size_t();
 	}
 };
 
