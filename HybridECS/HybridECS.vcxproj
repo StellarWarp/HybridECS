@@ -143,6 +143,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClInclude Include="src\container\static_string.h" />
+    <ClInclude Include="src\core\archetype_registry_II.h" />
     <ClInclude Include="src\core\archetype_registry_node.h" />
     <ClInclude Include="src\core\hybrid_component_storage.h" />
     <ClInclude Include="src\core\query_condition.h" />

@@ -230,10 +230,13 @@
     <ClInclude Include="src\core\static_data_registry.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="src\core\archetype_registry_node.h">
+    <ClInclude Include="src\core\archetype_registry_II.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="src\core\query_condition.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\archetype_registry_node.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
