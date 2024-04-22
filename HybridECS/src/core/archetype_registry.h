@@ -200,6 +200,9 @@ namespace hyecs
 		archetype m_all_component_condition;//seperate from world's archetype pool
 		set<archetype_node*> m_fit_archetypes;
 		vector<query*> m_child_queries;///todo 
+		{
+
+		}
 	public:
 
 		query_node(append_component all_components) :m_all_component_condition(all_components) {}
