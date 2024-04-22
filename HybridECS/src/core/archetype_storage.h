@@ -20,6 +20,7 @@ namespace hyecs
 		};
 
 		archetype_index m_index;
+		vector<component_type_index> m_notnull_components;
 		std::variant<table, sparse_table> m_table;
 		storage_type get_storage_type() const { return m_table.index() == 0 ? storage_type::Chunk : storage_type::Sparse; }
 		storage_key_registry::group_key_accessor m_key_registry;
@@ -35,12 +36,17 @@ namespace hyecs
 	public:
 		archetype_storage(
 			archetype_index index,
-			vector<component_storage*> component_storages,
+			sorted_sequence_ref<component_storage*> component_storages,
 			storage_key_registry::group_key_accessor key_registry)
 			: m_index(index),
 			m_table(sparse_table(component_storages)),
 			m_key_registry(key_registry)
 		{
+			m_notnull_components.reserve(component_storages.size());
+			for (uint64_t i = 0; i < component_storages.size(); ++i)
+			{
+				m_notnull_components.push_back(component_storages[i]->component_type());
+			}
 		}
 
 		archetype_index archetypex() const
@@ -49,6 +55,40 @@ namespace hyecs
 		}
 
 	public:
+		archetype_index archetype() const
+		{
+			return m_index;
+		}
+		void get_component_indices(
+			sorted_sequence_ref<const component_type_index> types,
+			sequence_ref<uint32_t> component_indices) const
+		{
+			auto comp_iter = types.begin();
+			auto write_iter = component_indices.begin();
+			uint32_t index = 0;
+			while (comp_iter != types.end())
+			{
+				const auto& comp = *comp_iter;
+				if (comp < m_notnull_components[index])
+				{
+					comp_iter++; 
+					write_iter++;
+				}
+				else if (comp == m_notnull_components[index])
+				{
+					*write_iter = index;
+					write_iter++;
+					comp_iter++;
+					index++;
+				}
+				else
+				{
+					index++;
+				}
+			}
+		}
+
+
 		void entity_change_archetype(
 			sequence_ref<const entity> entities,
 			archetype_storage* dest_archetype,
@@ -359,6 +399,15 @@ namespace hyecs
 							//todo
 						}
 						}));
+				}, m_table);
+		}
+
+
+		void dynamic_for_each(sequence_ref<const uint32_t> component_indices, std::function<void(entity, sequence_ref<void*>)> func)
+		{
+			std::visit([&](auto& t)
+				{
+					t.dynamic_for_each(component_indices, func);
 				}, m_table);
 		}
 

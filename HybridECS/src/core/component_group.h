@@ -100,11 +100,14 @@ namespace hyecs
 			if (it == m_groups.end()) throw std::runtime_error("group not found");
 			auto& group = it->second;
 			if (group.components.contains(type)) throw std::runtime_error("component already exists");
-			group.components[type] = component_register_info{
-				type,
-				seqence_allocator<component_register_info,uint32_t>::allocate(),
-				is_tag
-			};
+			group.components.insert({ 
+				type, 
+				component_register_info{
+					type,
+					seqence_allocator<component_register_info,uint32_t>::allocate(),
+					is_tag
+				} 
+				});
 		}
 
 		template<typename T>
@@ -172,11 +175,12 @@ namespace internal_component_register { \
 
 	class component_group_index
 	{
+		inline static component_group_info no_group{};
 		const component_group_info* info;
 
 	public:
 		component_group_index()
-			: info(nullptr)
+			: info(&no_group)
 		{}
 
 		component_group_index(const component_group_info& info)
@@ -202,6 +206,15 @@ namespace internal_component_register { \
 	};
 };
 
+
+template<>
+struct std::hash<hyecs::component_group_index>
+{
+	std::size_t operator()(const hyecs::component_group_index& index) const
+	{
+		return std::hash<hyecs::component_group_id>{}(index.id());
+	}
+};
 
 
 

@@ -2,6 +2,7 @@
 #include "archetype_registry.h"
 #include "archetype_storage.h"
 #include "taged_archetype_storage.h"
+#include "query.h"
 
 namespace hyecs
 {
@@ -24,10 +25,12 @@ namespace hyecs
 		vaildref_map<uint64_t, taged_archetype_storage> m_taged_archetypes_storage;
 		//using storage_variant = std::variant<component_storage, archetype_storage, taged_archetype_storage>;
 		//vaildref_map <archetype::hash_type, storage_variant> m_storages;
-		vaildref_map<uint64_t, table> m_tables;
 
 		vaildref_map<uint64_t, component_type_info> m_component_type_infos;
 		vaildref_map<component_group_id, component_group_info> m_component_group_infos;
+
+		vaildref_map<uint64_t, query> m_queries;
+		vaildref_map<uint64_t, taged_query> m_taged_queries;
 
 		dense_set<entity> m_entities;
 
@@ -94,7 +97,8 @@ namespace hyecs
 			storages.reserve(arch.component_count());
 			for (auto& component : arch)
 			{
-				storages.push_back(&m_component_storages.at(component.hash()));
+				if (!component.is_empty())
+					storages.push_back(&m_component_storages.at(component.hash()));
 			}
 			m_archetypes_storage.emplace(arch.hash(), archetype_storage(arch, storages, m_storage_key_registry.get_group_key_accessor()));
 		}
@@ -106,7 +110,8 @@ namespace hyecs
 			vector<component_storage*> taged_storages;
 			for (auto& component : arch)
 			{
-				if (component.is_tag()) taged_storages.push_back(&m_component_storages.at(component.hash()));
+				if (component.is_tag() && !component.is_empty()) 
+					taged_storages.push_back(&m_component_storages.at(component.hash()));
 			}
 			m_taged_archetypes_storage.emplace(arch.hash(), taged_archetype_storage(arch, base_storage, taged_storages));
 		}
@@ -122,7 +127,8 @@ namespace hyecs
 
 			group.component_types.push_back(component_index);
 			m_archetype_registry.register_component(component_index);
-			m_component_storages.emplace(type.hash(), component_storage(component_index));
+			if (!type.is_empty())
+				m_component_storages.emplace(type.hash(), component_storage(component_index));
 			return component_index;
 		}
 
@@ -167,18 +173,7 @@ namespace hyecs
 
 		}
 
-		template <typename... T>
-		auto get_component_types()
-		{
-			using input_sequence = type_list<T...>;
-			using type_order = sorted_type_list<T...>;
-			constexpr auto type_hashes = type_hash_array(type_order{});
 
-			auto cached = type_indexed_array<component_type_index, type_order>{
-				m_component_type_infos.at(type_hashes[input_sequence::template index_of<T>])...
-			};
-			return cached;
-		}
 
 
 
@@ -244,16 +239,19 @@ namespace hyecs
 			}
 		}
 
-		template<typename... T>
-		void emplace_static(
-			sequence_ref<entity> entities,
-			T&&... components
-		)
+		auto& get_query(query_condition condition)
 		{
-			static auto component_types = get_component_types<T...>();
-			static auto constructors = type_indexed_array<generic::constructor, type_list<T...>>{ generic::constructor(components)... };
-			emplace(component_types.as_array(), constructors.as_array(), entities);
+			auto hash = condition.hash();
+			if (auto iter = m_queries.find(hash); iter != m_queries.end())
+				return iter->second;
+
+			auto& q = m_queries.emplace(hash, query(condition));
+
+			m_archetype_registry.get_query(
+
+			return q;
 		}
+
 
 
 

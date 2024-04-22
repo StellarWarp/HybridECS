@@ -79,6 +79,16 @@ namespace hyecs
 			type_info(type_info&&) = delete;
 			type_info& operator=(const type_info&) = delete;
 		public:
+			type_info(
+				std::string_view name,
+				size_t size,
+				copy_constructor_ptr copy_constructor,
+				move_constructor_ptr move_constructor,
+				destructor_ptr destructor)
+			{
+
+			}
+
 			template<typename T>
 			static const type_info& of()
 			{
@@ -103,11 +113,12 @@ namespace hyecs
 			const type_info* m_info;
 
 		public:
-			type_index() : m_info(nullptr) {}
+			//type_index() : m_info(nullptr) {}
 			type_index(const type_info& info) : m_info(&info) {}
 
 			const type_info* info() const noexcept { return m_info; }
 			constexpr size_t size() const noexcept { return m_info->size; }
+			constexpr bool is_empty() const noexcept { return m_info->size == 0; }
 			constexpr type_hash hash() const noexcept { return m_info->hash; }
 
 			bool operator==(const type_index& other) const noexcept
@@ -258,6 +269,7 @@ namespace hyecs
 			type_index m_type;
 			std::function<void* (void*)> m_constructor;
 		public:
+			//constructor() : m_type(), m_constructor(nullptr) {}
 			constructor(type_index type, std::function<void* (void*)> constructor)
 				: m_type(type), m_constructor(constructor) {}
 

@@ -72,6 +72,7 @@ namespace hyecs
 		type_hash hash() const { return info->hash(); }
 		bit_key bit_key() const { return info->bit_key(); }
 		size_t size() const { return info->size(); }
+		bool is_empty() const { return info->is_empty(); }
 		bool is_tag() const { return info->is_tag(); }
 		component_group_index group() const { return info->group(); }
 
@@ -134,6 +135,24 @@ namespace hyecs
 		{
 			return type_index;
 		}
+	};
+
+	class component_bit_set :public bit_set
+	{
+	public:
+		using bit_set::bit_set;
+		component_bit_set(sequence_ref<component_type_index> indices)
+		{
+			for (auto& index : indices)
+			{
+				insert(index);
+			}
+		}
+        void insert(const component_type_index& index) { bit_set::insert(index.bit_key()); }
+        void erase(const component_type_index& index) { bit_set::erase(index.bit_key()); }
+        bool contains(const component_type_index& index) const { return bit_set::contains(index.bit_key()); }
+        bool contains(const component_bit_set& other) const { return bit_set::contains(other); }
+		bool contains_any(const component_bit_set& other) const { return bit_set::contains_any(other); }
 	};
 
 }

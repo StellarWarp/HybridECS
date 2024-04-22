@@ -1,331 +1,9 @@
 #pragma once
-#include "archetype.h"
+
+#include "archetype_registry_node.h"
 
 namespace hyecs
 {
-	class query;
-	class query_node;
-	class taged_query_node;
-	class taged_archetype_node;
-	class cross_query_node;
-	class component_node;
-	class taged_component_node;
-	class archetype_node;
-
-	//class archetype_node_base
-	//{
-	//	archetype_index m_archetype;
-	//	archetype_index archetype() const { return m_archetype; }
-	//};
-
-	class archetype_node
-	{
-		archetype_index m_archetype;
-		vector<query_node*> m_related_queries;//todo as component node is seperated from query node, need addition code for component node
-		vector<component_node*> m_component_nodes;
-	public:
-		archetype_node(archetype_index arch) :m_archetype(arch) {}
-		archetype_index archetype() const { return m_archetype; }
-
-		const vector<query_node*>& related_queries() const { return m_related_queries; }
-		const vector<component_node*>& component_nodes() const { return m_component_nodes; }
-
-		void add_related_query(query_node* query) { m_related_queries.push_back(query); }
-		void add_component_node(component_node* component) { m_component_nodes.push_back(component); }
-	};
-
-	class taged_archetype_node
-	{
-		archetype_index m_archetype;
-		archetype_node* m_base_archetype;
-		vector<taged_query_node*> m_related_queries;
-		vector<taged_component_node*> m_component_nodes;
-
-	public:
-		taged_archetype_node(archetype_index arch, archetype_node* base_archetype_node)
-			:m_archetype(arch), m_base_archetype(base_archetype_node) {}
-
-		archetype_index archetype() const { return m_archetype; }
-		archetype_node* base_archetype_node() const { return m_base_archetype; }
-		const vector<taged_query_node*>& related_queries() const { return m_related_queries; }
-		const vector<taged_component_node*>& component_nodes() const { return m_component_nodes; }
-
-		void add_related_query(taged_query_node* query) { m_related_queries.push_back(query); }
-		void add_component_node(taged_component_node* component) { m_component_nodes.push_back(component); }
-	};
-
-	using archetype_node_variant = std::variant<archetype_node*, taged_archetype_node*>;
-
-	class query_notify
-	{
-	public:
-		using Callback = std::function<void(archetype_index)>;
-	protected:
-		vector<Callback> m_archetype_addition_callbacks;
-
-		void publish_archetype_addition(archetype_index arch)
-		{
-			for (auto& callback : m_archetype_addition_callbacks)
-				callback(arch);
-		}
-
-		template<typename ArchetypeNodeContainer>
-		void add_callback(Callback&& callback, const ArchetypeNodeContainer& container)
-		{
-			for (auto& node : container)
-				callback(node->archetype());
-			m_archetype_addition_callbacks.emplace_back(std::move(callback));
-		}
-
-	};
-
-	using query_node_variant = std::variant<component_node*, taged_component_node*, query_node*, taged_query_node*>;
-
-
-	class component_node : public query_notify
-	{
-		component_type_index m_component;
-		set<archetype_node*> m_related_archetypes;
-		vector<query_node*> m_subquery_nodes;
-		vector<taged_query_node*> m_taged_subquery_nodes;
-		vector<cross_query_node*> m_cross_subquery_nodes;
-		vector<query*> m_single_component_queries;///todo
-
-	public:
-		component_node(component_type_index component) :m_component(component) {}
-		void add_callback(Callback&& callback)
-		{
-			query_notify::add_callback(std::move(callback), m_related_archetypes);
-		}
-
-
-		const vector<query_node*>& children_node() const { return m_subquery_nodes; }
-		const vector<taged_query_node*>& taged_children_node() const { return m_taged_subquery_nodes; }
-		const vector<cross_query_node*>& cross_children_node() const { return m_cross_subquery_nodes; }
-
-		const set<archetype_node*>& related_archetypes() const { return m_related_archetypes; }
-		const component_type_index& component() const { return m_component; }
-
-		void add_child(query_node* child)
-		{
-			m_subquery_nodes.push_back(child);
-		}
-
-		void add_child(taged_query_node* child)
-		{
-			m_taged_subquery_nodes.push_back(child);
-		}
-
-		void add_child(cross_query_node* child)
-		{
-			m_cross_subquery_nodes.push_back(child);
-		}
-
-		void add_child_query(query* child)
-		{
-			m_single_component_queries.push_back(child);
-		}
-
-		void add_related(archetype_node* arch_node)
-		{
-			assert(m_related_archetypes.contains(arch_node) == false);
-			m_related_archetypes.insert(arch_node);
-			publish_archetype_addition(arch_node->archetype());
-		}
-
-		void try_relate(archetype_node* arch_node)
-		{
-			if (arch_node->archetype().contains(m_component))
-				add_related(arch_node);
-		}
-	};
-
-
-
-	class taged_component_node : public query_notify
-	{
-		component_type_index m_component;
-		set<taged_archetype_node*> m_related_archetypes;
-		vector<taged_query_node*> m_taged_subquery_nodes;
-		vector<cross_query_node*> m_cross_subquery_nodes;
-		vector<query*> m_single_component_queries;///todo
-	public:
-		taged_component_node(component_type_index component) :m_component(component) {}
-		void add_callback(Callback&& callback)
-		{
-			query_notify::add_callback(std::move(callback), m_related_archetypes);
-		}
-
-
-		const vector<taged_query_node*>& taged_children_node() const { return m_taged_subquery_nodes; }
-		const vector<cross_query_node*>& cross_children_node() const { return m_cross_subquery_nodes; }
-
-		const set<taged_archetype_node*>& related_archetypes() const { return m_related_archetypes; }
-		const component_type_index& component() const { return m_component; }
-
-		void add_child(taged_query_node* child)
-		{
-			m_taged_subquery_nodes.push_back(child);
-		}
-
-		void add_child(cross_query_node* child)
-		{
-			m_cross_subquery_nodes.push_back(child);
-		}
-
-		void add_child_query(query* child)
-		{
-			m_single_component_queries.push_back(child);
-		}
-
-		void add_related(taged_archetype_node* arch_node)
-		{
-			assert(m_related_archetypes.contains(arch_node) == false);
-			m_related_archetypes.insert(arch_node);
-			arch_node->add_component_node(this);
-			publish_archetype_addition(arch_node->archetype());
-		}
-
-		void try_relate(taged_archetype_node* arch_node)
-		{
-			if (arch_node->archetype().contains(m_component))
-				add_related(arch_node);
-		}
-	};
-
-
-	class query_node : public query_notify
-	{
-		uint64_t m_iterate_version = std::numeric_limits<uint64_t>::max();
-		archetype m_all_component_condition;//seperate from world's archetype pool
-		set<archetype_node*> m_fit_archetypes;
-		vector<query*> m_child_queries;///todo 
-	public:
-
-		query_node(append_component all_components) :m_all_component_condition(all_components) {}
-		void add_callback(Callback&& callback)
-		{
-			query_notify::add_callback(std::move(callback), m_fit_archetypes);
-		}
-
-
-		constexpr uint64_t& iterate_version() { return m_iterate_version; }
-
-		size_t archetype_count() const { return m_fit_archetypes.size(); }
-		const set<archetype_node*>& archetype_nodes() const { return m_fit_archetypes; }
-		const archetype& all_component_set() const { return m_all_component_condition; }
-
-
-		void add_child_query(query* child)
-		{
-			m_child_queries.push_back(child);
-		}
-
-	private:
-
-		bool is_match(archetype_index arch) const
-		{
-			return arch.get_info().contains(m_all_component_condition);
-		}
-	public:
-
-		void add_matched(archetype_node* arch_node)
-		{
-			assert(is_match(arch_node->archetype()) == true);
-			assert(m_fit_archetypes.contains(arch_node) == false);
-			m_fit_archetypes.insert(arch_node);
-			arch_node->add_related_query(this);
-			publish_archetype_addition(arch_node->archetype());
-		}
-
-		bool try_match(archetype_node* arch_node)
-		{
-			auto arch = arch_node->archetype();
-			if (is_match(arch))
-			{
-				m_fit_archetypes.insert(arch_node);
-				arch_node->add_related_query(this);
-				publish_archetype_addition(arch);
-				return true;
-			}
-			return false;
-		}
-
-	};
-
-
-
-	class taged_query_node : public query_notify
-	{
-		uint64_t m_iterate_version = std::numeric_limits<uint64_t>::max();
-		archetype m_all_component_condition;//seperate from world's archetype pool
-		set<taged_archetype_node*> m_fit_archetypes;
-		vector<query*> m_child_queries;///todo
-
-	public:
-
-		taged_query_node(append_component all_components) :m_all_component_condition(all_components) {}
-		void add_callback(Callback&& callback)
-		{
-			query_notify::add_callback(std::move(callback), m_fit_archetypes);
-		}
-
-		constexpr uint64_t& iterate_version() { return m_iterate_version; }
-
-		size_t archetype_count() const { return m_fit_archetypes.size(); }
-		const set<taged_archetype_node*>& archetype_nodes() const { return m_fit_archetypes; }
-		const archetype& all_component_set() const { return m_all_component_condition; }
-
-
-		void add_child_query(query* child)
-		{
-			m_child_queries.push_back(child);
-		}
-
-	private:
-
-		bool is_match(archetype_index arch) const
-		{
-			return arch.get_info().contains(m_all_component_condition);
-		}
-	public:
-
-		void add_matched(taged_archetype_node* arch_node)
-		{
-			assert(is_match(arch_node->archetype()) == true);
-			assert(m_fit_archetypes.contains(arch_node) == false);
-			m_fit_archetypes.insert(arch_node);
-			arch_node->add_related_query(this);
-			publish_archetype_addition(arch_node->archetype());
-		}
-
-		bool try_match(taged_archetype_node* arch_node)
-		{
-			auto arch = arch_node->archetype();
-			if (is_match(arch))
-			{
-				m_fit_archetypes.insert(arch_node);
-				arch_node->add_related_query(this);
-				publish_archetype_addition(arch);
-				return true;
-			}
-			return false;
-		}
-
-	};
-
-	class cross_query_node
-	{
-		archetype m_all_component_condition;//seperate from world's archetype pool
-		vector<cross_query_node*> m_children;
-		uint64_t m_iterate_version;
-
-		vector<query*> m_child_queries;///todo
-	};
-
-
-
-
 
 	class archetype_registry
 	{
@@ -336,12 +14,17 @@ namespace hyecs
 		vaildref_map<uint64_t, taged_component_node> m_taged_component_nodes;
 		vaildref_map<uint64_t, query_node> m_query_nodes;
 		vaildref_map<uint64_t, taged_query_node> m_taged_query_nodes;
+		vaildref_map<uint64_t, mixed_query_node> m_mixed_query_nodes;
 		vaildref_map<uint64_t, cross_query_node> m_cross_query_nodes;
+		//group base phantom tag node
+		vaildref_map<component_group_index, taged_component_node> m_group_phantom_component_nodes;
 
 		std::function<void(archetype_index)> m_untaged_archetype_addition_callback;
 		std::function<void(archetype_index, archetype_index)> m_taged_archetype_addition_callback;
 
 	public:
+
+
 		void bind_untaged_archetype_addition_callback(std::function<void(archetype_index)>&& callback)
 		{
 			m_untaged_archetype_addition_callback = callback;
@@ -377,19 +60,12 @@ namespace hyecs
 			{
 				auto& origin_arch_node = m_archetype_nodes.at(origin_arch.hash());
 				if (removings.size() != 0)
-				{
 					for (auto query : origin_arch_node.related_queries())
-						query->try_match(&arch_node);
-					for (auto component : origin_arch_node.component_nodes())
-						component->try_relate(&arch_node);
-				}
+						std::visit([&](auto&& arg) {arg->try_match(&arch_node); }, query);
 				else
-				{
 					for (auto query : origin_arch_node.related_queries())
-						query->add_matched(&arch_node);
-					for (auto component : origin_arch_node.component_nodes())
-						component->add_related(&arch_node);
-				}
+						std::visit([&](auto&& arg) {arg->add_matched(&arch_node); }, query);
+				
 			}
 			m_untaged_archetype_addition_callback(arch);
 
@@ -405,7 +81,7 @@ namespace hyecs
 				else
 					com_node_index = &(*iter).second;
 
-				com_node_index->add_related(&arch_node);
+				com_node_index->add_matched(&arch_node);
 				for (auto query_node : com_node_index->children_node())
 				{
 					if (query_node->iterate_version() != iterate_version)
@@ -420,9 +96,9 @@ namespace hyecs
 
 		}
 
-		query_node_variant add_query(append_component all_components)
+		query_node_variant get_query(sequence_ref<component_type_index> condition_all)
 		{
-			uint64_t query_hash = archetype::addition_hash(0, all_components);
+			uint64_t query_hash = archetype::addition_hash(0, condition_all);
 			//check if query node already exist
 			if (auto iter = m_untaged_component_nodes.find(query_hash); iter != m_untaged_component_nodes.end())
 				return &(*iter).second;
@@ -431,13 +107,13 @@ namespace hyecs
 			//create new query node
 			auto& new_query_node = m_query_nodes.emplace(
 				query_hash,
-				query_node(all_components));
+				query_node(condition_all));
 			//init iteration
 			uint64_t iterate_version = seqence_allocator<query_node>::allocate();
 			size_t min_archetype_count = std::numeric_limits<int>::max();
 			component_node* inital_match_set = nullptr;
-			vector<component_node*> filter_component_nodes(all_components.size() - 1, nullptr);
-			for (decltype(auto) component : all_components)
+			vector<component_node*> filter_component_nodes(condition_all.size() - 1, nullptr);
+			for (decltype(auto) component : condition_all)
 			{
 				auto com_node_hash = archetype::addition_hash(0, { component });
 				component_node* com_node_index;
@@ -448,7 +124,7 @@ namespace hyecs
 
 				com_node_index->add_child(&new_query_node);
 				//get the min set of archetype
-				size_t related_archetype_count = com_node_index->related_archetypes().size();
+				size_t related_archetype_count = com_node_index->archetype_nodes().size();
 				if (related_archetype_count < min_archetype_count)
 				{
 					min_archetype_count = related_archetype_count;
@@ -467,12 +143,12 @@ namespace hyecs
 			)
 				//union operation
 				//inverse iteration order might be better
-				for (auto archetype_node : inital_match_set->related_archetypes())
+				for (auto archetype_node : inital_match_set->archetype_nodes())
 				{
 					bool is_match = true;
 					for (auto filter_node : filter_component_nodes)
 					{
-						if (!filter_node->related_archetypes().contains(archetype_node))
+						if (!filter_node->archetype_nodes().contains(archetype_node))
 						{
 							is_match = false;
 							break;
@@ -483,7 +159,7 @@ namespace hyecs
 				}
 
 			//alternative method for union operation
-			//for (auto archetype_node : inital_match_set->related_archetypes())
+			//for (auto archetype_node : inital_match_set->archetype_nodes())
 			//	new_query_node.try_match(archetype_node);
 
 
@@ -527,8 +203,6 @@ namespace hyecs
 		archetype_node_variant add_ingroup_archetype(
 			archetype_index origin_arch, append_component adding, remove_component removings, uint64_t arch_hash)
 		{
-			//todo fix
-
 			vector<component_type_index> untaged_removings_vec;
 			for (decltype(auto) comp : removings)
 			{
@@ -570,25 +244,18 @@ namespace hyecs
 					origin_arch_base = origin_arch;
 				auto base_arch_node = get_archetype_node(origin_arch_base, untaged_adding, untaged_removings);
 				auto& arch_node = m_taged_archetype_nodes.emplace(arch_hash, taged_archetype_node(arch, base_arch_node));
+				m_group_phantom_component_nodes.at(arch.group()).add_matched(&arch_node);
 				if (origin_arch.is_tagged())
 				{
 					auto& origin_arch_node = m_taged_archetype_nodes.at(origin_arch.hash());
 
 					//try match origin archetype related query
 					if (removings.size() != 0)
-					{
 						for (auto query : origin_arch_node.related_queries())
-							query->try_match(&arch_node);
-						for (auto component : origin_arch_node.component_nodes())
-							component->try_relate(&arch_node);
-					}
+							std::visit([&](auto&& arg) {arg->try_match(&arch_node); }, query);
 					else
-					{
 						for (auto query : origin_arch_node.related_queries())
-							query->add_matched(&arch_node);
-						for (auto component : origin_arch_node.component_nodes())
-							component->add_related(&arch_node);
-					}
+							std::visit([&](auto&& arg) {arg->add_matched(&arch_node); }, query);
 				}
 				m_taged_archetype_addition_callback(arch, base_arch_node->archetype());
 
@@ -604,7 +271,7 @@ namespace hyecs
 					else
 						taged_node = &(*iter).second;
 
-					taged_node->add_related(&arch_node);
+					taged_node->add_matched(&arch_node);
 					for (auto query_node : taged_node->taged_children_node())
 					{
 						if (query_node->iterate_version() != iterate_version)
@@ -657,9 +324,12 @@ namespace hyecs
 			return add_ingroup_archetype(origin_arch, adding, removings, hash);
 		}
 
-		query_node_variant add_taged_query(append_component all_components, vector<component_type_index> untaged_components, vector<component_type_index> taged_components)
+		query_node_variant get_taged_query(
+			sequence_ref<component_type_index> condition_all,
+			sequence_ref<component_type_index> untaged_components,
+			sequence_ref<component_type_index> taged_components)
 		{
-			uint64_t query_hash = archetype::addition_hash(0, all_components);
+			uint64_t query_hash = archetype::addition_hash(0, condition_all);
 			//check if query node already exist
 			if (auto iter = m_taged_component_nodes.find(query_hash); iter != m_taged_component_nodes.end())
 				return &(*iter).second;
@@ -668,14 +338,14 @@ namespace hyecs
 			//create new query node
 			auto& new_query_node = m_taged_query_nodes.emplace(
 				query_hash,
-				taged_query_node(all_components));
+				taged_query_node(condition_all));
 
 
 			//init iteration
 			uint64_t iterate_version = seqence_allocator<taged_query_node>::allocate();
 			size_t min_archetype_count = std::numeric_limits<size_t>::max();
 			const set<taged_archetype_node*>* inital_match_set = nullptr;
-			vector<const set<taged_archetype_node*>*> filter_set(all_components.size() - 1, nullptr);
+			vector<const set<taged_archetype_node*>*> filter_set(condition_all.size() - 1, nullptr);
 
 			for (decltype(auto) component : untaged_components)
 			{
@@ -689,7 +359,7 @@ namespace hyecs
 				com_node_index->add_child(&new_query_node);
 				///untaged component do not store the related taged archetype
 				//get the min set of archetype
-				//int related_archetype_count = com_node_index->related_archetypes().size();
+				//int related_archetype_count = com_node_index->archetype_nodes().size();
 				//if (related_archetype_count < min_archetype_count)
 				//{
 				//	min_archetype_count = related_archetype_count;
@@ -702,7 +372,11 @@ namespace hyecs
 				//	filter_untaged_component_nodes.push_back(com_node_index);
 				//}
 			}
-
+			if (taged_components.size() == 0)//support for any/none condition
+			{
+				auto group = untaged_components[0].group();
+				inital_match_set = &m_group_phantom_component_nodes.at(group).archetype_nodes();
+			}
 			for (decltype(auto) component : taged_components)
 			{
 				auto com_node_hash = archetype::addition_hash(0, { component });
@@ -714,17 +388,17 @@ namespace hyecs
 
 				com_node_index->add_child(&new_query_node);
 				//get the min set of archetype
-				size_t related_archetype_count = com_node_index->related_archetypes().size();
+				size_t related_archetype_count = com_node_index->archetype_nodes().size();
 				if (related_archetype_count < min_archetype_count)
 				{
 					min_archetype_count = related_archetype_count;
 					if (inital_match_set != nullptr)
-						filter_set.push_back(&com_node_index->related_archetypes());
-					inital_match_set = &com_node_index->related_archetypes();
+						filter_set.push_back(&com_node_index->archetype_nodes());
+					inital_match_set = &com_node_index->archetype_nodes();
 				}
 				else
 				{
-					filter_set.push_back(&com_node_index->related_archetypes());
+					filter_set.push_back(&com_node_index->archetype_nodes());
 				}
 			}
 			//union operation
@@ -748,35 +422,170 @@ namespace hyecs
 			ASSERTION_CODE(
 				assert(inital_match_set != nullptr);
 			if (!inital_match_set) return (query_node*)nullptr;
-			)
-				//alternative method for union operation
-				for (auto archetype_node : *inital_match_set) new_query_node.try_match(archetype_node);
+			);
+			//alternative method for union operation
+			for (auto archetype_node : *inital_match_set) new_query_node.try_match(archetype_node);
 
 
 
 			return &new_query_node;
 		}
 
-		query_node_variant add_ingroup_query(append_component all_components)
+		query_node_variant get_ingroup_query(sequence_ref<component_type_index> all_condition)
 		{
 			vector<component_type_index> untaged_components;
 			vector<component_type_index> taged_components;
-			for (decltype(auto) comp : all_components)
+			for (decltype(auto) comp : all_condition)
 			{
 				if (comp.is_tag()) taged_components.push_back(comp);
 				else untaged_components.push_back(comp);
 			}
 
 			if (taged_components.size() == 0)
-				return add_query(all_components);
+				return get_query(all_condition);
 			else
-				return add_taged_query(all_components, untaged_components, taged_components);
+				return get_taged_query(all_condition, untaged_components, taged_components);
 		}
+
+
+		query_node_variant get_untaged_subquery(untaged_query_node_variant base_query, const query_condition& condition)
+		{
+			//no need to check existance
+			//filter archetype from base query as the subquery is a subset of the base query
+
+			auto& new_query_node = m_query_nodes.emplace(
+				condition.hash(),
+				query_node(condition));
+			std::visit([&](auto&& node) {
+				const auto& arches = node->archetype_nodes();
+				for (decltype(auto) arch : arches)
+				{
+					new_query_node.try_match(arch);
+				}
+				node->add_child(&new_query_node);
+				}, base_query);
+			return &new_query_node;
+		}
+
+		query_node_variant get_taged_subquery(taged_query_node_variant base_query, const query_condition& condition)
+		{
+			auto& new_query_node = m_taged_query_nodes.emplace(
+				condition.hash(),
+				taged_query_node(condition));
+			std::visit([&](auto&& node) {
+				const auto& arches = node->archetype_nodes();
+				for (decltype(auto) arch : arches)
+				{
+					new_query_node.try_match(arch);
+				}
+				}, base_query);
+			return &new_query_node;
+		}
+
+		query_node_variant get_mixed_subquery(
+			untaged_query_node_variant untaged_base_query,
+			taged_query_node_variant taged_base_query,
+			const query_condition& condition)
+		{
+			auto& new_query_node = m_mixed_query_nodes.emplace(
+				condition.hash(),
+				mixed_query_node(condition));
+			/*
+			* filter algorithm:
+			* 1. untaged arch filter as normal
+			* 2. if taged arch's base arch match the condition, filter out, as it's included in untaged arch
+			*/
+			std::visit([&](auto&& node) {
+				const auto& arches = node->archetype_nodes();
+				for (decltype(auto) arch : arches)
+				{
+					new_query_node.try_match(arch);
+				}
+				}, untaged_base_query);
+			std::visit([&](auto&& node) {
+				const auto& arches = node->archetype_nodes();
+				for (decltype(auto) arch : arches)
+				{
+					if (condition.match(arch->base_archetype_node()->archetype()))
+						continue;
+					new_query_node.try_match(arch);
+				}
+				}, taged_base_query);
+			return &new_query_node;
+		}
+
+
+		query_node_variant get_ingroup_query(const query_condition& condition)
+		{
+			enum class query_type_t
+			{
+				untaged,
+				taged,
+				mixed
+			}query_type = query_type_t::untaged;
+			//todo support for no all condition query
+			if (condition.all.size() != 0)
+			{
+				//compute query type
+				auto basic_query_node = get_ingroup_query(condition.all);//todo need to add callback
+				if (std::get<taged_query_node*>(basic_query_node) != nullptr)
+					query_type = query_type_t::taged;
+				/* end condition all*/
+				/* condition any*/
+				if (query_type == query_type_t::untaged)
+				{
+					bool has_tag;
+					bool has_untag;
+					for (auto comp : condition.any)
+					{
+						if (comp.is_tag()) has_tag = true;
+						else has_untag = true;
+					}
+					if (has_tag && has_untag)
+						query_type = query_type_t::mixed;
+					else if (has_tag)
+						query_type = query_type_t::taged;
+					//else stay untaged
+				}
+				/* end condition any */
+				/* condition none*/
+				for (auto comp : condition.none)
+				{
+					if (comp.is_tag())
+					{
+						query_type = query_type_t::taged;
+						break;
+					}
+				}
+				/* end condition none */
+
+				switch (query_type)
+				{
+				case query_type_t::untaged:
+					return get_untaged_subquery(std::get<query_node*>(basic_query_node), condition);
+					break;
+				case query_type_t::taged:
+					return get_taged_subquery(std::get<taged_query_node*>(basic_query_node), condition);
+					break;
+				case query_type_t::mixed:
+					//depart mixed_query into untaged and taged part
+					break;
+				}
+			}
+
+		}
+
+
+
 
 	public:
 
 		void register_component(component_type_index component)
 		{
+			if (!m_group_phantom_component_nodes.contains(component.group()))
+			{
+				m_group_phantom_component_nodes.emplace(component.group(), taged_component_node({}));
+			}
 			if (component.is_tag())
 				m_taged_component_nodes.emplace(component.hash(), taged_component_node(component));
 			else
@@ -808,7 +617,13 @@ namespace hyecs
 
 		void get_query(append_component condition_all, query_notify::Callback&& callback)
 		{
-			auto query_node = add_ingroup_query(condition_all);
+			auto query_node = get_ingroup_query(condition_all);
+			std::visit([&](auto&& arg) {arg->add_callback(std::move(callback)); }, query_node);
+		}
+
+		void get_query(const query_condition& condition, query_notify::Callback&& callback)
+		{
+			auto query_node = get_ingroup_query(condition);
 			std::visit([&](auto&& arg) {arg->add_callback(std::move(callback)); }, query_node);
 		}
 

@@ -7,18 +7,19 @@ namespace hyecs
 	class sparse_table
 	{
 		dense_set<entity> m_entities;
-		vector<component_type_index> m_types;
+		vector<component_type_index> m_notnull_components;
 		vector<component_storage*> m_component_storages;
 
 
 	public:
 
-		sparse_table(vector<component_storage*> component_storages)
-			: m_component_storages(component_storages), m_types(component_storages.size())
+		sparse_table(sorted_sequence_ref<component_storage*> component_storages)
+			: m_component_storages(component_storages.begin(), component_storages.end())
 		{
-			for(uint64_t i = 0; i < m_component_storages.size(); ++i)
+			m_notnull_components.reserve(m_component_storages.size());
+			for (uint64_t i = 0; i < m_component_storages.size(); ++i)
 			{
-				m_types[i] = m_component_storages[i]->component_type();
+				m_notnull_components.push_back(m_component_storages[i]->component_type());
 			}
 		}
 
@@ -74,7 +75,7 @@ namespace hyecs
 			public:
 
 				component_array_accessor(uint32_t index, raw_accessor* accessor)
-					: m_type(accessor->m_table.m_types[index]), m_component_index(index), m_accessor(accessor)
+					: m_type(accessor->m_table.m_notnull_components[index]), m_component_index(index), m_accessor(accessor)
 				{
 				}
 
@@ -83,7 +84,7 @@ namespace hyecs
 				void operator++()
 				{
 					m_component_index++;
-					m_type = m_accessor->m_table.m_types[m_component_index];
+					m_type = m_accessor->m_table.m_notnull_components[m_component_index];
 				}
 
 				component_array_accessor& operator++(int)
@@ -96,7 +97,7 @@ namespace hyecs
 				auto comparable() const { return m_type; }
 				bool operator==(const component_array_accessor& other) const { return m_type == other.m_type; }
 				bool operator!=(const component_array_accessor& other) const { return !(*this == other); }
-				bool operator==(const end_iterator& other) const { return m_component_index == m_accessor->m_table.m_types.size(); }
+				bool operator==(const end_iterator& other) const { return m_component_index == m_accessor->m_table.m_notnull_components.size(); }
 				bool operator!=(const end_iterator& other) const { return !(*this == other); }
 
 
@@ -180,7 +181,7 @@ namespace hyecs
 
 				component_array_accessor(allocate_accessor* accessor, uint32_t index)
 					: m_accessor(accessor),
-					m_type(accessor->m_table.m_types[index]),
+					m_type(accessor->m_table.m_notnull_components[index]),
 					m_component_index(index),
 					m_components(accessor->m_entities.size())
 				{
@@ -194,7 +195,7 @@ namespace hyecs
 					m_component_index++;
 					if (operator!=(end_iterator{}))
 					{
-						m_type = m_accessor->m_table.m_types[m_component_index];
+						m_type = m_accessor->m_table.m_notnull_components[m_component_index];
 						allocate_for_index(m_component_index);
 					}
 				}
@@ -202,7 +203,7 @@ namespace hyecs
 				auto comparable() const { return m_type; }
 				bool operator==(const component_array_accessor& other) const { return m_type == other.m_type; }
 				bool operator!=(const component_array_accessor& other) const { return !(*this == other); }
-				bool operator==(const end_iterator& other) const { return m_component_index == m_accessor->m_table.m_types.size(); }
+				bool operator==(const end_iterator& other) const { return m_component_index == m_accessor->m_table.m_notnull_components.size(); }
 				bool operator!=(const end_iterator& other) const { return !(*this == other); }
 				using iterator = typename vector<void*>::iterator;
 				iterator begin() { return m_components.begin(); }
@@ -255,8 +256,22 @@ namespace hyecs
 		{
 			return deallocate_accessor(*this, entities);
 		}
+
+		void dynamic_for_each(sequence_ref<const uint32_t> component_indices, std::function<void(entity, sequence_ref<void*>)> func)
+		{
+			vector<void*> addrs(component_indices.size());//todo this allocation can be optimized
+			for (const auto& entity : m_entities)
+			{
+				for (auto i = 0; i < component_indices.size(); i++)
+				{
+					addrs[i] = m_component_storages[component_indices[i]]->at(entity);
+				}
+				func(entity, addrs);
+			}
+		}
+
 	};
 
 
 
-};
+}

@@ -21,11 +21,11 @@ namespace hyecs
 		taged_archetype_storage(
 			archetype_index index,
 			archetype_storage* untaged_storage,
-			vector<component_storage*> taged_storages
+			sorted_sequence_ref<component_storage*> taged_storages
 		) :
 			m_index(index),
 			m_untaged_storage(untaged_storage),
-			m_taged_storages(taged_storages)
+			m_taged_storages(taged_storages.begin(), taged_storages.end())
 		{
 		}
 

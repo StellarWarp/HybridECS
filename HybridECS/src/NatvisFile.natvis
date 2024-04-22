@@ -48,4 +48,12 @@
 		</Expand>
 	</Type>
 
+	<Type Name="hyecs::component_type_index">
+		<DisplayString>{{ name={info->m_type_index.m_index.m_info->name} }}</DisplayString>
+	</Type>
+
+	<Type Name="hyecs::generic::type_index">
+		<DisplayString>{{ name={m_info->name} }}</DisplayString>
+	</Type>
+
 </AutoVisualizer>

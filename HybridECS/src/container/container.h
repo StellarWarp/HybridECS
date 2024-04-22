@@ -284,6 +284,14 @@ namespace hyecs
 			std::sort(this->begin(), this->end());
 		}
 	};
+
+	template<typename Range, typename Compare = std::less<>>
+	Range sort_range(Range&& range, Compare compare = Compare{})
+	{
+		auto sorted = range;
+		std::sort(sorted.begin(), sorted.end(), compare);
+		return sorted;
+	}
 }
 
 
