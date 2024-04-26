@@ -89,7 +89,7 @@ namespace hyecs
 				return { m_iter->first, *m_iter->second };
 			}
 
-			//this works but it's UB, not advised to use, use operator*() instead
+			//this works but it's a UB, not advised to use, use operator*() instead
 			std::pair<const key_type&, mapped_type&>* operator->() const
 			{
 				std::pair<const key_type&, mapped_type&> temp = { m_iter->first, *m_iter->second };

@@ -79,15 +79,6 @@ namespace hyecs
 			type_info(type_info&&) = delete;
 			type_info& operator=(const type_info&) = delete;
 		public:
-			type_info(
-				std::string_view name,
-				size_t size,
-				copy_constructor_ptr copy_constructor,
-				move_constructor_ptr move_constructor,
-				destructor_ptr destructor)
-			{
-
-			}
 
 			template<typename T>
 			static const type_info& of()
