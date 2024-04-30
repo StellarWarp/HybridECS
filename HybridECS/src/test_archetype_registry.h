@@ -1,125 +1,182 @@
 #pragma once
-#include "pch.h"
-#include "core/archetype_registry.h"
-#include "container/container.h"
-//#include "container/stl_container.h"
+#include "core/static_data_registry.h"
+
 
 using namespace hyecs;
 
-std::ostream& operator<<(std::ostream& os, const component_type_index& index) {
-	os << index.get_info().name();
-	return os;
+
+constexpr auto group_a = component_group_id("Group A");
+inline const auto _ = ecs_static_register_context::register_context.add_group("Group A");
+
+
+struct A
+{
+	int x;
+	// A(int x) : x(x)
+	// {
+	// 	std::cout << "A constructor" << std::endl;
+	// }
+	// A(A&& other) noexcept : x(other.x)
+	// {
+	// 	std::cout << "A move constructor" << std::endl;
+	// }
+	// A(const A& other) : x(other.x)
+	// {
+	// 	std::cout << "A copy constructor" << std::endl;
+	// }
+	// ~A()
+	// {
+	// 	std::cout << "A destructor" << std::endl;
+	// }
+};
+
+struct B
+{
+	int x;
+};
+
+struct C
+{
+	int x;
+};
+
+struct D
+{
+	int x;
+};
+
+struct E
+{
+	int x;
+};
+
+struct T1
+{
+};
+
+struct T2
+{
+};
+
+struct T3
+{
+};
+
+REGISTER_HYECS_COMPONENT(A, group_a);
+
+REGISTER_HYECS_COMPONENT(B, group_a);
+
+REGISTER_HYECS_COMPONENT(C, group_a);
+
+REGISTER_HYECS_COMPONENT(D, group_a);
+
+REGISTER_HYECS_COMPONENT(E, group_a);
+
+REGISTER_HYECS_COMPONENT(T1, group_a);
+
+REGISTER_HYECS_COMPONENT(T2, group_a);
+
+REGISTER_HYECS_COMPONENT(T3, group_a);
+
+struct register_idents
+{
+	enum
+	{
+		main,
+	};
+};
+
+
+class main_registry : public static_data_registry<register_idents::main>
+{
+	using static_data_registry::static_data_registry;
+};
+
+
+template <typename Callable, typename... Args, size_t... I>
+void in_group_for_each_impl(Callable&& func, type_list<Args...>, std::index_sequence<I...>)
+{
+	using component_param = typename type_list<Args...>::template filter_with<is_static_component>;
+	using non_component_param = typename type_list<Args...>::template filter_without<is_static_component>;
+
+	std::cout << type_name<component_param> << std::endl;
+	std::cout << type_name<non_component_param> << std::endl;
+
+	std::array<void*,non_component_param::size> comp_addr{ nullptr };
+	
+	auto get_param = [&](auto type) -> decltype(auto)
+	{
+		using param_type = typename decltype(type)::type;
+		using base_type = typename std::decay_t<param_type>;
+		if constexpr (is_static_component<param_type>::value)
+		{
+			size_t index = component_param::template index_of<param_type>;
+			return static_cast<param_type>(*static_cast<base_type*>(comp_addr[index]));
+		}
+		else
+		{
+			return param_type{};
+		}
+	};
+	
+	func(get_param(type_wrapper<Args>{})...);
+	
 }
 
-std::ostream& operator<<(std::ostream& os, const archetype_index& index) {
-	const auto& arch = index.get_info();
-	for (auto& comp : arch) {
-		os << comp << " ";
-	}
-	return os;
-}
 
-struct A { int x; };
-struct B { int x; };
-struct C { int x; };
-struct D { int x; };
-struct E { int x; };
-struct T1 {};
-struct T2 {};
-struct T3 {};
+template <typename Callable>
+auto in_group_for_each(Callable&& func)
+{
+	in_group_for_each_impl<Callable>(
+		std::forward<Callable>(func),
+		typename function_traits<Callable>::args{},
+		std::make_index_sequence<function_traits<Callable>::arity>{}
+	);
+}
 
 int main()
 {
-	int x[] = { 1,2,3,4,5,6,7,8,9,10 };
-	sequence_ref<int> list(x, x + 10);
-	sequence_ref<const int> list2 = { 1,2,3,4,5,6,7,8,9,10 };
+	// main_registry registry(ecs_static_register_context::register_context);
 
 
-	generic::type_index int_type = generic::type_registry::register_type<int>();
+	// vector<entity> entities2(10);
+	// registry.emplace_static(entities2, A{ 1 }, B{ 2 }, T1{});
+	// registry.emplace_static(entities2, A{ 1 }, C{ 2 });
+	// registry.emplace_static(entities2, T1{}, T3{});
+	// registry.emplace_static(entities2, A{ 1 }, B{ 2 }, C{ 3 }, D{ 4 }, E{ 5 }, T1{}, T2{}, T3{});
+	// registry.emplace_static(entities2, A{ 1 }, D{ 4 }, E{ 5 }, T1{}, T2{}, T3{});
+	// registry.emplace_static(entities2, A{ 1 }, B{ 2 });
+	// registry.emplace_static(entities2, A{ 1 });
+	//
+	//
+	//
+	// registry.get_query({
+	// 	{registry.component_types<A,B>()},
+	// 	{}
+	// });
+	//
+	// registry.emplace_static(entities2,  A{ 1 }, B{ 2 }, C{ 3 });
+	//
+	// std::cout << "-------------------" << std::endl;
+	//
+	// auto& q = registry.get_query({
+	// 	{registry.component_types<A,B>()},{},{registry.component_types<C>()}
+	// });
+	//
+	// entities2.resize(300);
+	// registry.emplace_static(entities2, A{ 1 }, B{ 2 });
+	//
+	//
+	//
+	// q.dynamic_for_each(q.get_access_info(registry.component_types<A,B>()),
+	// 	[](entity e ,sequence_ref<void*> data)
+	// {
+	// 	auto [a,b] = data.cast_tuple<A*,B*>();
+	// 	std::cout << e.id() << " : " << a->x << " " << b->x << std::endl;
+	// });
 
-
-
-	component_type_index a_type = component_type_info::from_template<A>();
-	component_type_index b_type = component_type_info::from_template<B>();
-	component_type_index c_type = component_type_info::from_template<C>();
-	component_type_index d_type = component_type_info::from_template<D>();
-	component_type_index e_type = component_type_info::from_template<E>();
-	component_type_index t1_type = component_type_info::from_template<T1>();
-	component_type_index t2_type = component_type_info::from_template<T2>();
-	component_type_index t3_type = component_type_info::from_template<T3>();
-
-	archetype_registry registry;
-
-	registry.register_component(a_type);
-	registry.register_component(b_type);
-	registry.register_component(c_type);
-	registry.register_component(t1_type);
-	registry.register_component(t2_type);
-	registry.register_component(t3_type);
-
-	registry.register_query({ a_type, b_type }, [](archetype_index arch) {
-		std::cout << "Query AB: " << arch << std::endl;
+	in_group_for_each(
+		[](entity, const B&, D&, C, A&)
+		{
 		});
-
-	registry.register_query({ a_type, c_type }, [](archetype_index arch) {
-		std::cout << "Query AC: " << arch << std::endl;
-		});
-
-	registry.register_query({ a_type, b_type, c_type }, [](archetype_index arch) {
-		std::cout << "Query ABC: " << arch << std::endl;
-		});
-
-	registry.register_query({ a_type, b_type, c_type, t1_type }, [](archetype_index arch) {
-		std::cout << "Query ABC T1: " << arch << std::endl;
-		});
-
-	registry.register_query({ a_type, b_type, c_type, t2_type }, [](archetype_index arch) {
-		std::cout << "Query ABC T2: " << arch << std::endl;
-		});
-
-	registry.register_query({ a_type, b_type, c_type, t3_type }, [](archetype_index arch) {
-		std::cout << "Query ABC T3: " << arch << std::endl;
-		});
-
-	auto arch_ab = registry.register_archetype({ a_type, b_type });
-	auto arch_ac = registry.register_archetype({ a_type, c_type });
-	auto arch_abc = registry.register_archetype({ a_type, b_type, c_type });
-	auto arch_bc = registry.register_archetype({ b_type, c_type });
-	auto arch_bad = registry.register_archetype({ b_type, a_type, d_type });
-	auto arch_abc_t1 = registry.register_archetype({ a_type, b_type, c_type, t1_type });
-	auto arch_abc_t2 = registry.register_archetype({ a_type, b_type, c_type, t2_type });
-	auto arch_abc_t3 = registry.register_archetype({ a_type, b_type, c_type, t3_type });
-	auto arch_abc_t1t3 = registry.register_archetype({ a_type, b_type, c_type, t1_type, t3_type });
-	auto arch_abc_t1t2t3 = registry.register_archetype({ a_type, b_type, c_type, t1_type, t2_type, t3_type });
-
-	std::cout << "\n late query registration\n\n";
-	//late query registration
-	registry.register_query({ a_type, t1_type, t3_type }, [](archetype_index arch) {
-		std::cout << "Query A T1 T3: " << arch << std::endl;
-		});
-	auto arch_ab_ref = registry.register_archetype({ a_type, b_type });
-
-	registry.register_query({ a_type }, [](archetype_index arch) {
-		std::cout << "Query A: " << arch << std::endl;
-		});
-
-	registry.register_query({ t1_type }, [](archetype_index arch) {
-		std::cout << "Query T1: " << arch << std::endl;
-		});
-
-
-
-
-	auto arch_t1t3 = registry.register_archetype({ t1_type, t3_type });
-	auto arch_t1t2 = registry.register_archetype({ t1_type, t2_type });
-
-	registry.register_query({ b_type }, [](archetype_index arch) {
-		std::cout << "Query B: " << arch << std::endl;
-		});
-
-
-
-
-
-
 }

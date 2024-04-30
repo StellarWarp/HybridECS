@@ -128,7 +128,7 @@
     <ClInclude Include="src\core\archetype_storage.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="src\core\archetype_registry.h">
+    <ClInclude Include="src\core\discard\archetype_registry.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="src\container\vaildref_map.h">
@@ -194,7 +194,7 @@
     <ClInclude Include="src\core\sparse_table.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="src\core\taged_archetype_storage.h">
+    <ClInclude Include="src\core\tag_archetype_storage.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="src\meta\meta_utils.h">
@@ -230,13 +230,31 @@
     <ClInclude Include="src\core\static_data_registry.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="src\core\archetype_registry_II.h">
+    <ClInclude Include="src\core\archetype_registry.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="src\core\query_condition.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="src\core\archetype_registry_node.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\container\raw_segmented_vector.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\dense_map.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\container\segmented_bit_set.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\container\sequence_ref.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\test_table.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\test_sparse_table.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

@@ -10,7 +10,7 @@
 
 #include "core/archetype_storage.h"
 //#include "core/component_storage.h"
-#include "core/taged_archetype_storage.h"
+#include "core/tag_archetype_storage.h"
 #include "core/data_registry.h"
 
 //#include "core/archetype_storage.h"

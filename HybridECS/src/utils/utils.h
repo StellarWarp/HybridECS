@@ -63,7 +63,7 @@ namespace hyecs
 		template <class Range, class Compare = std::less<>>
 		constexpr auto sort(Range&& range , Compare cmp = Compare{}) {
 			quicksort(std::begin(range), std::end(range), cmp);
-			return range;
+			return std::forward<Range>(range);
 		}
 	}
 

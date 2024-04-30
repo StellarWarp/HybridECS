@@ -11,7 +11,7 @@ namespace hyecs
 
 	class archetype_storage
 	{
-		friend class taged_archetype_storage;
+		friend class tag_archetype_storage;
 
 		enum class storage_type
 		{
@@ -20,18 +20,22 @@ namespace hyecs
 		};
 
 		archetype_index m_index;
-		vector<component_type_index> m_notnull_components;
+		vector<component_type_index> m_notnull_components;//cache from m_component_storages
+		vector<component_storage*> m_component_storages;//store for chunk to sparse convert
 		std::variant<table, sparse_table> m_table;
 		storage_type get_storage_type() const { return m_table.index() == 0 ? storage_type::Chunk : storage_type::Sparse; }
 		storage_key_registry::group_key_accessor m_key_registry;
 
 		//event
-
-		vector<std::function<void(entity, storage_key)>> m_on_entity_add;
-		vector<std::function<void(entity, storage_key)>> m_on_entity_remove;
+		//add and remove event are inside the m_table
+		// vector<std::function<void(entity, storage_key)>> m_on_entity_add;
+		// vector<std::function<void(entity, storage_key)>> m_on_entity_remove;
 		vector<std::function<void(entity, storage_key, storage_key)>> m_on_entity_move;//from, to
 		vector<std::function<void()>> m_on_sparse_to_chunk;
 		vector<std::function<void()>> m_on_chunk_to_sparse;
+
+		uint32_t sparse_to_chunk_convert_limit;
+		uint32_t chunk_to_sparse_convert_limit;
 
 	public:
 		archetype_storage(
@@ -39,53 +43,76 @@ namespace hyecs
 			sorted_sequence_ref<component_storage*> component_storages,
 			storage_key_registry::group_key_accessor key_registry)
 			: m_index(index),
+			m_component_storages(component_storages),
 			m_table(sparse_table(component_storages)),
 			m_key_registry(key_registry)
 		{
+			assert(component_storages.size() != 1);
 			m_notnull_components.reserve(component_storages.size());
 			for (uint64_t i = 0; i < component_storages.size(); ++i)
 			{
 				m_notnull_components.push_back(component_storages[i]->component_type());
 			}
+			size_t components_size = sizeof(entity);
+			for (auto& comp : index)
+				components_size += comp.size();
+
+			sparse_to_chunk_convert_limit = component_table_chunk_traits::size / components_size;
+			chunk_to_sparse_convert_limit = sparse_to_chunk_convert_limit / 2;
 		}
 
-		archetype_index archetypex() const
-		{
-			return m_index;
-		}
+		archetype_storage(const archetype_storage&) = delete;
+		archetype_storage(archetype_storage&&) = delete;
+	
 
 	public:
 		archetype_index archetype() const
 		{
 			return m_index;
 		}
+		const storage_key_registry::group_key_accessor& get_key_registry() const
+		{
+			return m_key_registry;
+		}
+		
+		table* get_table()
+		{
+			return std::get_if<table>(&m_table);
+		}
+
+		const vector<component_type_index>& get_accessible_components() const
+		{
+			return m_notnull_components;
+		}
+		const vector<component_storage*>& get_component_storages() const
+		{
+			return m_component_storages;
+		}
 		void get_component_indices(
 			sorted_sequence_ref<const component_type_index> types,
 			sequence_ref<uint32_t> component_indices) const
 		{
-			auto comp_iter = types.begin();
-			auto write_iter = component_indices.begin();
-			uint32_t index = 0;
-			while (comp_iter != types.end())
-			{
-				const auto& comp = *comp_iter;
-				if (comp < m_notnull_components[index])
+			get_sub_sequence_indices<component_type_index>(
+				m_notnull_components,
+				types,
+				component_indices);
+		}
+		
+
+
+		void add_callback_on_entity_add(std::function<void(entity, storage_key)> callback)
+		{
+			std::visit([&](auto& t)
 				{
-					comp_iter++; 
-					write_iter++;
-				}
-				else if (comp == m_notnull_components[index])
+					t.add_callback_on_entity_add(callback);
+				}, m_table);
+		}
+		void add_callback_on_entity_remove(std::function<void(entity, storage_key)> callback)
+		{
+			std::visit([&](auto& t)
 				{
-					*write_iter = index;
-					write_iter++;
-					comp_iter++;
-					index++;
-				}
-				else
-				{
-					index++;
-				}
-			}
+					t.add_callback_on_entity_remove(callback);
+				}, m_table);
 		}
 
 
@@ -179,7 +206,8 @@ namespace hyecs
 
 			auto src_accessor = sparse_table_ptr->get_raw_accessor();
 			auto entity_seq = make_sequence_ref(entities.begin(), entities.end());
-			auto dest_accessor = std::get<table>(m_table).get_allocate_accessor(entity_seq, [=](entity e, storage_key s) {
+			auto dest_accessor = std::get<table>(m_table).get_allocate_accessor(entity_seq,
+				[this](entity e, storage_key s) {
 				m_key_registry.insert(e, s);
 				});
 
@@ -190,6 +218,7 @@ namespace hyecs
 				auto src_comp_iter = src_component_accessors.begin();
 				auto dest_comp_iter = dest_component_accessors.begin();
 				component_type_index type = src_component_accessors.component_type();
+				assert(type == dest_component_accessors.component_type());
 				while (src_comp_iter != src_component_accessors.end())
 				{
 					type.move_constructor(*dest_comp_iter, *src_comp_iter);
@@ -204,17 +233,21 @@ namespace hyecs
 			{
 				on_sparse_to_chunk();
 			}
+
+			dest_accessor.notify_move_construct_finish();
 		}
 
 		void chunk_convert_to_sparse()
 		{
 			auto table_ptr = std::make_unique<table>(std::move(std::get<table>(m_table)));
+			m_table.emplace<sparse_table>(m_component_storages);
 			auto entities = table_ptr->get_entities();
 			auto entities_seq = make_sequence_ref(entities).as_const();
 			auto src_accessor = table_ptr->get_raw_accessor();
-			auto dest_accessor = std::get<sparse_table>(m_table).get_allocate_accessor(entities_seq, [](entity e, storage_key s) {
-				//todo
-				//no action for sparse table as entity is the only key for sparse table
+			auto dest_accessor = std::get<sparse_table>(m_table).get_allocate_accessor(entities_seq,
+				[this](entity e, storage_key s) {
+					//todo may need erase key
+				// m_key_registry.insert(e, s);//need to set the key to null
 				});
 
 			auto src_component_accessors = src_accessor.begin();
@@ -238,60 +271,51 @@ namespace hyecs
 			{
 				on_chunk_to_sparse();
 			}
+
+			dest_accessor.notify_move_construct_finish();
 		}
 
-
-
-		storage_key add_entity(entity e, sorted_sequence_ref<const generic::constructor> constructors)
+		void add_callback_on_sparse_to_chunk(std::function<void()>&& callback)
 		{
-			storage_key key;
-			switch (get_storage_type())
-			{
-			case storage_type::Sparse:
-				break;
-			case storage_type::Chunk:
-				break;
-			}
-
-			for (auto& on_add : m_on_entity_add)
-			{
-				on_add(e, key);
-			}
-
-			return key;
+			m_on_sparse_to_chunk.emplace_back(callback);
 		}
 
-		void emplace_entity(
-			sequence_ref<const entity> entities,
-			sorted_sequence_ref<const generic::constructor> constructors,
-			sequence_ref<storage_key> keys)
+		void add_callback_on_chunk_to_sparse(std::function<void()>&& callback)
 		{
-			std::visit([&](auto& table)
-				{
-					auto accessor = table.get_allocate_accessor(entities, [](entity e, storage_key s) {
-						//todo
-						});
-					auto component_accessors = accessor.begin();
-					for (auto constructor : constructors)
-					{
-						for (void* addr : component_accessors)
-						{
-							constructor(addr);
-						}
-						component_accessors++;
-					}
-				}, m_table);
-
-			for (auto& on_add : m_on_entity_add)
-			{
-				auto key_iter = keys.begin();
-				for (entity e : entities)
-				{
-					on_add(e, *key_iter);
-					key_iter++;
-				}
-			}
+			m_on_chunk_to_sparse.emplace_back(callback);
 		}
+
+		// void emplace_entity(
+		// 	sequence_ref<const entity> entities,
+		// 	sorted_sequence_ref<const generic::constructor> constructors,
+		// 	sequence_ref<storage_key> keys)
+		// {
+		// 	std::visit([&](auto& table)
+		// 		{
+		// 			auto accessor = table.get_allocate_accessor(entities, [](entity e, storage_key s) {
+		// 				//todo
+		// 				});
+		// 			auto component_accessors = accessor.begin();
+		// 			for (auto constructor : constructors)
+		// 			{
+		// 				for (void* addr : component_accessors)
+		// 				{
+		// 					constructor(addr);
+		// 				}
+		// 				component_accessors++;
+		// 			}
+		// 		}, m_table);
+		//
+		// 	for (auto& on_add : m_on_entity_add)
+		// 	{
+		// 		auto key_iter = keys.begin();
+		// 		for (entity e : entities)
+		// 		{
+		// 			on_add(e, *key_iter);
+		// 			key_iter++;
+		// 		}
+		// 	}
+		// }
 
 		using end_iterator = nullptr_t;
 
@@ -304,10 +328,20 @@ namespace hyecs
 			std::variant<sparse_allocate_accessor, chunk_allocate_accessor> m_accessor;
 
 		public:
-			allocate_accessor(sparse_allocate_accessor accessor)
-				: m_accessor(accessor) {}
-			allocate_accessor(chunk_allocate_accessor accessor)
-				: m_accessor(accessor) {}
+			allocate_accessor(sparse_allocate_accessor&& accessor)
+				:m_accessor(std::move(accessor)) {}
+			allocate_accessor(chunk_allocate_accessor&& accessor)
+				:m_accessor(std::move(accessor)) {}
+
+			const chunk_allocate_accessor* get_chunk_allocate_accessor() const
+			{
+				return std::get_if<chunk_allocate_accessor>(&m_accessor);
+			}
+
+			void notify_construct_finish()
+			{
+				std::visit([](auto& accessor) {accessor.notify_construct_finish(); }, m_accessor);
+			}
 
 			class component_array_accessor
 			{
@@ -322,8 +356,11 @@ namespace hyecs
 				component_array_accessor(chunk_component_array_accessor accessor)
 					: m_accessor(accessor) {}
 
-				component_array_accessor(const component_array_accessor& other)
-					: m_accessor(other.m_accessor) {}
+				component_array_accessor(const component_array_accessor& other) = delete;
+				component_array_accessor(component_array_accessor&& other) noexcept
+					: m_accessor(std::move(other.m_accessor)) {}
+				
+				
 
 				component_array_accessor& operator++() { std::visit([](auto& accessor) {++accessor; }, m_accessor); return*this; }
 				component_array_accessor operator++(int) { std::visit([](auto& accessor) {accessor++; }, m_accessor); return *this; }
@@ -334,7 +371,7 @@ namespace hyecs
 				{
 					using sparse_iterator = typename sparse_component_array_accessor::iterator;
 					using chunk_iterator = typename chunk_component_array_accessor::iterator;
-					std::variant<sparse_iterator, chunk_iterator, end_iterator> m_iterator;
+					std::variant<sparse_iterator, chunk_iterator> m_iterator;
 
 				public:
 					iterator(sparse_iterator iter)
@@ -342,9 +379,6 @@ namespace hyecs
 
 					iterator(chunk_iterator iter)
 						: m_iterator(iter) {}
-
-					iterator(end_iterator)
-						: m_iterator(nullptr) {}
 
 					void* operator*()
 					{
@@ -366,11 +400,26 @@ namespace hyecs
 						return *this;
 					}
 
-					bool operator==(const iterator& other) const { return m_iterator == other.m_iterator; }
-					bool operator!=(const iterator& other) const { return m_iterator != other.m_iterator; }
+					//can't use variant operator== and operator!=
+					bool operator==(const iterator& other) const 
+					{ 
+						return std::visit(
+							[](auto& accessor) {
+								using iter_type = std::decay_t<decltype(accessor)>;
+								if constexpr (std::is_same_v<iter_type, sparse_iterator>)
+									return accessor == std::get<sparse_iterator>(other.m_iterator);
+								else if constexpr (std::is_same_v<iter_type, chunk_iterator>)
+									return accessor == std::get<chunk_iterator>(other.m_iterator);
+								else
+									static_assert(!std::is_same_v<iter_type, iter_type>, "unhandled type");
+							}, m_iterator);
+					}
+					bool operator!=(const iterator& other) const { return !operator==(other); }
+					bool operator==(const end_iterator&) const { return std::visit([](auto& accessor) {return accessor == nullptr; }, m_iterator); }
+					bool operator!=(const end_iterator&) const { return std::visit([](auto& accessor) {return accessor != nullptr; }, m_iterator); }
 				};
 				iterator begin() { return std::visit([](auto& accessor) {return iterator(accessor.begin()); }, m_accessor); }
-				iterator end() { return std::visit([](auto& accessor) {return iterator(accessor.end()); }, m_accessor); }
+				end_iterator end() { return nullptr; }
 
 				bool operator==(const component_array_accessor& other) const { return m_accessor == other.m_accessor; }
 				bool operator!=(const component_array_accessor& other) const { return m_accessor != other.m_accessor; }
@@ -386,10 +435,21 @@ namespace hyecs
 		template<typename SeqParam>
 		auto get_allocate_accessor(sequence_ref<const entity, SeqParam> entities)
 		{
+			std::visit([&](auto& t)
+			{
+				using table_type = std::decay_t<decltype(t)>;
+				if constexpr (std::is_same_v<table_type, sparse_table>)
+				{
+					if (t.size() + entities.size() > sparse_to_chunk_convert_limit)
+						sparse_convert_to_chunk();
+				}
+			}, m_table);
+
 			return std::visit([&](auto& t)
 				{
 					using table_type = std::decay_t<decltype(t)>;
-					return allocate_accessor(t.get_allocate_accessor(entities, [this](entity e, storage_key s) {
+
+					return std::move(allocate_accessor(t.get_allocate_accessor(entities, [this](entity e, storage_key s) {
 						if constexpr (std::is_same_v<table_type, table>)
 						{
 							m_key_registry.insert(e, s);
@@ -398,7 +458,7 @@ namespace hyecs
 						{
 							//todo
 						}
-						}));
+						})));
 				}, m_table);
 		}
 

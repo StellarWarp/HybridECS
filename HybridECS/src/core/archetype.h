@@ -24,7 +24,7 @@ namespace hyecs
 		using hash_type = uint64_t;
 	private:
 		hash_type m_hash;
-		hash_type m_untaged_hash;
+		hash_type m_untag_hash;
 		//uint32_t m_tag_count;
 		component_bit_set m_component_mask;
 		vector<component_type_index> m_component_types;
@@ -74,22 +74,23 @@ namespace hyecs
 			}
 			else debug_archetype_hash.insert({ m_hash, m_component_mask });
 
-			//untaged part assertion
+			//untag part assertion
 			component_bit_set exclusive_mask = m_component_mask;
 			for (auto& type : m_component_types)
 			{
 				if (type.is_tag()) exclusive_mask.erase(type);
 			}
 
-			if (auto it = debug_archetype_hash.find(m_untaged_hash); it != debug_archetype_hash.end()) {
+			if (auto it = debug_archetype_hash.find(m_untag_hash); it != debug_archetype_hash.end()) {
 				assert(it->second == exclusive_mask);// hash collision
 			}
-			else debug_archetype_hash.insert({ m_untaged_hash, exclusive_mask });
+			else debug_archetype_hash.insert({ m_untag_hash, exclusive_mask });
 
 		}
 
 		void test_group_identity() const
 		{
+			if (!m_group.valid()) return;
 			for (auto& type : m_component_types)
 			{
 				if (type.group() != m_group)
@@ -106,7 +107,7 @@ namespace hyecs
 			{
 				m_hash += (uint64_t)type.hash();
 				m_component_mask.insert(type);
-				if (!type.is_tag()) m_untaged_hash += (uint64_t)type.hash();
+				if (!type.is_tag()) m_untag_hash += (uint64_t)type.hash();
 				//else m_tag_count++;
 			}
 			ASSERTION_CODE(hash_collision_assertion());
@@ -120,7 +121,7 @@ namespace hyecs
 			{
 				m_hash -= (uint64_t)type.hash();
 				m_component_mask.erase(type);
-				if (!type.is_tag()) m_untaged_hash -= (uint64_t)type.hash();
+				if (!type.is_tag()) m_untag_hash -= (uint64_t)type.hash();
 				//else m_tag_count--;
 			}
 			ASSERTION_CODE(hash_collision_assertion());
@@ -128,9 +129,9 @@ namespace hyecs
 
 	public:
 
-		archetype() : m_hash(0), m_untaged_hash(0), m_group() {}
+		archetype() : m_hash(0), m_untag_hash(0), m_group() {}
 		archetype(std::initializer_list<component_type_index> components)
-			: m_hash(0), m_component_types(components), m_untaged_hash(0)
+			: m_hash(0), m_component_types(components), m_untag_hash(0)
 		{
 			std::sort(m_component_types.begin(), m_component_types.end());
 			hash_append_component(components);
@@ -160,8 +161,8 @@ namespace hyecs
 			for (auto& component : adding)
 				m_component_types.push_back(component);
 			std::sort(m_component_types.begin(), m_component_types.end());
-			hash_removed_component(removings);
 			hash_append_component(adding);
+			hash_removed_component(removings);
 		}
 
 		bool contains(component_type_index type) const { return m_component_mask.contains(type); }
@@ -170,20 +171,20 @@ namespace hyecs
 		const component_bit_set& component_mask() const { return m_component_mask; }
 		bool operator==(const archetype& other) const { return m_hash == other.m_hash; }
 		uint64_t hash() const { return m_hash; }
-		uint64_t excludsive_hash() const { return m_untaged_hash; }
+		uint64_t excludsive_hash() const { return m_untag_hash; }
 		component_type_index operator[](size_t index) const { return m_component_types[index]; }
 		const component_type_index* begin() const { return m_component_types.data(); }
 		const component_type_index* end() const { return m_component_types.data() + m_component_types.size(); }
-		bool is_tagged() const { return m_untaged_hash != m_hash; }
+		bool is_tag() const { return m_untag_hash != m_hash; }
 		size_t component_count() const { return m_component_types.size(); }
 		component_group_index group() const { return m_group; }
 
-		//size_t untaged_component_count() const
+		//size_t untag_component_count() const
 		//{
 		//	return m_component_types.size() - m_tag_count;
 		//}
 
-		//size_t tagged_component_count() const
+		//size_t tag_component_count() const
 		//{
 		//	return m_tag_count;
 		//}
@@ -207,7 +208,7 @@ namespace hyecs
 		const uint64_t exclusive_hash() const { return m_archetype->excludsive_hash(); }
 		const uint64_t hash(append_component addition_components) const { return archetype::addition_hash(m_archetype->hash(), addition_components); }
 		const uint64_t hash(remove_component removal_components) const { return archetype::subtraction_hash(m_archetype->hash(), removal_components); }
-		bool is_tagged() const { return m_archetype->is_tagged(); }
+		bool is_tag() const { return m_archetype->is_tag(); }
 		bool contains(component_type_index type) const { return m_archetype->contains(type); }
 		bool contains(const archetype_index& other) const { return m_archetype->contains(other.get_info()); }
 		bool contains(const component_bit_set& mask) const { return m_archetype->contains(mask); }

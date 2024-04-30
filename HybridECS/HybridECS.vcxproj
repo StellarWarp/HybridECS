@@ -142,20 +142,26 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClInclude Include="src\container\raw_segmented_vector.h" />
+    <ClInclude Include="src\container\segmented_bit_set.h" />
+    <ClInclude Include="src\container\sequence_ref.h" />
     <ClInclude Include="src\container\static_string.h" />
-    <ClInclude Include="src\core\archetype_registry_II.h" />
+    <ClInclude Include="src\core\archetype_registry.h" />
     <ClInclude Include="src\core\archetype_registry_node.h" />
+    <ClInclude Include="src\core\dense_map.h" />
     <ClInclude Include="src\core\hybrid_component_storage.h" />
     <ClInclude Include="src\core\query_condition.h" />
     <ClInclude Include="src\core\sparse_table.h" />
     <ClInclude Include="src\core\static_data_registry.h" />
     <ClInclude Include="src\core\storage_key_registry.h" />
-    <ClInclude Include="src\core\taged_archetype_storage.h" />
+    <ClInclude Include="src\core\tag_archetype_storage.h" />
     <ClInclude Include="src\meta\assertion.h" />
     <ClInclude Include="src\meta\meta_utils.h" />
     <ClInclude Include="src\meta\operator_test.h" />
     <ClInclude Include="src\test_archetype_registry.h" />
     <ClInclude Include="src\test_seq.h" />
+    <ClInclude Include="src\test_sparse_table.h" />
+    <ClInclude Include="src\test_table.h" />
     <ClInclude Include="src\test_type.h" />
     <ClInclude Include="src\utils\utils.h" />
   </ItemGroup>
@@ -190,7 +196,7 @@
     <ClInclude Include="src\core\old\ISystem.h" />
     <ClInclude Include="src\core\old\Query.h" />
     <ClInclude Include="src\core\old\QueryBuilder.h" />
-    <ClInclude Include="src\core\archetype_registry.h" />
+    <ClInclude Include="src\core\discard\archetype_registry.h" />
     <ClInclude Include="src\core\old\Reflection.h" />
     <ClInclude Include="src\core\query.h" />
     <ClInclude Include="src\core\rtref.h" />

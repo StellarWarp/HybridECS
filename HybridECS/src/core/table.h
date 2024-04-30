@@ -6,9 +6,9 @@
 
 namespace hyecs
 {
-	static struct ChunkConfig
+	static struct component_table_chunk_traits
 	{
-		static const size_t DEFAULT_CHUNK_SIZE = 128 * 1024;//128kb
+		static constexpr size_t size = 2 * 1024;
 	};
 
 
@@ -20,20 +20,29 @@ namespace hyecs
 		using byte = uint8_t;
 
 		using table_index_t = storage_key::table_index_t;
-		using table_offset_t = storage_key::table_offset_t;
+		using table_offset_t = storage_key::table_offset_t;//table offset is not consistent
 
 
 		class chunk
 		{
 		private:
-			std::array<entity, ChunkConfig::DEFAULT_CHUNK_SIZE> m_entities;
-			std::array<byte, ChunkConfig::DEFAULT_CHUNK_SIZE> m_data;
+			std::array<byte, component_table_chunk_traits::size> m_data;
 			size_t m_size = 0;
 		public:
 			size_t size() const { return m_size; }
 			byte* data() { return m_data.data(); }
-			auto& entities() { return m_entities; }
-			const auto& entities() const { return m_entities; }
+			sequence_ref<entity> entities()
+			{
+				auto begin = reinterpret_cast<entity*>(m_data.data());
+				auto end = begin + m_size;
+				return sequence_ref(begin, end);
+			}
+			sequence_ref<const entity> entities() const
+			{
+				auto begin = reinterpret_cast<const entity*>(m_data.data());
+				auto end = begin + m_size;
+				return sequence_ref(begin, end);
+			}
 
 			void increase_size(size_t size) { m_size += size; }
 			void decrease_size(size_t size) { m_size -= size; }
@@ -68,8 +77,51 @@ namespace hyecs
 			uint32_t chunk_offset;
 		};
 		//temporary hole in the table for batch adding removing entities
-		stack<entity_table_index> m_free_indices;
+		struct free_indices_stack
+		{
+		public:
+			vector<stack<uint32_t>> m_free_indices;
+			stack<uint32_t> m_free_chunks_indices;
+			void push(entity_table_index index)
+			{
+				if (m_free_indices.size() <= index.chunk_index)
+				{
+					m_free_indices.resize(index.chunk_index + 1);
+				}
+				if (m_free_indices[index.chunk_index].empty())
+				{
+					m_free_chunks_indices.push(index.chunk_index);
+				}
+				m_free_indices[index.chunk_index].push(index.chunk_offset);
+			}
+			bool empty() const
+			{
+				return m_free_chunks_indices.empty();
+			}
+			entity_table_index top()
+			{
+				uint32_t chunk_index = m_free_chunks_indices.top();
+				uint32_t chunk_offset = m_free_indices[chunk_index].top();
+				return { chunk_index, chunk_offset };
+			}
+			void pop()
+			{
+				assert(!m_free_chunks_indices.empty());
+				uint32_t chunk_index = m_free_chunks_indices.top();
+				m_free_indices[chunk_index].pop();
+				if (m_free_indices[chunk_index].empty())
+				{
+					m_free_chunks_indices.pop();
+				}
+			}
+		};
+		free_indices_stack m_free_indices;
+		stack<std::pair<chunk*, uint32_t>> m_free_chunks;//free chunk and it's index
 
+		//event
+		vector<std::function<void(entity, storage_key)>> m_on_entity_add;
+		vector<std::function<void(entity, storage_key)>> m_on_entity_remove;
+		vector<std::function<void(entity, storage_key)>> m_on_entity_move;
 
 
 	public:
@@ -79,7 +131,7 @@ namespace hyecs
 			//for (auto& type : m_types)
 			//	type.size = std::bit_ceil(type.size);
 
-			size_t column_size = 0;
+			size_t column_size = sizeof(entity);
 			size_t offset = 0;
 
 			for (auto& type : components)
@@ -87,18 +139,17 @@ namespace hyecs
 				if (type.size() == 0) continue;
 				column_size += type.size();
 			}
-
-			m_chunk_capacity = ChunkConfig::DEFAULT_CHUNK_SIZE / column_size;
+			m_chunk_capacity = component_table_chunk_traits::size / column_size;
+			offset = sizeof(entity) * m_chunk_capacity;
 			//how many bits needed to store chunk offset
 			m_chunk_offset_bits = std::bit_width(m_chunk_capacity - 1);
-			auto comp_iter = components.begin();
+
 			m_notnull_components.reserve(components.size());
-			for (auto& type : m_notnull_components)
+			for (auto& type : components)
 			{
-				if (comp_iter->size() == 0) continue;
-				m_notnull_components.emplace_back(*comp_iter, offset);
+				if (type.size() == 0) continue;
+				m_notnull_components.emplace_back(type, offset);
 				offset += type.size() * m_chunk_capacity;
-				comp_iter++;
 			}
 		}
 		~table()
@@ -109,14 +160,33 @@ namespace hyecs
 			}
 		}
 
-		table(const table& other) {};
+		table(const table& other) = delete;
 		table(table&& other) :
 			m_allocator(std::move(other.m_allocator)),
 			m_notnull_components(std::move(other.m_notnull_components)),
 			m_chunks(std::move(other.m_chunks)),
 			m_chunk_capacity(std::move(other.m_chunk_capacity)),
-			m_free_indices(std::move(other.m_free_indices))
+			m_free_indices(std::move(other.m_free_indices)),
+			m_free_chunks(std::move(other.m_free_chunks))
 		{
+		}
+
+		void add_callback_on_entity_add(std::function<void(entity, storage_key)> callback)
+		{
+			for (uint32_t chunk_index = 0; chunk_index < m_chunks.size(); chunk_index++)
+			{
+				const auto chunk = m_chunks[chunk_index];
+				for (uint32_t i = 0; i < chunk->size(); i++)
+				{
+					callback(chunk->entities()[i], { m_table_index, table_offset({chunk_index, i}) });
+				}
+			}
+
+			m_on_entity_add.push_back(callback);
+		}
+		void add_callback_on_entity_remove(std::function<void(entity, storage_key)> callback)
+		{
+			m_on_entity_remove.push_back(callback);
 		}
 
 
@@ -128,7 +198,7 @@ namespace hyecs
 			chunk* new_chunk = new (m_allocator.allocate(1)) chunk();
 			m_chunks.push_back(new_chunk);
 			uint32_t chunk_index = m_chunks.size() - 1;
-
+			m_free_chunks.push({ new_chunk, chunk_index });
 			return new_chunk;
 		}
 		void deallocate_chunk(chunk* _chunk)
@@ -149,11 +219,17 @@ namespace hyecs
 				m_free_indices.pop();
 				return index;
 			}
-			if (m_chunks.empty() || m_chunks.back()->size() == m_chunk_capacity)
+			if (m_free_chunks.empty())
 				allocate_chunk();
 
-			uint32_t chunk_index = m_chunks.size() - 1;
-			uint32_t chunk_offset = m_chunks.back()->size();
+			auto [chunk, chunk_index] = m_free_chunks.top();
+			uint32_t chunk_offset = chunk->size();
+			chunk->increase_size(1);
+			if (chunk->size() == m_chunk_capacity)
+			{
+				m_free_chunks.pop();
+			}
+
 
 			return { chunk_index, chunk_offset };
 		}
@@ -169,30 +245,85 @@ namespace hyecs
 		}
 
 	public:
-		//todo can be optimized to in-chunk swap
 		//call after all addition and removal were done
+		//todo this will cause invild storage key reference
 		void phase_swap_back()
-		{
+		{	
+			size_t max_len = 0;
+			for (auto& free_indices : m_free_indices.m_free_indices)
+				max_len = std::max(max_len, free_indices.size());
+			vector<uint32_t> sorted_indices;
+			sorted_indices.reserve(max_len);
 			while (!m_free_indices.empty())
 			{
-				auto [chunk_index, chunk_offset] = m_free_indices.top();
-				m_free_indices.pop();
-				auto last_chunk = m_chunks.back();
-				if (last_chunk->size() == 0)
+				auto chunk_index = m_free_indices.m_free_chunks_indices.top();
+				m_free_indices.m_free_chunks_indices.pop();
+				auto& free_indices = m_free_indices.m_free_indices[chunk_index];
+				sorted_indices.clear();
+				while (!free_indices.empty())
 				{
-					m_chunks.pop_back();
-					m_allocator.deallocate(last_chunk, 1);
-					if (m_chunks.empty()) return;
-					last_chunk = m_chunks.back();
+					auto chunk_offset = free_indices.top();
+					free_indices.pop();
+					sorted_indices.push_back(chunk_offset);
 				}
-				uint32_t last_chunk_offset = last_chunk->size() - 1;
-				last_chunk->decrease_size(1);
-				for (auto& type : m_notnull_components)
+				std::sort(sorted_indices.begin(), sorted_indices.end());
+				auto head_hole_iter = sorted_indices.begin();
+				auto tail_hole_iter = sorted_indices.rbegin();
+				chunk* chunk = m_chunks[chunk_index];
+				uint32_t last_entity_offset = chunk->size() - 1;
+
+				auto move_to_head = [&](uint32_t head_offset) mutable
 				{
-					byte* last_data = component_address(last_chunk, last_chunk_offset, type);
-					byte* data = component_address(m_chunks[chunk_index], chunk_offset, type);
-					type.move_constructor(data, last_data);
+					//move last entity to head hole
+					auto& last_entity = chunk->entities()[last_entity_offset];
+					chunk->entities()[head_offset] = last_entity;
+					for (auto& type : m_notnull_components)
+					{
+						byte* last_data = component_address(chunk, last_entity_offset, type);
+						byte* data = component_address(chunk, head_offset, type);
+						type.move_constructor(data, last_data);
+					}
+					last_entity_offset--;
+					head_hole_iter++;
+
+					for (auto& callback : m_on_entity_move)
+					{
+						callback(last_entity, { m_table_index, table_offset({ chunk_index, head_offset }) });
+					}
+				};
+
+				while (true)
+				{
+					auto head_entity_offset = *head_hole_iter;
+					auto tail_entity_offset = *tail_hole_iter;
+					bool skip = tail_entity_offset == last_entity_offset;
+					if (head_entity_offset == tail_entity_offset)
+					{
+						if(!skip) move_to_head(head_entity_offset);
+						break;
+					}
+					if (skip)
+					{
+						last_entity_offset--;
+						tail_hole_iter++;
+						continue;
+					}
+					move_to_head(head_entity_offset);
+
 				}
+				if(chunk->size() == m_chunk_capacity)
+					m_free_chunks.push({ chunk, chunk_index });
+				chunk->decrease_size(sorted_indices.size());
+
+				//todo swap / deallocate chunk
+
+				//if (last_chunk->size() == 0)
+				//{
+				//	m_chunks.pop_back();
+				//	m_allocator.deallocate(last_chunk, 1);
+				//	if (m_chunks.empty()) return;
+				//	last_chunk = m_chunks.back();
+				//}
 			}
 		}
 	private:
@@ -296,11 +427,16 @@ namespace hyecs
 			public:
 
 				component_array_accessor(uint32_t index, raw_accessor* accessor)
-					: m_type(&accessor->m_table.m_notnull_components[index]),
+					:m_accessor(accessor),
 					m_component_index(index),
-					m_table_component_count(accessor->m_table.m_notnull_components.size()),
-					m_accessor(accessor)
+					m_table_component_count(accessor->m_table.m_notnull_components.size())
 				{
+					if (accessor->m_table.m_notnull_components.empty())
+					{
+						m_type = nullptr;
+						return;
+					}
+					m_type = &accessor->m_table.m_notnull_components[index];
 				}
 
 				component_type_index component_type() const { return *m_type; }
@@ -308,7 +444,10 @@ namespace hyecs
 				component_array_accessor& operator++()
 				{
 					m_component_index++;
-					m_type = &m_accessor->m_table.m_notnull_components[m_component_index];
+					if (m_component_index < m_table_component_count)
+						m_type = &m_accessor->m_table.m_notnull_components[m_component_index];
+					else
+						m_type = nullptr;
 					return *this;
 				}
 
@@ -323,6 +462,9 @@ namespace hyecs
 				{
 					return *m_type;
 				}
+
+				component_array_accessor& operator*() { return *this; }
+
 
 				bool operator==(const component_array_accessor& other) const { return *m_type == *other.m_type; }
 				bool operator!=(const component_array_accessor& other) const { return !(*this == other); }
@@ -366,8 +508,8 @@ namespace hyecs
 
 					bool operator==(const iterator& other) const { return m_offset_iter == other.m_offset_iter; }
 					bool operator!=(const iterator& other) const { return !operator==(other); }
-					bool operator==(const end_iterator& other) const { return m_offset_iter == m_accessor->table_offsets.end(); }
-					bool operator!=(const end_iterator& other) const { return !operator==(other); }
+					bool operator==(end_iterator) const { return m_offset_iter == m_accessor->table_offsets.end(); }
+					bool operator!=(end_iterator) const { return !operator==(nullptr); }
 
 					void* operator*()
 					{
@@ -439,7 +581,10 @@ namespace hyecs
 				component_array_accessor& operator++()
 				{
 					m_component_index++;
-					m_type = &m_table->m_notnull_components[m_component_index];
+					if(m_component_index < m_table_component_count)
+						m_type = &m_table->m_notnull_components[m_component_index];
+					else
+						m_type = nullptr;
 					return *this;
 				}
 
@@ -449,6 +594,9 @@ namespace hyecs
 					++(*this);
 					return copy;
 				}
+
+				component_array_accessor& operator*() { return *this; }
+
 				bool operator==(const component_array_accessor& other) const { return *m_type == *other.m_type; }
 				bool operator!=(const component_array_accessor& other) const { return !(*this == other); }
 				bool operator==(const end_iterator& other) const { return m_component_index == m_table_component_count; }
@@ -540,10 +688,11 @@ namespace hyecs
 			using entity_seq = sequence_ref<const entity, SeqParam>;
 			entity_seq entities;
 			vector<table_offset_t> entity_table_offsets;
+			ASSERTION_CODE(bool m_is_construct_finished = false);
 		public:
 			template<typename StorageKeyBuilder>
 			allocate_accessor(table& in_table, entity_seq entities, StorageKeyBuilder builder) :
-				raw_accessor(in_table,{}), entities(entities)
+				raw_accessor(in_table, {}), entities(entities)
 			{
 				uint32_t count = entities.size();
 				auto entity_iter = entities.begin();
@@ -560,6 +709,46 @@ namespace hyecs
 				}
 				raw_accessor::table_offsets = make_sequence_ref(entity_table_offsets);
 			}
+
+			allocate_accessor(const allocate_accessor&) = delete;
+			allocate_accessor& operator=(const allocate_accessor&) = delete;
+			allocate_accessor(allocate_accessor&& other) :
+				raw_accessor(std::move(other)),
+				entities(std::move(other.entities)),
+				entity_table_offsets(std::move(other.entity_table_offsets))
+			{
+				ASSERTION_CODE(other.m_is_construct_finished = true);
+			}
+
+			template<typename Callable>
+			void for_each_entity_key(Callable func) const
+			{
+				for (uint32_t i = 0; i < entities.size(); i++)
+				{
+					func(entities[i], { m_table.m_table_index, entity_table_offsets[i] });
+				}
+			}
+
+			void notify_construct_finish()
+			{
+				for (auto& callback : m_table.m_on_entity_add)
+				{
+					for (uint32_t i = 0; i < entities.size(); i++)
+					{
+						callback(entities[i], { m_table.m_table_index, entity_table_offsets[i] });
+					}
+				}
+				ASSERTION_CODE(m_is_construct_finished = true);
+			}
+
+			void notify_move_construct_finish()
+			{
+				ASSERTION_CODE(m_is_construct_finished = true);
+			}
+
+
+			~allocate_accessor() { assert(m_is_construct_finished); }
+
 		};
 
 		template<typename SeqParam, typename StorageKeyBuilder>
@@ -571,13 +760,50 @@ namespace hyecs
 
 		class deallocate_accessor : public raw_accessor
 		{
+			ASSERTION_CODE(bool m_is_destruct_finished = false);
+
 		public:
 			using raw_accessor::raw_accessor;
-
-			~deallocate_accessor()
+			deallocate_accessor(const deallocate_accessor&) = delete;
+			deallocate_accessor& operator=(const deallocate_accessor&) = delete;
+			deallocate_accessor(deallocate_accessor&& other) : raw_accessor(std::move(other))
 			{
-				for (auto& offset : table_offsets) m_table.deallocate_entity(offset);
+				ASSERTION_CODE(other.m_is_destruct_finished = true);
 			}
+
+			void destruct()
+			{
+				assert(!m_is_destruct_finished);
+
+				for (auto& offset : table_offsets)
+				{
+					auto [chunk_index, chunk_offset] = m_table.chunk_index_offset(offset);
+					for (auto& type : m_table.m_notnull_components)
+					{
+						byte* data = component_address(m_table.m_chunks[chunk_index], chunk_offset, type);
+						type.destructor(data, 1);
+					}
+				}
+
+				notify_destruct_finish();
+			}
+
+			void notify_destruct_finish()
+			{
+				assert(!m_is_destruct_finished);
+				for (auto& offset : table_offsets) m_table.deallocate_entity(offset);
+				for (auto& callback : m_table.m_on_entity_remove)
+				{
+					for (auto& table_offset : table_offsets)
+					{
+						auto [chunk_index, chunk_offset] = m_table.chunk_index_offset(table_offset);
+						callback(m_table.m_chunks[chunk_index]->entities()[chunk_offset], { m_table.m_table_index, table_offset });
+					}
+				}
+				ASSERTION_CODE(m_is_destruct_finished = true);
+			}
+
+			~deallocate_accessor(){assert(m_is_destruct_finished);}
 
 
 		};
@@ -624,12 +850,12 @@ namespace hyecs
 	private:
 		//using Callable = std::function<void(entity, sequence_ref<void*>)>;
 		template<typename Callable>
-		void dynamic_for_each(sequence_ref<const uint32_t> component_indices, Callable func)
+		void dynamic_for_each_impl(sequence_ref<const uint32_t> component_indices, Callable func)
 		{
 			using params = typename function_traits<Callable>::args;
 			constexpr bool query_entity = params::template contains<entity>;
 			constexpr bool query_storage_key = params::template contains<storage_key>;
-			vector<void*> addresses(component_indices.size());
+			vector<void*> addresses(component_indices.size());//todo optimize allocation
 			for (uint32_t chunk_index = 0; chunk_index < m_chunks.size(); chunk_index++)
 			{
 				auto chunk = m_chunks[chunk_index];
@@ -659,7 +885,7 @@ namespace hyecs
 						if constexpr (query_storage_key)
 						{
 							storage_key key(m_table_index, table_offset({ chunk_index, chunk_offset }));
-							func(addresses, key);
+							func(key, addresses);
 						}
 						else
 						{
@@ -674,25 +900,40 @@ namespace hyecs
 		void dynamic_for_each(sequence_ref<const uint32_t> component_indices,
 			std::function<void(entity, sequence_ref<void*>)> func)
 		{
-			dynamic_for_each(component_indices, func);
+			dynamic_for_each_impl(component_indices, func);
 		}
 
 		void dynamic_for_each(sequence_ref<const uint32_t> component_indices,
 			std::function<void(sequence_ref<void*>)> func)
 		{
-			dynamic_for_each(component_indices, func);
+			dynamic_for_each_impl(component_indices, func);
 		}
 
 		void dynamic_for_each(sequence_ref<const uint32_t> component_indices,
 			std::function<void(entity, storage_key, sequence_ref<void*>)> func)
 		{
-			dynamic_for_each(component_indices, func);
+			dynamic_for_each_impl(component_indices, func);
 		}
 
 		void dynamic_for_each(sequence_ref<const uint32_t> component_indices,
 			std::function<void(storage_key, sequence_ref<void*>)> func)
 		{
-			dynamic_for_each(component_indices, func);
+			dynamic_for_each_impl(component_indices, func);
+		}
+
+		void components_addresses(
+			storage_key key,
+			sequence_ref<const uint32_t> component_indices,
+			sequence_ref<void*> addresses)
+		{
+			auto [chunk_index, chunk_offset] = chunk_index_offset(key.get_table_offset());
+			chunk* chunk = m_chunks[chunk_index];
+			for (uint32_t i : component_indices)
+			{
+				auto& type = m_notnull_components[i];
+				byte* data = component_address(chunk, chunk_offset, type.offset(), type.size());
+				addresses[i] = data;
+			}
 		}
 
 		void get_components_offsets(
@@ -727,6 +968,7 @@ namespace hyecs
 
 		class entity_accessor
 		{
+		public:
 			using chunk_seq = sequence_ref<const chunk* const>;
 		protected:
 			chunk_seq m_chunks;
@@ -781,6 +1023,11 @@ namespace hyecs
 					return m_chunk->entities()[m_offset];
 				}
 
+				const entity* operator->()
+				{
+					return &m_chunk->entities()[m_offset];
+				}
+
 
 				bool operator==(const iterator& other) const { return m_chunk == other.m_chunk && m_offset == other.m_offset; }
 				bool operator!=(const iterator& other) const { return !operator==(other); }
@@ -808,6 +1055,11 @@ namespace hyecs
 				return size;
 			}
 		};
+
+		entity_accessor get_entities()
+		{
+			return entity_accessor(this);
+		}
 
 		class table_offset_accessor : public entity_accessor
 		{
@@ -838,12 +1090,6 @@ namespace hyecs
 			}
 
 		};
-
-
-		entity_accessor get_entities()
-		{
-			return entity_accessor(this);
-		}
 
 		table_offset_accessor get_table_offsets()
 		{

@@ -21,11 +21,9 @@ namespace hyecs
 		[[no_unique_address]] Alloc alloc;
 
 	public:
-		basic_bit_set(uint32_t default_size = 4, Alloc alloc = Alloc())
-			: size(default_size), alloc(alloc)
+		basic_bit_set(Alloc alloc = Alloc())
+			: data(nullptr), size(0), alloc(alloc)
 		{
-			data = alloc.allocate(default_size);
-			memset(data, 0, default_size * sizeof(uint32_t));
 		}
 
 		basic_bit_set(const basic_bit_set& other)
@@ -86,6 +84,7 @@ namespace hyecs
 			return true;
 		}
 
+		//true for empty set
 		bool contains_any(const basic_bit_set& other) const
 		{
 			for (uint32_t i = 0; i < std::min(size, other.size); i++)
@@ -103,23 +102,19 @@ namespace hyecs
 
 		bool operator == (const basic_bit_set& other) const
 		{
+			auto [min_size,max_size] = std::minmax(size, other.size);
+
 			if (size != other.size)
 			{
 				//make sure the extra data is 0
-				if (size < other.size)
-					for (uint32_t i = size; i < other.size; i++)
-						if (other.data[i] != 0)
-							return false;
-						else
-							for (uint32_t i = other.size; i < size; i++)
-								if (data[i] != 0)
-									return false;
+				auto& longer = size > other.size ? *this : other;
+				for (uint32_t i = min_size; i < max_size; i++)
+					if (longer.data[i] != 0)
+						return false;
 			}
-			for (uint32_t i = 0; i < size; i++)
-			{
+			for (uint32_t i = 0; i < min_size; i++)
 				if (data[i] != other.data[i])
 					return false;
-			}
 			return true;
 		}
 

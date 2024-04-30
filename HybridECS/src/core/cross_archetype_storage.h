@@ -10,7 +10,7 @@ namespace hyecs
 		struct group_info
 		{
 			archetype_storage* storage;
-			taged_archetype_storage* taged_storage;
+			tag_archetype_storage* tag_storage;
 			dense_set<storage_key> m_sort_keys;
 		};
 

@@ -1,6 +1,7 @@
 #pragma once
 #include "../lib/std_lib.h"
 #include "../meta/meta_utils.h"
+#include "container/static_string.h"
 
 namespace hyecs
 {
@@ -18,39 +19,81 @@ namespace hyecs
 	struct tag_component { static constexpr bool is_tag = true; };
 
 	DECLATE_MEMBER_STATIC_VARIABLE_TEST(is_tag);
-
-	template<typename T>
-	class component_traits
-	{
-
-		static constexpr bool is_tag_helper()
-		{
-			if constexpr (has_member_static_variable_is_tag_v<T>) return T::is_tag;
-			else return std::is_empty_v<T>;
-		}
-	public:
-		static constexpr bool is_tag = is_tag_helper();
-	};
+	DECLATE_MEMBER_STATIC_VARIABLE_TEST(static_group_id);
 
 	struct component_group_id
 	{
 		uint32_t id;
 	public:
-		component_group_id() : id(0) {}
+		constexpr component_group_id() : id(0) {}
+		template <size_t Np1, typename CharT = char>
+		constexpr component_group_id(const CharT (&str)[Np1])
+			:id (string_hash32(str)){}
+		constexpr component_group_id(const component_group_id& id) : id(id.id) {}
 		component_group_id(const std::string& name)
 		{
-			id = static_cast<uint32_t>(std::hash<std::string>{}(name));
-		}
-		component_group_id(const char* name)
-		{
-			id = static_cast<uint32_t>(std::hash<std::string>{}(name));
+			id = string_hash32(name.c_str(), name.size());
 		}
 		component_group_id(const volatile component_group_id& other) : id(other.id) {}
 		bool operator == (const component_group_id& other) const { return id == other.id; }
 		bool operator != (const component_group_id& other) const { return id != other.id; }
 		bool operator < (const component_group_id& other) const { return id < other.id; }
 		bool operator > (const component_group_id& other) const { return id > other.id; }
+		int compare(const component_group_id& other) const { return id - other.id; }
 	};
+
+
+	//specialize this and add static_group_id to override the default behavior
+	template<typename T>
+	struct component_static_group_override{};
+	//specialize this and add is_tag and static_group_id to override the default behavior
+	template<typename T>
+	struct component_traits_override{/*static_group_id*/};
+	template<typename T>
+	struct component_register_static : std::false_type{};
+
+	template<typename T>
+	class component_traits
+	{
+		static constexpr bool is_static_type_helper()
+		{
+			if constexpr (component_register_static<T>::value)
+				return true;
+			else if constexpr (has_member_static_variable_static_group_id_v<component_static_group_override<T>>)
+				return true;
+			else if constexpr (has_member_static_variable_static_group_id_v<component_traits_override<T>>)
+				return true;
+			else if constexpr (has_member_static_variable_static_group_id_v<T>)
+				return true;
+			else
+			return false;
+		}
+		static constexpr bool is_tag_helper()
+		{
+			if constexpr (has_member_static_variable_is_tag_v<component_traits_override<T>>)
+				return component_traits_override<T>::is_tag;
+			else if constexpr (has_member_static_variable_is_tag_v<T>)
+				return T::is_tag;
+			else
+				return std::is_empty_v<T>;
+		}
+		static constexpr component_group_id static_group_id_helper()
+		{
+			if constexpr (has_member_static_variable_static_group_id_v<component_static_group_override<T>>)
+				return component_static_group_override<T>::static_group_id;
+			else if constexpr (has_member_static_variable_static_group_id_v<component_traits_override<T>>)
+				return component_traits_override<T>::static_group_id;
+			else if constexpr (has_member_static_variable_static_group_id_v<T>)
+				return T::static_group_id;
+			else return component_group_id();
+		}
+	public:
+		static constexpr bool is_static = is_static_type_helper();
+		static constexpr bool is_tag = is_tag_helper();
+		static constexpr component_group_id static_group_id{static_group_id_helper()};
+	};
+	template<typename T>
+	struct is_static_component { static constexpr bool value = component_traits<std::decay_t<T>>::is_static; };
 }
 
 
@@ -85,14 +128,15 @@ namespace hyecs
 	private:
 		unordered_map<component_group_id, component_group_register_info> m_groups;
 	public:
-
-		component_group_id add_group(const std::string& name)
+		template <size_t Np1, typename CharT = char>
+		component_group_id add_group(const CharT(&name)[Np1])
 		{
 			component_group_id id(name);
 			component_group_register_info info{ id, name, {} };
 			m_groups[id] = info;
-			return id;
+			return component_group_id(name);
 		}
+
 
 		void add_component(component_group_id group_id, generic::type_index type, bool is_tag)
 		{
@@ -137,7 +181,14 @@ namespace hyecs
 #define REGISTER_HYECS_COMPONENT(T, group_id) \
 namespace internal_component_register { \
 	inline static volatile ecs_component_static_register<T> __ecs_component_register_##T(group_id); \
-}
+}\
+\
+template<>\
+struct component_static_group_override<T>{\
+static constexpr component_group_id static_group_id{group_id};\
+};\
+template<>\
+struct component_register_static<T> : std::true_type{};
 
 	template<typename T>
 	struct ecs_component_static_register
@@ -156,7 +207,8 @@ namespace internal_component_register { \
 
 	struct ecs_component_group_static_register
 	{
-		ecs_component_group_static_register(const char* name)
+		template <size_t Np1, typename CharT = char>
+		ecs_component_group_static_register(const CharT(&name)[Np1])
 		{
 			ecs_static_register_context::register_context.add_group(name);
 		}
@@ -198,11 +250,13 @@ namespace internal_component_register { \
 
 		component_group_id id() const { return info->id; }
 		const std::string& name() const { return info->name; }
+		bool valid() const { return info != &no_group; }
 		const vector<component_type_index>& component_types() const { return info->component_types; }
 		bool operator == (const component_group_index& other) const { return info->id == other.info->id; }
 		bool operator != (const component_group_index& other) const { return !operator==(other); }
 		bool operator < (const component_group_index& other) const { return info->id < other.info->id; }
 		bool operator > (const component_group_index& other) const { return info->id > other.info->id; }
+		int compare(const component_group_index& other) const { return info->id.compare(other.info->id); }
 	};
 };
 

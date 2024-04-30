@@ -69,7 +69,7 @@ namespace hyecs
     };
 
     using string_hash = basic_string_hash<uint64_t>;
-
+    using string_hash32 = basic_string_hash<uint32_t>;
 
     template <size_t Np1, typename CharT = char>
     class static_string

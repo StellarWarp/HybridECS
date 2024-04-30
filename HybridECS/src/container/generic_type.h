@@ -12,31 +12,31 @@ namespace hyecs
 		using move_constructor_ptr = void* (*)(void*, void*);
 		using destructor_ptr = void(*)(void*);
 
-		template<typename T>
+		template <typename T>
 		constexpr void* default_constructor(void* addr)
 		{
-			return (T*)new (addr) T();
+			return (T*)new(addr) T();
 		}
 
-		template<typename T>
+		template <typename T>
 		constexpr void* move_constructor(void* dest, void* src)
 		{
-			return (T*)new (dest) T(std::move(*(T*)src));
+			return (T*)new(dest) T(std::move(*(T*)src));
 		}
 
-		template<typename T>
+		template <typename T>
 		constexpr void* copy_constructor(void* dest, const void* src)
 		{
-			return (T*)new (dest) T(*(T*)src);
+			return (T*)new(dest) T(*(T*)src);
 		}
 
-		template<typename T>
+		template <typename T>
 		constexpr void destructor(void* addr)
 		{
 			((T*)addr)->~T();
 		}
 
-		template<typename T>
+		template <typename T>
 		constexpr auto nullable_move_constructor()
 		{
 			if constexpr (std::is_move_constructible_v<T> || std::is_copy_constructible_v<T>)
@@ -45,7 +45,7 @@ namespace hyecs
 				return nullptr;
 		}
 
-		template<typename T>
+		template <typename T>
 		constexpr auto nullable_copy_constructor()
 		{
 			if constexpr (std::is_copy_constructible_v<T>)
@@ -54,7 +54,7 @@ namespace hyecs
 				return nullptr;
 		}
 
-		template<typename T>
+		template <typename T>
 		constexpr auto nullable_destructor()
 		{
 			if constexpr (!std::is_trivially_destructible_v<T>)
@@ -78,24 +78,23 @@ namespace hyecs
 			type_info(const type_info&) = delete;
 			type_info(type_info&&) = delete;
 			type_info& operator=(const type_info&) = delete;
-		public:
 
-			template<typename T>
+		public:
+			template <typename T>
 			static const type_info& of()
 			{
 				static_assert(std::is_same_v<T, std::decay_t<T>>, "T must be a decayed type");
 				//wait c++20
 				const static type_info info{
-				   std::is_empty_v<T> ? 0 : sizeof(T),
-				   nullable_copy_constructor<T>(),
-				   nullable_move_constructor<T>(),
-				   nullable_destructor<T>(),
-				   type_hash::of<T>,
-				   type_name<T>
+					std::is_empty_v<T> ? 0 : sizeof(T),
+					nullable_copy_constructor<T>(),
+					nullable_move_constructor<T>(),
+					nullable_destructor<T>(),
+					type_hash::of<T>,
+					type_name<T>
 				};
 				return info;
 			}
-	
 		};
 
 
@@ -105,7 +104,9 @@ namespace hyecs
 
 		public:
 			//type_index() : m_info(nullptr) {}
-			type_index(const type_info& info) : m_info(&info) {}
+			type_index(const type_info& info) : m_info(&info)
+			{
+			}
 
 			const type_info* info() const noexcept { return m_info; }
 			constexpr size_t size() const noexcept { return m_info->size; }
@@ -116,9 +117,9 @@ namespace hyecs
 			{
 				ASSERTION_CODE(
 					if (m_info != nullptr && other.m_info != nullptr && m_info != other.m_info)
-						assert(m_info->hash != other.m_info->hash);//multiple location of same type is not allowed
+					assert(m_info->hash != other.m_info->hash); //multiple location of same type is not allowed
 				)
-					return m_info == other.m_info;//a type should only have one instance of type_info
+				return m_info == other.m_info; //a type should only have one instance of type_info
 			}
 
 			bool operator!=(const type_index& other) const noexcept { return !operator==(other); }
@@ -128,6 +129,7 @@ namespace hyecs
 			void* copy_constructor(void* dest, const void* src) const { return m_info->copy_constructor(dest, src); }
 			void* move_constructor(void* dest, void* src) const { return m_info->move_constructor(dest, src); }
 			void destructor(void* addr) const { m_info->destructor(addr); }
+
 			void destructor(void* addr, size_t count) const
 			{
 				if (m_info->destructor == nullptr)
@@ -166,21 +168,25 @@ namespace hyecs
 			copy_constructor_ptr m_copy_constructor;
 			move_constructor_ptr m_move_constructor;
 			destructor_ptr m_destructor;
-		public:
 
+		public:
 			type_index_container_cached(const type_info& info)
 				: m_index(info),
-				m_size(info.size),
-				m_copy_constructor(info.copy_constructor),
-				m_move_constructor(info.move_constructor),
-				m_destructor(info.destructor) {}
+				  m_size(info.size),
+				  m_copy_constructor(info.copy_constructor),
+				  m_move_constructor(info.move_constructor),
+				  m_destructor(info.destructor)
+			{
+			}
 
 			type_index_container_cached(type_index index)
 				: m_index(index),
-				m_size(index.size()),
-				m_copy_constructor(index.info()->copy_constructor),
-				m_move_constructor(index.info()->move_constructor),
-				m_destructor(index.info()->destructor) {}
+				  m_size(index.size()),
+				  m_copy_constructor(index.info()->copy_constructor),
+				  m_move_constructor(index.info()->move_constructor),
+				  m_destructor(index.info()->destructor)
+			{
+			}
 
 			constexpr size_t size() const noexcept { return m_size; }
 			constexpr type_hash hash() const noexcept { return m_index.hash(); }
@@ -241,8 +247,7 @@ namespace hyecs
 			inline static vaildref_map<uint64_t, type_info> m_type_info;
 
 		public:
-
-			template<typename T>
+			template <typename T>
 			static type_index register_type()
 			{
 				type_info info = type_info::of<T>();
@@ -251,42 +256,70 @@ namespace hyecs
 				m_type_info.emplace(info.hash, info);
 				return type_index(&m_type_info.at(info.hash));
 			}
-
 		};
 
 
 		class constructor
 		{
 			type_index m_type;
-			std::function<void* (void*)> m_constructor;
+			std::function<void*(void*)> m_constructor;
+
+			// template <typename T>
+			// struct lambda_forward_wrapper
+			// {
+			// 	using type = std::decay_t<T>;
+			// 	uint8_t data[std::is_empty_v<type> ? 0 : sizeof(type)];
+			// 	lambda_forward_wrapper(T&& val)
+			// 	{
+			// 		if constexpr (!std::is_empty_v<type>)
+			// 			new(reinterpret_cast<std::decay_t<T>*>(data)) std::decay_t<T>(std::forward<T>(val));
+			// 	}
+			// 	T&& forward()
+			// 	{
+			// 		if constexpr (!std::is_empty_v<type>)
+			// 			return std::forward<T>(*reinterpret_cast<std::decay_t<T>*>(data));
+			// 		else return T{};
+			// 	}
+			// };
+
 		public:
-			//constructor() : m_type(), m_constructor(nullptr) {}
-			constructor(type_index type, std::function<void* (void*)> constructor)
-				: m_type(type), m_constructor(constructor) {}
+			constructor() : m_type(type_info::of<nullptr_t>())
+			{
+			}
 
-			template<typename T, std::enable_if_t<!std::is_same_v<std::decay_t<T>, constructor>, int> = 0>
+			constructor(type_index type, std::function<void*(void*)> constructor)
+				: m_type(type), m_constructor(constructor)
+			{
+			}
+
+			template <typename T, std::enable_if_t<!std::is_same_v<std::decay_t<T>, constructor>, int>  = 0>
 			constructor(T&& src)
-				: m_type(type_info::of<std::decay_t<T>>()), m_constructor(
-					[src](void* ptr)
-					{ return new (ptr) std::decay_t <T>(src); }
-				) {}
+				:m_type(type_info::of<std::decay_t<T>>())
+			{
+				if constexpr (!std::is_empty_v<std::decay_t<T>>)
+					m_constructor = [src = std::forward<T>(src)](void* ptr) mutable
+						{
+							return new(ptr) std::decay_t<T>(src);
+						};
+			}
 
-			void* operator()(void* ptr) const { return m_constructor(ptr); }
+			void* operator()(void* ptr) const
+			{
+				if(m_constructor) return m_constructor(ptr);
+				return ptr;
+			}
 			type_index type() const { return m_type; }
 
-			template<typename T, typename... Args>
-			static constructor of(Args&& ... args)
+			template <typename T, typename... Args>
+			static constructor of(Args&&... args)
 			{
-				return constructor(type_info::of<T>(), [args...](void* ptr) { return new (ptr) T(args...); });
+				return constructor(type_info::of<T>(), [args...](void* ptr) { return new(ptr) T(args...); });
 			}
 		};
-
-
-
 	}
 }
 
-template<>
+template <>
 struct std::hash<hyecs::generic::type_index>
 {
 	size_t operator()(const hyecs::generic::type_index& index) const noexcept
@@ -294,4 +327,3 @@ struct std::hash<hyecs::generic::type_index>
 		return index.hash().operator size_t();
 	}
 };
-

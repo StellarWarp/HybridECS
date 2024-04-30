@@ -9,8 +9,10 @@ namespace hyecs
 
 	public:
 
-		entity() : m_id(0), m_version(0) {}
-		entity(uint32_t m_id, uint32_t version) : m_id(m_id), m_version(version) {}
+		constexpr entity() :
+			m_id(std::numeric_limits<uint32_t>::max()),
+			m_version(std::numeric_limits<uint32_t>::max()) {}
+		constexpr entity(uint32_t m_id, uint32_t version) : m_id(m_id), m_version(version) {}
 
 		uint32_t id() const { return m_id; }
 		uint32_t version() const { return m_version; }
@@ -41,6 +43,8 @@ namespace hyecs
 			return *reinterpret_cast<const uint64_t*>(this);
 		}
 	};
+
+	static constexpr entity null_entity = entity();
 
 	template<typename T>
 	struct is_entity : std::is_same<T, entity> {};

@@ -104,11 +104,12 @@ namespace hyecs
 		iterator begin() { return iterator(m_key_to_index.begin()); }
 		iterator end() { return iterator(m_key_to_index.end()); }
 
-		mapped_type& emplace(const key_type& key, const mapped_type& value)
+		template<typename... Args>
+		mapped_type& emplace_value(const key_type& key, Args&&... args)
 		{
 			if (m_free_value_iter.empty())
 			{
-				auto& ref = m_values.emplace_back(value);
+				auto& ref = m_values.emplace_back(std::forward<Args>(args)...);
 				m_key_to_index.emplace(key, &*(m_values.end() - 1));
 				return ref;
 			}
@@ -116,31 +117,24 @@ namespace hyecs
 			{
 				auto iter = m_free_value_iter.top();
 				m_free_value_iter.pop();
-				new(iter) mapped_type(value);
-				//*iter = value;
+				new(iter) mapped_type(std::forward<Args>(args)...);
 				m_key_to_index.emplace(key, &*iter);
 				return *iter;
 			}
 		}
 
+		mapped_type& emplace(const key_type& key, mapped_type&& value)
+		{
+			assert(!m_key_to_index.contains(key));
+			return emplace_value(key, std::move(value));
+		}
+
+
 
 		mapped_type& insert(std::pair<const key_type, mapped_type>&& value)
 		{
 			assert(!m_key_to_index.contains(value.first));
-			if (m_free_value_iter.empty())
-			{
-				auto& ref = m_values.emplace_back(std::move(value.second));
-				m_key_to_index.emplace(std::move(value.first), &*(m_values.end() - 1));
-				return ref;
-			}
-			else
-			{
-				auto iter = m_free_value_iter.top();
-				m_free_value_iter.pop();
-				*iter = std::move(value.second);
-				m_key_to_index.emplace(std::move(value.first), &*iter);
-				return *iter;
-			}
+			return emplace_value(std::move(value.first), std::move(value.second));
 		}
 
 		mapped_type& at(const key_type& key)

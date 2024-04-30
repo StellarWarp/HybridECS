@@ -95,12 +95,12 @@ namespace hyecs
 		void resize(size_t new_size) noexcept
 		{
 			size_t new_capacity_byte_size = m_type.size() * new_size;
-			size_t copy_btye_size = std::min(new_capacity_byte_size, byte_size());
+			size_t copy_byte_size = std::min(new_capacity_byte_size, byte_size());
 			uint8_t* new_data = new uint8_t[new_capacity_byte_size];
-			std::memcpy(new_data, m_begin, copy_btye_size);
+			std::memcpy(new_data, m_begin, copy_byte_size);
 			delete[] m_begin;
 			m_begin = new_data;
-			m_end = m_begin + copy_btye_size;
+			m_end = m_begin + copy_byte_size;
 			m_capacity_end = m_begin + new_capacity_byte_size;
 		}
 
@@ -166,7 +166,7 @@ namespace hyecs
 		}
 	public:
 
-		void* allocate_element()
+		void* allocate_value()
 		{
 			if (m_end == m_capacity_end)
 				capacity_extend();
@@ -175,7 +175,7 @@ namespace hyecs
 			return addr;
 		}
 
-		void deallocate_element(void* ptr)
+		void deallocate_value(void* ptr)
 		{
 			assert(ptr >= m_begin && ptr < m_end);
 			uint8_t* erase_ptr = (uint8_t*)ptr;
@@ -188,7 +188,7 @@ namespace hyecs
 		void* push_back(const T& value)
 		{
 			assert(type_hash::of<T> == m_type.hash());
-			T* addr = (T*)allocate_element();
+			T* addr = (T*)allocate_value();
 			new(addr) T(std::forward<T>(value));
 			return addr;
 		}
@@ -199,7 +199,7 @@ namespace hyecs
 			using type = std::remove_reference_t<T>;
 			using pointer = type*;
 			assert(type_hash::of<type> == m_type.hash());
-			pointer addr = (pointer)allocate_element();
+			pointer addr = (pointer)allocate_value();
 			new(addr) type(std::forward<T>(value));
 			return addr;
 		}
@@ -208,7 +208,7 @@ namespace hyecs
 		void* emplace_back(Args&&... args)
 		{
 			assert(type_hash::of<T> == m_type.hash());
-			T* addr = (T*)allocate_element();
+			T* addr = (T*)allocate_value();
 			new(addr) T(std::forward<Args>(args)...);
 			return addr;
 		}
@@ -216,7 +216,7 @@ namespace hyecs
 		void* emplace_back(generic::constructor constructor)
 		{
 			assert(constructor.type() == m_type);
-			return constructor(allocate_element());
+			return constructor(allocate_value());
 		}
 
 		void pop_back()

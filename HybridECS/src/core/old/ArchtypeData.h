@@ -26,12 +26,12 @@ namespace hyecs
 	class ArchetypeData
 	{
 	private:
-		static struct ChunkConfig
+		static struct component_table_chunk_traits
 		{
-			static const size_t DEFAULT_CHUNK_SIZE = 128 * 1024;//128kb
+			static const size_t size = 128 * 1024;//128kb
 		};
 
-		template<size_t SIZE = ChunkConfig::DEFAULT_CHUNK_SIZE>
+		template<size_t SIZE = component_table_chunk_traits::size>
 		struct Chunk
 		{
 			static const size_t CHUNK_SIZE = SIZE;
@@ -75,7 +75,7 @@ namespace hyecs
 			}
 		};
 
-		//template<size_t SIZE = ChunkConfig::DEFAULT_CHUNK_SIZE>
+		//template<size_t SIZE = component_table_chunk_traits::size>
 		//struct DataChunk
 		//{
 		//	std::array<uint8_t, SIZE> m_data;
@@ -88,7 +88,7 @@ namespace hyecs
 
 		//	}
 		//};
-		//template<size_t ChunkSize = ChunkConfig::DEFAULT_CHUNK_SIZE>
+		//template<size_t ChunkSize = component_table_chunk_traits::size>
 		//struct ChunkArray
 		//{
 

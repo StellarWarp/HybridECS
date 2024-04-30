@@ -81,6 +81,11 @@ namespace hyecs
 				storage_map().insert({ e, key });
 			}
 
+			void erase(entity e)
+			{
+				storage_map().erase(e);
+			}
+
 			storage_key at(entity e)
 			{
 				return storage_map().at(e);

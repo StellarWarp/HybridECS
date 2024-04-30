@@ -1,7 +1,6 @@
 #pragma once
 
 #include "generic_type.h"
-#include "generic_vector.h"
 
 namespace hyecs
 {
@@ -24,7 +23,7 @@ namespace hyecs
 
 	private:
 		unordered_map<Key, void*> m_map;
-		generic_vector m_values;
+		raw_segmented_vector m_values;
 
 
 	public:

@@ -86,9 +86,21 @@ namespace hyecs
 		operator const generic::type_index() const { return info->type_index(); }
 		bool operator == (const component_type_index& other) const { return info->hash() == other.info->hash(); }
 		bool operator != (const component_type_index& other) const { return !(*this == other); }
-		bool operator < (const component_type_index& other) const {
-			return info->group() < other.info->group() || info->hash() < other.info->hash(); }
-		bool operator > (const component_type_index& other) const { return info->hash() > other.info->hash(); }
+		bool operator < (const component_type_index& other) const
+		{
+
+			int group_comp = group().compare(other.group());
+			if (group_comp != 0) return group_comp < 0;
+			if (is_tag() != other.is_tag()) return !is_tag();
+			return hash() < other.hash();
+		}
+		bool operator > (const component_type_index& other) const 
+		{
+			int group_comp = group().compare(other.group());
+			if (group_comp != 0) return group_comp > 0;
+			if (is_tag() != other.is_tag()) return is_tag();
+			return hash() > other.hash();
+		}
 	};
 
 	class cached_component_type_index
@@ -109,10 +121,10 @@ namespace hyecs
 		void destructor(void* addr, size_t count) const { return type_index_cache.destructor(addr, count); }
 		operator component_type_index() const { return index; }
 		operator generic::type_index() const { return index; }
-		bool operator==(const cached_component_type_index& other) const { return type_index_cache == other.type_index_cache; }
-		bool operator!=(const cached_component_type_index& other) const { return type_index_cache != other.type_index_cache; }
-		bool operator<(const cached_component_type_index& other) const { return type_index_cache < other.type_index_cache; }
-		bool operator>(const cached_component_type_index& other) const { return type_index_cache > other.type_index_cache; }
+		bool operator==(const cached_component_type_index& other) const { return index == other.index; }
+		bool operator!=(const cached_component_type_index& other) const { return index != other.index; }
+		bool operator<(const cached_component_type_index& other) const { return index < other.index; }
+		bool operator>(const cached_component_type_index& other) const { return index > other.index; }
 	};
 
 
@@ -165,3 +177,54 @@ struct std::hash<hyecs::component_type_index>
 		return (size_t)index.get_info().hash();
 	}
 };
+
+
+namespace hyecs
+{
+	namespace internal
+	{
+		template<typename... T, size_t... I>
+		auto sorted_static_components_helper(std::index_sequence<I...>)
+		{
+			//only support for static type
+			static_assert((component_traits<std::decay_t<T>>::is_static && ...), "only support for static type");
+			//static sort
+			struct type_sort_info
+			{
+				int original_index;
+				component_group_id group;
+				bool is_tag;
+				type_hash hash;
+			};
+
+			static constexpr std::array<type_sort_info,sizeof...(T)> order_mapping =
+				internal::sort(std::array<type_sort_info,sizeof...(T)>{
+				type_sort_info{
+					I,
+					component_traits<T>::static_group_id,
+					component_traits<T>::is_tag,
+					type_hash::of<T>
+				}...
+				},[](const type_sort_info& lhs, const type_sort_info& rhs)
+			{
+				if(lhs.group != rhs.group)
+					return lhs.group < rhs.group;
+				if(lhs.is_tag != rhs.is_tag)
+					return !lhs.is_tag;
+				return lhs.hash < rhs.hash;
+			});
+
+			using unordered_types = type_list<T...>;
+			using sorted_types = type_list<
+				typename unordered_types::template get<
+					order_mapping[I].original_index
+			>...
+			>;
+
+			return sorted_types{};
+		}
+	}
+
+	template<typename... T>
+	using sorted_static_components = decltype(internal::sorted_static_components_helper<T...>(std::make_index_sequence<sizeof...(T)>{}));
+}
