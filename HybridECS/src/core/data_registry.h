@@ -144,7 +144,9 @@ namespace hyecs
 					storages.push_back(&m_component_storages.at(component.hash()));
 			}
 			//todo process for single component arch
-			m_archetypes_storage.emplace_value(arch.hash(), arch, storages, m_storage_key_registry.get_group_key_accessor());
+			m_archetypes_storage.emplace_value(arch.hash(), arch, 
+				sorted_sequence_cref(storages),
+				m_storage_key_registry.get_group_key_accessor());
 
 			std::cout << "add untag archetype " << arch << std::endl;
 		}
@@ -160,7 +162,7 @@ namespace hyecs
 				if (component.is_tag() && !component.is_empty())
 					tag_storages.push_back(&m_component_storages.at(component.hash()));
 			}
-			m_tag_archetypes_storage.emplace_value(arch.hash(), arch, base_storage, tag_storages);
+			m_tag_archetypes_storage.emplace_value(arch.hash(), arch, base_storage, sorted_sequence_cref(tag_storages));
 			std::cout << "add tag archetype " << arch << std::endl;
 		}
 
@@ -293,8 +295,8 @@ namespace hyecs
 		}
 
 		void emplace(
-			sorted_sequence_ref<const component_type_index> components,
-			sorted_sequence_ref<const generic::constructor> constructors,
+			sorted_sequence_cref<component_type_index> components,
+			sorted_sequence_cref<generic::constructor> constructors,
 			sequence_ref<entity> entities)
 		{
 			assert(components.size() == constructors.size());
@@ -317,16 +319,15 @@ namespace hyecs
 				auto constructors_begin = constructors.begin() + (group_begin - components.begin());
 				auto constructors_end = constructors.begin() + (group_end - components.begin());
 
-				emplace_in_group(arch, entities,
-					sorted_sequence_ref<const generic::constructor>(constructors_begin, constructors_end));
+				emplace_in_group(arch, entities, sorted_sequence_cref(constructors_begin, constructors_end));
 
 				group_begin = group_end;
 			}
 		}
 
 		void emplace_in_group(archetype_index arch,
-			sequence_ref<const entity> entities,
-			sorted_sequence_ref<const generic::constructor> constructors)
+			sequence_cref<entity> entities,
+			sorted_sequence_cref<generic::constructor> constructors)
 		{
 			if (arch.component_count() == 1)
 			{
@@ -364,7 +365,7 @@ namespace hyecs
 				else
 				{
 					auto& storage = m_archetypes_storage.at(arch.hash());
-					construct_process(storage.get_allocate_accessor(entities.as_const()));
+					construct_process(storage.get_allocate_accessor(entities));
 				}
 			}
 		}

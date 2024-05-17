@@ -1,14 +1,16 @@
 #pragma once
 #include "core/static_data_registry.h"
-
+#include "core/component_group.h"
 
 using namespace hyecs;
 
 
 constexpr auto group_a = component_group_id("Group A");
+constexpr auto group_b = component_group_id("Group B");
+constexpr auto group_c = component_group_id("Group C");
 inline const auto _ = ecs_static_register_context::register_context.add_group("Group A");
-
-
+inline const auto __ = ecs_static_register_context::register_context.add_group("Group B");
+inline const auto ___ = ecs_static_register_context::register_context.add_group("Group C");
 struct A
 {
 	int x;
@@ -62,6 +64,13 @@ struct T3
 {
 };
 
+#ifdef __JETBRAINS_IDE__
+template<typename T>
+struct component_static_group_override{};
+template<typename T>
+struct component_register_static : std::false_type{};
+#endif
+
 REGISTER_HYECS_COMPONENT(A, group_a);
 
 REGISTER_HYECS_COMPONENT(B, group_a);
@@ -78,6 +87,22 @@ REGISTER_HYECS_COMPONENT(T2, group_a);
 
 REGISTER_HYECS_COMPONENT(T3, group_a);
 
+struct A2
+{
+	int x;
+};
+REGISTER_HYECS_COMPONENT(A2, group_b);
+struct B2
+{
+	int x;
+};
+REGISTER_HYECS_COMPONENT(B2, group_b);
+struct A3
+{
+	int x;
+};
+REGISTER_HYECS_COMPONENT(A3, group_c);
+
 struct register_idents
 {
 	enum
@@ -93,50 +118,10 @@ class main_registry : public static_data_registry<register_idents::main>
 };
 
 
-template <typename Callable, typename... Args, size_t... I>
-void in_group_for_each_impl(Callable&& func, type_list<Args...>, std::index_sequence<I...>)
-{
-	using component_param = typename type_list<Args...>::template filter_with<is_static_component>;
-	using non_component_param = typename type_list<Args...>::template filter_without<is_static_component>;
-
-	std::cout << type_name<component_param> << std::endl;
-	std::cout << type_name<non_component_param> << std::endl;
-
-	std::array<void*,non_component_param::size> comp_addr{ nullptr };
-	
-	auto get_param = [&](auto type) -> decltype(auto)
-	{
-		using param_type = typename decltype(type)::type;
-		using base_type = typename std::decay_t<param_type>;
-		if constexpr (is_static_component<param_type>::value)
-		{
-			size_t index = component_param::template index_of<param_type>;
-			return static_cast<param_type>(*static_cast<base_type*>(comp_addr[index]));
-		}
-		else
-		{
-			return param_type{};
-		}
-	};
-	
-	func(get_param(type_wrapper<Args>{})...);
-	
-}
-
-
-template <typename Callable>
-auto in_group_for_each(Callable&& func)
-{
-	in_group_for_each_impl<Callable>(
-		std::forward<Callable>(func),
-		typename function_traits<Callable>::args{},
-		std::make_index_sequence<function_traits<Callable>::arity>{}
-	);
-}
 
 int main()
 {
-	// main_registry registry(ecs_static_register_context::register_context);
+	 main_registry registry(ecs_static_register_context::register_context);
 
 
 	// vector<entity> entities2(10);
@@ -169,14 +154,22 @@ int main()
 	//
 	//
 	// q.dynamic_for_each(q.get_access_info(registry.component_types<A,B>()),
-	// 	[](entity e ,sequence_ref<void*> data)
+	// 	[](entity e ,sequence_ref<void*> data)registry
 	// {
 	// 	auto [a,b] = data.cast_tuple<A*,B*>();
 	// 	std::cout << e.id() << " : " << a->x << " " << b->x << std::endl;
 	// });
-
-	in_group_for_each(
-		[](entity, const B&, D&, C, A&)
+	
+	
+	 registry.query_with()
+	.all<B2,A,A3,B,A2>()
+	.for_each(
+		[](entity e, const B& b, const A& a, storage_key key)
 		{
+			std::cout << e.id() << " "
+			<< "Sort key : " << (uint32_t)key.get_table_offset() << " "
+			<< "A : " << a.x << " "
+			<< "B : " << b.x << std::endl;
 		});
+
 }

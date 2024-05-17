@@ -15,26 +15,27 @@ namespace hyecs
 		vector<std::function<void(entity, storage_key)>> m_on_entity_add;
 		vector<std::function<void(entity, storage_key)>> m_on_entity_remove;
 
-
 	public:
 		tag_archetype_storage(
 			archetype_index index,
 			archetype_storage* untag_storage,
-			sorted_sequence_ref<component_storage*> tag_storages
+			sorted_sequence_cref<component_storage*> tag_storages
 		) :
 			m_index(index),
 			m_untag_storage(untag_storage),
 			m_tag_storages(tag_storages.begin(), tag_storages.end())
 		{
-			m_untag_storage->add_callback_on_sparse_to_chunk([this]() {
+			m_untag_storage->add_callback_on_sparse_to_chunk([this]()
+			{
 				notify_storage_chunk_convert();
-				});
+			});
 		}
 
 		tag_archetype_storage(const tag_archetype_storage&) = delete;
 		tag_archetype_storage(tag_archetype_storage&&) = delete;
 
 		dense_map<entity, storage_key>& entities() { return m_entities; }
+
 		void add_callback_on_entity_add(std::function<void(entity, storage_key)> callback)
 		{
 			for (auto [e, key] : m_entities)
@@ -43,6 +44,7 @@ namespace hyecs
 			}
 			m_on_entity_add.push_back(callback);
 		}
+
 		void add_callback_on_entity_remove(std::function<void(entity, storage_key)> callback)
 		{
 			m_on_entity_remove.push_back(callback);
@@ -70,13 +72,12 @@ namespace hyecs
 		//todo emplace entity etc..
 
 
-
 		void entity_change_archetype(
-			sequence_ref<const entity> entities,
+			sequence_cref<entity> entities,
 			tag_archetype_storage* dest_archetype,
 			remove_component tag_remove_components,
-			sorted_sequence_ref<const generic::constructor> untag_adding_constructors,
-			sorted_sequence_ref<const generic::constructor> tag_adding_constructors)
+			sorted_sequence_cref<generic::constructor> untag_adding_constructors,
+			sorted_sequence_cref<generic::constructor> tag_adding_constructors)
 		{
 			m_untag_storage->entity_change_archetype(entities, dest_archetype->m_untag_storage, untag_adding_constructors);
 
@@ -99,22 +100,22 @@ namespace hyecs
 					dest_tag_storages.emplace(entities, *constructors_iter);
 					constructors_iter++;
 				}
-
 			}
 		}
 
-		template<typename SeqParam>
+		template <typename SeqParam>
 		class allocate_accessor
 		{
 			//using SeqParam = const entity*;
 			using end_iterator = nullptr_t;
 			using tag_component_iterator = vector<component_storage*>::iterator;
-			using entity_seq = sequence_ref<const entity, SeqParam>;
+			using entity_seq = sequence_cref<entity, SeqParam>;
 
 			tag_archetype_storage& m_archetype;
 			archetype_storage::allocate_accessor<SeqParam> m_untag_accessor;
 			entity_seq m_entities;
 			ASSERTION_CODE(bool m_is_construct_finished = false);
+
 		public:
 			allocate_accessor(tag_archetype_storage& archetype, entity_seq entities) :
 				m_archetype(archetype),
@@ -123,16 +124,18 @@ namespace hyecs
 			{
 				if (const table::allocate_accessor<SeqParam>* chunk_accessor = m_untag_accessor.get_chunk_allocate_accessor())
 				{
-					chunk_accessor->for_each_entity_key([&](entity e, storage_key key) {
-						m_archetype.m_entities.insert({ e, key });
-						});
+					chunk_accessor->for_each_entity_key([&](entity e, storage_key key)
+					{
+						m_archetype.m_entities.insert({e, key});
+					});
 				}
 				else
 					for (auto e : m_entities)
 					{
-						m_archetype.m_entities.insert({ e, storage_key{} });
+						m_archetype.m_entities.insert({e, storage_key{}});
 					}
 			}
+
 			allocate_accessor(allocate_accessor&& other) noexcept :
 				m_archetype(other.m_archetype),
 				m_untag_accessor(std::move(other.m_untag_accessor)),
@@ -140,6 +143,7 @@ namespace hyecs
 			{
 				ASSERTION_CODE(other.m_is_construct_finished = true);
 			}
+
 			allocate_accessor(const allocate_accessor& other) = delete;
 
 
@@ -159,8 +163,6 @@ namespace hyecs
 			~allocate_accessor() { assert(m_is_construct_finished); }
 
 
-
-
 			class component_array_accessor
 			{
 				using untag_accessor = typename archetype_storage::allocate_accessor<SeqParam>::component_array_accessor;
@@ -170,6 +172,7 @@ namespace hyecs
 				tag_component_iterator m_tag_storages_iter;
 				tag_component_iterator m_tag_storages_end;
 				entity_seq m_entities;
+
 			public:
 				component_array_accessor(
 					untag_accessor&& untag_accessor,
@@ -181,7 +184,8 @@ namespace hyecs
 					m_tag_storages_iter(tag_storages_iter),
 					m_tag_storages_end(tag_storages_end),
 					m_entities(entities)
-				{}
+				{
+				}
 
 				component_type_index component_type() const
 				{
@@ -196,15 +200,17 @@ namespace hyecs
 				}
 
 
-				component_array_accessor& operator++() {
-					std::visit([this](auto& accessor) {
+				component_array_accessor& operator++()
+				{
+					std::visit([this](auto& accessor)
+					{
 						using accessor_type = std::decay_t<decltype(accessor)>;
 						if constexpr (std::is_same_v<accessor_type, untag_accessor>)
 						{
 							++accessor;
 							if (accessor == end_iterator{} && m_tag_storages_iter != m_tag_storages_end)
 							{
-								m_accessor = (*m_tag_storages_iter)->allocate(m_entities);//change accessor
+								m_accessor = (*m_tag_storages_iter)->allocate(m_entities); //change accessor
 								++m_tag_storages_iter;
 							}
 						}
@@ -214,7 +220,7 @@ namespace hyecs
 							++m_tag_storages_iter;
 						}
 						else static_assert(!std::is_same_v<accessor_type, accessor_type>, "not support type");
-						}, m_accessor);
+					}, m_accessor);
 					return *this;
 				}
 
@@ -224,34 +230,49 @@ namespace hyecs
 				{
 					using iterator_variant = std::variant<typename untag_accessor::iterator, tag_accessor::iterator>;
 					iterator_variant m_iterator;
+
 				public:
-					iterator(typename untag_accessor::iterator iter) : m_iterator(iter) {}
-					iterator(typename tag_accessor::iterator iter) : m_iterator(iter) {}
-					iterator& operator++() { std::visit([](auto& iter) {++iter; }, m_iterator); return *this; }
+					iterator(typename untag_accessor::iterator iter) : m_iterator(iter)
+					{
+					}
+
+					iterator(typename tag_accessor::iterator iter) : m_iterator(iter)
+					{
+					}
+
+					iterator& operator++()
+					{
+						std::visit([](auto& iter) { ++iter; }, m_iterator);
+						return *this;
+					}
+
 					bool operator==(const iterator& other) const { return m_iterator == other.m_iterator; }
 					bool operator!=(const iterator& other) const { return m_iterator != other.m_iterator; }
-					bool operator==(const end_iterator&) const{return std::visit([](auto& iter) {return iter == end_iterator{}; }, m_iterator);}
+					bool operator==(const end_iterator&) const { return std::visit([](auto& iter) { return iter == end_iterator{}; }, m_iterator); }
 					bool operator!=(const end_iterator&) const { return !operator==(end_iterator{}); }
-					void* operator*() { return std::visit([](auto& iter) {return *iter; }, m_iterator); }
+					void* operator*() { return std::visit([](auto& iter) { return *iter; }, m_iterator); }
 				};
 
-				iterator begin() { return std::visit([](auto& accessor) {return iterator{ accessor.begin() }; }, m_accessor); }
-				end_iterator end() { return{}; }
+				iterator begin() { return std::visit([](auto& accessor) { return iterator{accessor.begin()}; }, m_accessor); }
+				end_iterator end() { return {}; }
 
-				bool operator== (const component_array_accessor& other) const { return m_accessor == other.m_accessor; }
-				bool operator!= (const component_array_accessor& other) const { return m_accessor != other.m_accessor; }
-				bool operator== (const end_iterator&) const
+				bool operator==(const component_array_accessor& other) const { return m_accessor == other.m_accessor; }
+				bool operator!=(const component_array_accessor& other) const { return m_accessor != other.m_accessor; }
+
+				bool operator==(const end_iterator&) const
 				{
-					return std::visit([this](auto& accessor) {
+					return std::visit([this](auto& accessor)
+					{
 						using accessor_type = std::decay_t<decltype(accessor)>;
 						if constexpr (std::is_same_v<accessor_type, untag_accessor>)
 							return accessor == end_iterator{};
 						else if constexpr (std::is_same_v<accessor_type, tag_accessor>)
 							return m_tag_storages_iter == m_tag_storages_end;
 						else static_assert(!std::is_same_v<accessor_type, accessor_type>, "not support type");
-						}, m_accessor);
+					}, m_accessor);
 				}
-				bool operator!= (const end_iterator&) const { return !operator==(end_iterator{}); }
+
+				bool operator!=(const end_iterator&) const { return !operator==(end_iterator{}); }
 			};
 
 			component_array_accessor begin()
@@ -262,18 +283,16 @@ namespace hyecs
 					m_archetype.m_tag_storages.end(),
 					m_entities
 				);
-
 			}
-			end_iterator end() { return{}; }
 
+			end_iterator end() { return {}; }
 		};
 
 
-		auto allocate(sequence_ref<const entity> entities)
+		auto allocate(sequence_cref< entity> entities)
 		{
 			allocate_accessor accessor(*this, entities);
 			return accessor;
 		}
-
 	};
 }

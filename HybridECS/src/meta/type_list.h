@@ -37,6 +37,13 @@ namespace hyecs {
 		static constexpr bool contains =
 			std::bool_constant<(... && contains_helper<U>)>::value;
 
+		template <typename Other>
+		static constexpr bool contains_in = Other::template contains<T...>;
+
+		template <typename Other>
+		static constexpr bool contains_all = Other::template contains_in<type_list<T...>>;
+
+
 	private:
 		template <typename... Us> struct is_unique_helper;
 		template <> struct is_unique_helper<> {
@@ -262,5 +269,26 @@ namespace hyecs {
 		using type = T;
 	};
 
+	template <typename Callable>
+	auto for_each_type_impl(Callable, type_list<>) {};
+	template <typename T, typename... Ts, typename Callable>
+	auto for_each_type_impl(Callable callable, type_list<T, Ts...>)
+	{
+		static_assert(std::is_invocable_v<Callable, T>);
+		using invoke_result = std::invoke_result_t<Callable, T>;
+		using next_list = type_list<Ts...>;
+		if constexpr (std::is_void_v<invoke_result>)
+		{
+			callable(type_wrapper<T>{});
+			for_each_type_impl(callable, next_list{});
+		}
+		else
+			return callable(type_wrapper<T>{}), for_each_type_impl(callable, next_list{});
+	}
+	template <typename... T, typename Callable>
+	auto for_each_type(Callable callable, type_list<T...> list)
+	{
+		return for_each_type_impl(callable, list);
+	}
 
 } // namespace hyecs

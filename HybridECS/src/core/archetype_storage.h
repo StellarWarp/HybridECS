@@ -7,8 +7,6 @@
 
 namespace hyecs
 {
-
-
 	class archetype_storage
 	{
 		friend class tag_archetype_storage;
@@ -20,8 +18,8 @@ namespace hyecs
 		};
 
 		archetype_index m_index;
-		vector<component_type_index> m_notnull_components;//cache from m_component_storages
-		vector<component_storage*> m_component_storages;//store for chunk to sparse convert
+		vector<component_type_index> m_notnull_components; //cache from m_component_storages
+		vector<component_storage*> m_component_storages; //store for chunk to sparse convert
 		std::variant<table, sparse_table> m_table;
 		storage_type get_storage_type() const { return m_table.index() == 0 ? storage_type::Chunk : storage_type::Sparse; }
 		storage_key_registry::group_key_accessor m_key_registry;
@@ -30,7 +28,7 @@ namespace hyecs
 		//add and remove event are inside the m_table
 		// vector<std::function<void(entity, storage_key)>> m_on_entity_add;
 		// vector<std::function<void(entity, storage_key)>> m_on_entity_remove;
-		vector<std::function<void(entity, storage_key, storage_key)>> m_on_entity_move;//from, to
+		vector<std::function<void(entity, storage_key, storage_key)>> m_on_entity_move; //from, to
 		vector<std::function<void()>> m_on_sparse_to_chunk;
 		vector<std::function<void()>> m_on_chunk_to_sparse;
 
@@ -40,14 +38,13 @@ namespace hyecs
 	public:
 		archetype_storage(
 			archetype_index index,
-			sorted_sequence_ref<component_storage*> component_storages,
+			sorted_sequence_cref<component_storage*> component_storages,
 			storage_key_registry::group_key_accessor key_registry)
 			: m_index(index),
-			m_component_storages(component_storages),
-			m_table(sparse_table(component_storages)),
-			m_key_registry(key_registry)
+			  m_component_storages(component_storages),
+			  m_table(sparse_table(component_storages)),
+			  m_key_registry(key_registry)
 		{
-			assert(component_storages.size() != 1);
 			m_notnull_components.reserve(component_storages.size());
 			for (uint64_t i = 0; i < component_storages.size(); ++i)
 			{
@@ -57,24 +54,32 @@ namespace hyecs
 			for (auto& comp : index)
 				components_size += comp.size();
 
-			sparse_to_chunk_convert_limit = component_table_chunk_traits::size / components_size;
-			chunk_to_sparse_convert_limit = sparse_to_chunk_convert_limit / 2;
+			if (component_storages.size() > 1)
+			{
+				sparse_to_chunk_convert_limit = component_table_chunk_traits::size / components_size;
+				chunk_to_sparse_convert_limit = sparse_to_chunk_convert_limit / 2;
+			}
+			else
+			{
+				sparse_to_chunk_convert_limit = std::numeric_limits<uint32_t>::max();
+				chunk_to_sparse_convert_limit = 0;
+			}
 		}
 
 		archetype_storage(const archetype_storage&) = delete;
 		archetype_storage(archetype_storage&&) = delete;
-	
 
 	public:
 		archetype_index archetype() const
 		{
 			return m_index;
 		}
+
 		const storage_key_registry::group_key_accessor& get_key_registry() const
 		{
 			return m_key_registry;
 		}
-		
+
 		table* get_table()
 		{
 			return std::get_if<table>(&m_table);
@@ -84,42 +89,54 @@ namespace hyecs
 		{
 			return m_notnull_components;
 		}
+
 		const vector<component_storage*>& get_component_storages() const
 		{
 			return m_component_storages;
 		}
+
 		void get_component_indices(
-			sorted_sequence_ref<const component_type_index> types,
+			sorted_sequence_cref<component_type_index> types,
 			sequence_ref<uint32_t> component_indices) const
 		{
 			get_sub_sequence_indices<component_type_index>(
-				m_notnull_components,
+				sorted_sequence_cref(m_notnull_components),
 				types,
 				component_indices);
 		}
-		
+
+		void get_component_indices(
+			sequence_cref<component_type_index> types,
+			sequence_ref<uint32_t> component_indices) const
+		{
+			get_sub_sequence_indices<component_type_index>(
+				sorted_sequence_cref(m_notnull_components),
+				types,
+				component_indices);
+		}
 
 
 		void add_callback_on_entity_add(std::function<void(entity, storage_key)> callback)
 		{
 			std::visit([&](auto& t)
-				{
-					t.add_callback_on_entity_add(callback);
-				}, m_table);
+			{
+				t.add_callback_on_entity_add(callback);
+			}, m_table);
 		}
+
 		void add_callback_on_entity_remove(std::function<void(entity, storage_key)> callback)
 		{
 			std::visit([&](auto& t)
-				{
-					t.add_callback_on_entity_remove(callback);
-				}, m_table);
+			{
+				t.add_callback_on_entity_remove(callback);
+			}, m_table);
 		}
 
 
 		void entity_change_archetype(
-			sequence_ref<const entity> entities,
+			sequence_cref<entity> entities,
 			archetype_storage* dest_archetype,
-			sorted_sequence_ref<const generic::constructor> adding_constructors)
+			sorted_sequence_cref<generic::constructor> adding_constructors)
 		{
 			auto constructors_iter = adding_constructors.begin();
 
@@ -133,7 +150,8 @@ namespace hyecs
 				keys.reserve(entities.size());
 				for (auto e : entities) keys.push_back(m_key_registry.at(e).get_table_offset());
 			}
-			auto src_accessor_var = std::visit([&](auto& t) -> src_accessor_variant {
+			auto src_accessor_var = std::visit([&](auto& t) -> src_accessor_variant
+			{
 				using table_type = std::decay_t<decltype(t)>;
 				if constexpr (std::is_same_v<table_type, table>)
 					return t.get_deallocate_accessor(keys);
@@ -141,60 +159,61 @@ namespace hyecs
 					return t.get_deallocate_accessor(entities);
 				else
 					static_assert(!std::is_same_v<table_type, table_type>, "unhandled type");
-				}, src);
-			auto dest_accessor_var = std::visit([&](auto& t) -> dest_accessor_variant {
-				return t.get_allocate_accessor(entities, [&](entity e, storage_key s) {
+			}, src);
+			auto dest_accessor_var = std::visit([&](auto& t) -> dest_accessor_variant
+			{
+				return t.get_allocate_accessor(entities, [&](entity e, storage_key s)
+				{
 					using table_type = std::decay_t<decltype(t)>;
 					if constexpr (std::is_same_v<table_type, table>)
 					{
 						m_key_registry.insert(e, s);
 					}
-					else if constexpr (std::is_same_v<table_type, sparse_table>) {}
+					else if constexpr (std::is_same_v<table_type, sparse_table>)
+					{
+					}
 					else static_assert(!std::is_same_v<table_type, table_type>, "unhandled type");
-					});
-				}, dest);
+				});
+			}, dest);
 
 
 			//discard src unmatch components and construct dest unmatch components, move match components
 			std::visit([&](auto& src_accessor, auto& dest_accessor)
-				{
-
-					auto src_component_accessors = src_accessor.begin();
-					auto dest_component_accessors = dest_accessor.begin();
-					while (src_component_accessors != src_accessor.end())
-						if (src_component_accessors.comparable() < dest_component_accessors.comparable())
+			{
+				auto src_component_accessors = src_accessor.begin();
+				auto dest_component_accessors = dest_accessor.begin();
+				while (src_component_accessors != src_accessor.end())
+					if (src_component_accessors.comparable() < dest_component_accessors.comparable())
+					{
+						component_type_index type = src_component_accessors.component_type();
+						for (void* addr : src_component_accessors)
+							type.destructor(addr);
+						src_component_accessors++;
+					}
+					else if (src_component_accessors.comparable() > dest_component_accessors.comparable())
+					{
+						assert(constructors_iter->type() == dest_component_accessors.component_type().type_index());
+						auto& constructor = *constructors_iter;
+						for (void* addr : dest_component_accessors)
+							constructor(addr);
+						dest_component_accessors++;
+						constructors_iter++;
+					}
+					else
+					{
+						auto src_comp_iter = src_component_accessors.begin();
+						auto dest_comp_iter = dest_component_accessors.begin();
+						component_type_index type = src_component_accessors.component_type();
+						while (src_comp_iter != src_component_accessors.end())
 						{
-							component_type_index type = src_component_accessors.component_type();
-							for (void* addr : src_component_accessors)
-								type.destructor(addr);
-							src_component_accessors++;
+							type.move_constructor(*dest_comp_iter, *src_comp_iter);
+							src_comp_iter++;
+							dest_comp_iter++;
 						}
-						else if (src_component_accessors.comparable() > dest_component_accessors.comparable())
-						{
-							assert(constructors_iter->type() == dest_component_accessors.component_type().type_index());
-							auto& constructor = *constructors_iter;
-							for (void* addr : dest_component_accessors)
-								constructor(addr);
-							dest_component_accessors++;
-							constructors_iter++;
-						}
-						else
-						{
-							auto src_comp_iter = src_component_accessors.begin();
-							auto dest_comp_iter = dest_component_accessors.begin();
-							component_type_index type = src_component_accessors.component_type();
-							while (src_comp_iter != src_component_accessors.end())
-							{
-								type.move_constructor(*dest_comp_iter, *src_comp_iter);
-								src_comp_iter++;
-								dest_comp_iter++;
-							}
-							src_component_accessors++;
-							dest_component_accessors++;
-						}
-
-				}, src_accessor_var, dest_accessor_var);
-
+						src_component_accessors++;
+						dest_component_accessors++;
+					}
+			}, src_accessor_var, dest_accessor_var);
 		}
 
 		void sparse_convert_to_chunk()
@@ -205,11 +224,12 @@ namespace hyecs
 			auto& entities = sparse_table_ptr->get_entities();
 
 			auto src_accessor = sparse_table_ptr->get_raw_accessor();
-			auto entity_seq = make_sequence_ref(entities.begin(), entities.end());
+			auto entity_seq = sequence_cref(entities.begin(), entities.end());
 			auto dest_accessor = std::get<table>(m_table).get_allocate_accessor(entity_seq,
-				[this](entity e, storage_key s) {
-				m_key_registry.insert(e, s);
-				});
+			                                                                    [this](entity e, storage_key s)
+			                                                                    {
+				                                                                    m_key_registry.insert(e, s);
+			                                                                    });
 
 			auto src_component_accessors = src_accessor.begin();
 			auto dest_component_accessors = dest_accessor.begin();
@@ -240,14 +260,16 @@ namespace hyecs
 		void chunk_convert_to_sparse()
 		{
 			auto table_ptr = std::make_unique<table>(std::move(std::get<table>(m_table)));
-			m_table.emplace<sparse_table>(m_component_storages);
+			m_table.emplace<sparse_table>(sorted_sequence_cref(m_component_storages));
 			auto entities = table_ptr->get_entities();
-			auto entities_seq = make_sequence_ref(entities).as_const();
+			auto entities_seq = entities;
 			auto src_accessor = table_ptr->get_raw_accessor();
-			auto dest_accessor = std::get<sparse_table>(m_table).get_allocate_accessor(entities_seq,
-				[this](entity e, storage_key s) {
+			auto dest_accessor = std::get<sparse_table>(m_table).get_allocate_accessor(
+				sequence_cref(entities),
+				[this](entity e, storage_key s)
+				{
 					//todo may need erase key
-				// m_key_registry.insert(e, s);//need to set the key to null
+					// m_key_registry.insert(e, s);//need to set the key to null
 				});
 
 			auto src_component_accessors = src_accessor.begin();
@@ -286,7 +308,7 @@ namespace hyecs
 		}
 
 		// void emplace_entity(
-		// 	sequence_ref<const entity> entities,
+		// 	sequence_cref< entity> entities,
 		// 	sorted_sequence_ref<const generic::constructor> constructors,
 		// 	sequence_ref<storage_key> keys)
 		// {
@@ -320,7 +342,7 @@ namespace hyecs
 		using end_iterator = nullptr_t;
 
 		//a warp for sparse_table and table allocate_accessor
-		template<typename SeqParam>
+		template <typename SeqParam>
 		class allocate_accessor
 		{
 			using sparse_allocate_accessor = sparse_table::allocate_accessor<SeqParam>;
@@ -329,9 +351,14 @@ namespace hyecs
 
 		public:
 			allocate_accessor(sparse_allocate_accessor&& accessor)
-				:m_accessor(std::move(accessor)) {}
+				: m_accessor(std::move(accessor))
+			{
+			}
+
 			allocate_accessor(chunk_allocate_accessor&& accessor)
-				:m_accessor(std::move(accessor)) {}
+				: m_accessor(std::move(accessor))
+			{
+			}
 
 			const chunk_allocate_accessor* get_chunk_allocate_accessor() const
 			{
@@ -340,7 +367,7 @@ namespace hyecs
 
 			void notify_construct_finish()
 			{
-				std::visit([](auto& accessor) {accessor.notify_construct_finish(); }, m_accessor);
+				std::visit([](auto& accessor) { accessor.notify_construct_finish(); }, m_accessor);
 			}
 
 			class component_array_accessor
@@ -351,21 +378,36 @@ namespace hyecs
 
 			public:
 				component_array_accessor(sparse_component_array_accessor accessor)
-					: m_accessor(accessor) {}
+					: m_accessor(accessor)
+				{
+				}
 
 				component_array_accessor(chunk_component_array_accessor accessor)
-					: m_accessor(accessor) {}
+					: m_accessor(accessor)
+				{
+				}
 
 				component_array_accessor(const component_array_accessor& other) = delete;
+
 				component_array_accessor(component_array_accessor&& other) noexcept
-					: m_accessor(std::move(other.m_accessor)) {}
-				
-				
+					: m_accessor(std::move(other.m_accessor))
+				{
+				}
 
-				component_array_accessor& operator++() { std::visit([](auto& accessor) {++accessor; }, m_accessor); return*this; }
-				component_array_accessor operator++(int) { std::visit([](auto& accessor) {accessor++; }, m_accessor); return *this; }
 
-				component_type_index component_type() const { return std::visit([](auto& accessor) {return accessor.component_type(); }, m_accessor); }
+				component_array_accessor& operator++()
+				{
+					std::visit([](auto& accessor) { ++accessor; }, m_accessor);
+					return *this;
+				}
+
+				component_array_accessor operator++(int)
+				{
+					std::visit([](auto& accessor) { accessor++; }, m_accessor);
+					return *this;
+				}
+
+				component_type_index component_type() const { return std::visit([](auto& accessor) { return accessor.component_type(); }, m_accessor); }
 
 				class iterator
 				{
@@ -375,10 +417,14 @@ namespace hyecs
 
 				public:
 					iterator(sparse_iterator iter)
-						: m_iterator(iter) {}
+						: m_iterator(iter)
+					{
+					}
 
 					iterator(chunk_iterator iter)
-						: m_iterator(iter) {}
+						: m_iterator(iter)
+					{
+					}
 
 					void* operator*()
 					{
@@ -386,25 +432,27 @@ namespace hyecs
 							using iter_type = std::decay_t<decltype(iter)>;
 							if constexpr (has_operator_dereference_v<iter_type>)return *iter;
 							else return nullptr;
-							}, m_iterator);
+						}, m_iterator);
 					}
 
 					iterator& operator++()
 					{
-						std::visit([](auto& iterator) {iterator++; }, m_iterator);
+						std::visit([](auto& iterator) { iterator++; }, m_iterator);
 						return *this;
 					}
+
 					iterator& operator++(int)
 					{
-						std::visit([](auto& iterator) {iterator++; }, m_iterator);
+						std::visit([](auto& iterator) { iterator++; }, m_iterator);
 						return *this;
 					}
 
 					//can't use variant operator== and operator!=
-					bool operator==(const iterator& other) const 
-					{ 
+					bool operator==(const iterator& other) const
+					{
 						return std::visit(
-							[](auto& accessor) {
+							[&](auto& accessor)
+							{
 								using iter_type = std::decay_t<decltype(accessor)>;
 								if constexpr (std::is_same_v<iter_type, sparse_iterator>)
 									return accessor == std::get<sparse_iterator>(other.m_iterator);
@@ -414,26 +462,27 @@ namespace hyecs
 									static_assert(!std::is_same_v<iter_type, iter_type>, "unhandled type");
 							}, m_iterator);
 					}
+
 					bool operator!=(const iterator& other) const { return !operator==(other); }
-					bool operator==(const end_iterator&) const { return std::visit([](auto& accessor) {return accessor == nullptr; }, m_iterator); }
-					bool operator!=(const end_iterator&) const { return std::visit([](auto& accessor) {return accessor != nullptr; }, m_iterator); }
+					bool operator==(const end_iterator&) const { return std::visit([](auto& accessor) { return accessor == nullptr; }, m_iterator); }
+					bool operator!=(const end_iterator&) const { return std::visit([](auto& accessor) { return accessor != nullptr; }, m_iterator); }
 				};
-				iterator begin() { return std::visit([](auto& accessor) {return iterator(accessor.begin()); }, m_accessor); }
+
+				iterator begin() { return std::visit([](auto& accessor) { return iterator(accessor.begin()); }, m_accessor); }
 				end_iterator end() { return nullptr; }
 
 				bool operator==(const component_array_accessor& other) const { return m_accessor == other.m_accessor; }
 				bool operator!=(const component_array_accessor& other) const { return m_accessor != other.m_accessor; }
-				bool operator==(const end_iterator& other) const { return std::visit([](auto& accessor) {return accessor == nullptr; }, m_accessor); }
-				bool operator!=(const end_iterator& other) const { return std::visit([](auto& accessor) {return accessor != nullptr; }, m_accessor); }
+				bool operator==(const end_iterator& other) const { return std::visit([](auto& accessor) { return accessor == nullptr; }, m_accessor); }
+				bool operator!=(const end_iterator& other) const { return std::visit([](auto& accessor) { return accessor != nullptr; }, m_accessor); }
 			};
 
-			component_array_accessor begin() { return std::visit([](auto& accessor) {return component_array_accessor(accessor.begin()); }, m_accessor); }
+			component_array_accessor begin() { return std::visit([](auto& accessor) { return component_array_accessor(accessor.begin()); }, m_accessor); }
 			end_iterator end() { return {}; }
-
 		};
 
-		template<typename SeqParam>
-		auto get_allocate_accessor(sequence_ref<const entity, SeqParam> entities)
+		template <typename SeqParam>
+		auto get_allocate_accessor(sequence_cref<entity, SeqParam> entities)
 		{
 			std::visit([&](auto& t)
 			{
@@ -446,33 +495,40 @@ namespace hyecs
 			}, m_table);
 
 			return std::visit([&](auto& t)
-				{
-					using table_type = std::decay_t<decltype(t)>;
+			{
+				using table_type = std::decay_t<decltype(t)>;
 
-					return std::move(allocate_accessor(t.get_allocate_accessor(entities, [this](entity e, storage_key s) {
-						if constexpr (std::is_same_v<table_type, table>)
-						{
-							m_key_registry.insert(e, s);
-						}
-						else if constexpr (std::is_same_v<table_type, sparse_table>)
-						{
-							//todo
-						}
-						})));
-				}, m_table);
+				return std::move(allocate_accessor(t.get_allocate_accessor(entities, [this](entity e, storage_key s)
+				{
+					if constexpr (std::is_same_v<table_type, table>)
+					{
+						m_key_registry.insert(e, s);
+					}
+					else if constexpr (std::is_same_v<table_type, sparse_table>)
+					{
+						//todo
+					}
+				})));
+			}, m_table);
 		}
 
 
-		void dynamic_for_each(sequence_ref<const uint32_t> component_indices, std::function<void(entity, sequence_ref<void*>)> func)
+		void dynamic_for_each(sequence_cref<uint32_t> component_indices, std::function<void(entity, sequence_ref<void*>)> func)
 		{
 			std::visit([&](auto& t)
-				{
-					t.dynamic_for_each(component_indices, func);
-				}, m_table);
+			{
+				t.dynamic_for_each(component_indices, func);
+			}, m_table);
 		}
 
-
-
+		template <typename Callable>
+		void for_each(Callable&& func, sequence_cref<uint32_t> component_indices)
+		{
+			std::visit([&](auto& t)
+			{
+				t.template for_each<Callable>(std::forward<Callable>(func), component_indices);
+			}, m_table);
+		}
 
 
 		//storage_key copy_construct_entity(entity e, sequence_ref<void*> component_data)
@@ -497,7 +553,6 @@ namespace hyecs
 		//}
 
 
-
 		//template<typename Callable>
 		//void for_each_entity(Callable&& callable)
 		//{
@@ -511,11 +566,5 @@ namespace hyecs
 		//		break;
 		//	}
 		//}
-
-
-
-
 	};
-
-
 }

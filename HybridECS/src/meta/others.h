@@ -58,7 +58,7 @@ namespace hyecs
 
 	//hack
 	template <typename T>
-	T* pointer_from_vector_iterator(typename vector<T>::iterator& it)
+	T* pointer_from_vector_iterator(const typename vector<T>::iterator& it)
 	{
 #ifdef HYECS_USING_STD_VECTOR
 #ifdef _DEBUG
@@ -71,7 +71,7 @@ namespace hyecs
 	}
 
 	template <typename T>
-	const T* pointer_from_vector_iterator(typename vector<T>::const_iterator& it)
+	const T* pointer_from_vector_iterator(const typename vector<T>::const_iterator& it)
 	{
 #ifdef HYECS_USING_STD_VECTOR
 #ifdef _DEBUG
@@ -80,6 +80,12 @@ namespace hyecs
 #endif
 #endif
 #endif
+		return it.operator->();
+	}
+
+	template <typename T, size_t N>
+	T* pointer_from_array_iterator(const typename std::array<T, N>::iterator& it)
+	{
 		return it.operator->();
 	}
 
@@ -119,8 +125,8 @@ namespace hyecs
 #endif
 	};
 
-	template <typename... T,typename Callable, size_t... I>
-	void for_each_indexed_arg_impl(Callable callable, std::index_sequence<I...>,T&&... args)
+	template <typename... T, typename Callable, size_t... I>
+	void for_each_indexed_arg_impl(Callable callable, std::index_sequence<I...>, T&&... args)
 	{
 		(callable(std::forward<T>(args), std::integral_constant<size_t, I>{}), ...);
 	}
@@ -131,11 +137,73 @@ namespace hyecs
 	{
 		for_each_indexed_arg_impl(callable, std::make_index_sequence<sizeof ...(T)>(), std::forward<T>(args)...);
 	}
-	template <typename... T, typename Callable>
-	void for_each_arg(Callable callable, T&&... args)
+
+	template <typename Callable>
+	auto for_each_arg_impl(Callable)
 	{
-		(callable(std::forward<T>(args)), ...);
+	};
+
+	template <typename T, typename... Ts, typename Callable>
+	auto for_each_arg_impl(Callable callable, T&& arg, Ts&&... args)
+	{
+		static_assert(std::is_invocable_v<Callable, T>);
+		using invoke_result = std::invoke_result_t<Callable, T>;
+		if constexpr (std::is_void_v<invoke_result>)
+		{
+			callable(std::forward<T>(arg));
+			for_each_arg_impl(callable, std::forward<Ts>(args)...);
+		}
+		else
+			return callable(std::forward<T>(arg));
 	}
 
-	
+	template <typename... T, typename Callable>
+	auto for_each_arg(Callable callable, T&&... args)
+	{
+		return for_each_arg_impl(callable, std::forward<T>(args)...);
+	}
+
+	template <typename T, typename Ctx, typename CtxTransform>
+	auto for_each_arg_acc_impl(Ctx ctx, CtxTransform ctx_transform, T&& arg)
+	{
+		return ctx_transform(std::forward<T>(arg),ctx);
+	}
+
+	template <typename T, typename... Ts, typename Ctx, typename CtxTransform>
+	auto for_each_arg_acc_impl(Ctx ctx, CtxTransform ctx_transform,
+		T&& arg, Ts&&... args)
+	{
+		return for_each_arg_acc_impl(
+			ctx_transform(std::forward<T>(arg),ctx),
+			std::forward<Ts>(args)...
+		);
+	}
+
+	template <typename... T, typename Ctx, typename CtxTransform>
+	auto for_each_arg_acc(Ctx ctx, CtxTransform ctx_transform,
+	                      T&&... args)
+	{
+		return for_each_arg_acc_impl(ctx, ctx_transform, std::forward<T>(args)...);
+	}
+}
+
+
+//std::get<I> for std::integer_sequence
+
+namespace std
+{
+	template <size_t I, typename T, T Val, T... Vals>
+	constexpr auto get_helper(std::integer_sequence<T, Val, Vals...>)
+	{
+		if constexpr (I == 0)
+			return Val;
+		else
+			return get_helper<I - 1>(std::integer_sequence<T, Vals...>{});
+	}
+
+	template <size_t I, typename T, T... Vals>
+	constexpr auto get(std::integer_sequence<T, Vals...> seq)
+	{
+		return get_helper<I>(seq);
+	}
 }

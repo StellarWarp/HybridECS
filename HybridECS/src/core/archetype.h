@@ -235,7 +235,7 @@ namespace hyecs
 template<>
 struct std::hash<hyecs::archetype>
 {
-	size_t operator()(const hyecs::archetype& arch) const
+	size_t operator()(const hyecs::archetype& arch) const noexcept
 	{
 		return arch.hash();
 	}
@@ -244,7 +244,7 @@ struct std::hash<hyecs::archetype>
 template<>
 struct std::hash<hyecs::archetype_index>
 {
-	size_t operator()(const hyecs::archetype_index& arch) const
+	size_t operator()(const hyecs::archetype_index& arch) const noexcept
 	{
 		return arch.hash();
 	}

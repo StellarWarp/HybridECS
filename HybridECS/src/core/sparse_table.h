@@ -2,6 +2,7 @@
 #include "entity.h"
 #include "component_storage.h"
 #include "storage_key_registry.h"
+
 namespace hyecs
 {
 	class sparse_table
@@ -13,9 +14,9 @@ namespace hyecs
 		//event
 		vector<std::function<void(entity, storage_key)>> m_on_entity_add;
 		vector<std::function<void(entity, storage_key)>> m_on_entity_remove;
-	public:
 
-		sparse_table(sorted_sequence_ref<component_storage*> component_storages)
+	public:
+		sparse_table(sorted_sequence_cref<component_storage*> component_storages)
 			: m_component_storages(component_storages.begin(), component_storages.end())
 		{
 			m_notnull_components.reserve(m_component_storages.size());
@@ -36,7 +37,6 @@ namespace hyecs
 		}
 
 	public:
-
 		size_t size() const { return m_entities.size(); }
 		const dense_set<entity>& get_entities() { return m_entities; }
 
@@ -44,10 +44,11 @@ namespace hyecs
 		{
 			for (auto e : m_entities)
 			{
-				callback(e,{});
+				callback(e, {});
 			}
 			m_on_entity_add.push_back(callback);
 		}
+
 		void add_callback_on_entity_remove(std::function<void(entity, storage_key)> callback)
 		{
 			m_on_entity_remove.push_back(callback);
@@ -55,15 +56,16 @@ namespace hyecs
 
 
 		using end_iterator = nullptr_t;
+
 		//todo template SeqIter
 		class raw_accessor
 		{
 		protected:
-			using entity_seq = sequence_ref<const entity>;
+			using entity_seq = sequence_cref<entity>;
 			sparse_table& m_table;
 			entity_seq m_entities;
-		public:
 
+		public:
 			raw_accessor(sparse_table& in_table)
 				: m_table(in_table)
 			{
@@ -75,6 +77,7 @@ namespace hyecs
 			}
 
 			raw_accessor(const raw_accessor&) = delete;
+
 			raw_accessor(raw_accessor&& other) : m_table(other.m_table), m_entities(std::move(other.m_entities))
 			{
 			}
@@ -88,7 +91,6 @@ namespace hyecs
 				uint32_t m_component_index;
 
 			public:
-
 				component_array_accessor(uint32_t index, raw_accessor* accessor)
 					: m_type(accessor->m_table.m_notnull_components[index]), m_component_index(index), m_accessor(accessor)
 				{
@@ -111,6 +113,7 @@ namespace hyecs
 					++(*this);
 					return copy;
 				}
+
 				component_array_accessor& operator*() { return *this; }
 
 				auto comparable() const { return m_type; }
@@ -129,10 +132,11 @@ namespace hyecs
 
 					sparse_table& sparse_table() const { return m_accessor->m_table; }
 					const entity_seq& sequence() const { return m_accessor->m_entities; }
+
 				public:
 					iterator(uint32_t component_index,
-						raw_accessor* accessor,
-						typename entity_seq::iterator entity_iter)
+					         raw_accessor* accessor,
+					         typename entity_seq::iterator entity_iter)
 						:
 						m_storage(accessor->m_table.m_component_storages[component_index]),
 						m_accessor(accessor),
@@ -141,7 +145,14 @@ namespace hyecs
 					}
 
 					void operator++() { m_entity_iter++; }
-					iterator operator++(int) { iterator copy = *this; ++(*this); return copy; }
+
+					iterator operator++(int)
+					{
+						iterator copy = *this;
+						++(*this);
+						return copy;
+					}
+
 					bool operator==(const iterator& other) const { return m_entity_iter == other.m_entity_iter; }
 					bool operator!=(const iterator& other) const { return !(*this == other); }
 					bool operator==(const end_iterator& other) const { return m_entity_iter == m_accessor->m_entities.end(); }
@@ -155,21 +166,21 @@ namespace hyecs
 
 			component_array_accessor begin() { return component_array_accessor(0u, this); }
 			end_iterator end() { return end_iterator{}; }
-
 		};
 
-		template<typename SeqParam = const entity*>
+		template <typename SeqParam = const entity*>
 		class allocate_accessor
 		{
-			using entity_seq = sequence_ref<const entity, SeqParam>;
+			using entity_seq = sequence_cref<entity, SeqParam>;
 			sparse_table& m_table;
 			entity_seq m_entities;
 			ASSERTION_CODE(bool m_is_construct_finished = false);
+
 		public:
-			template<typename Callable>
+			template <typename Callable>
 			allocate_accessor(sparse_table& in_table, entity_seq entities, Callable&& builder)
 				: m_table(in_table),
-				m_entities(entities)			
+				  m_entities(entities)
 			{
 				for (auto e : m_entities)
 				{
@@ -177,13 +188,16 @@ namespace hyecs
 					//m_storage_key_builder(e, {});
 				}
 			}
+
 			allocate_accessor(const allocate_accessor&) = delete;
+
 			allocate_accessor(allocate_accessor&& other)
 				: m_table(other.m_table),
-				m_entities(std::move(other.m_entities))
+				  m_entities(std::move(other.m_entities))
 			{
 				ASSERTION_CODE(other.m_is_construct_finished = true);
 			}
+
 			void notify_construct_finish()
 			{
 				for (auto& callback : m_table.m_on_entity_add)
@@ -195,11 +209,13 @@ namespace hyecs
 				}
 				ASSERTION_CODE(m_is_construct_finished = true);
 			}
+
 			void notify_move_construct_finish()
 			{
 				ASSERTION_CODE(m_is_construct_finished = true);
 			}
-			~allocate_accessor(){ assert(m_is_construct_finished); }
+
+			~allocate_accessor() { assert(m_is_construct_finished); }
 
 
 			class component_array_accessor
@@ -217,13 +233,12 @@ namespace hyecs
 				}
 
 			public:
-
 				component_array_accessor(allocate_accessor* accessor, uint32_t index)
 					: m_accessor(accessor),
-					m_components(accessor->m_entities.size()),
-					m_component_index(index)
+					  m_components(accessor->m_entities.size()),
+					  m_component_index(index)
 				{
-					if(accessor->m_table.m_notnull_components.empty())
+					if (accessor->m_table.m_notnull_components.empty())
 					{
 						m_type = component_type_index{};
 						return;
@@ -243,29 +258,53 @@ namespace hyecs
 						allocate_for_index(m_component_index);
 					}
 				}
+
 				component_array_accessor& operator*() { return *this; }
-				component_array_accessor& operator++(int) { component_array_accessor copy = *this; ++(*this); return copy; }
+
+				component_array_accessor& operator++(int)
+				{
+					component_array_accessor copy = *this;
+					++(*this);
+					return copy;
+				}
+
 				auto comparable() const { return m_type; }
 				bool operator==(const component_array_accessor& other) const { return m_type == other.m_type; }
 				bool operator!=(const component_array_accessor& other) const { return !(*this == other); }
 				bool operator==(const end_iterator& other) const { return m_component_index == m_accessor->m_table.m_notnull_components.size(); }
 				bool operator!=(const end_iterator& other) const { return !(*this == other); }
+
 				class iterator
 				{
 					sequence_ref<void*>::iterator m_current;
 					sequence_ref<void*>::iterator m_end;
+
 				public:
 					iterator(sequence_ref<void*> components)
-						: m_current(components.begin()), m_end(components.end()){}
+						: m_current(components.begin()), m_end(components.end())
+					{
+					}
 
-					iterator& operator++() { m_current++; return *this; }
-					iterator operator++(int) { iterator copy = *this; ++(*this); return copy; }
+					iterator& operator++()
+					{
+						m_current++;
+						return *this;
+					}
+
+					iterator operator++(int)
+					{
+						iterator copy = *this;
+						++(*this);
+						return copy;
+					}
+
 					void* operator*() const { return *m_current; }
 					bool operator==(const iterator& other) const { return m_current == other.m_current; }
 					bool operator!=(const iterator& other) const { return !(*this == other); }
 					bool operator==(const end_iterator& other) const { return m_current == m_end; }
 					bool operator!=(const end_iterator& other) const { return !operator==(other); }
 				};
+
 				iterator begin() { return iterator(m_components); }
 				end_iterator end() { return {}; }
 			};
@@ -281,20 +320,20 @@ namespace hyecs
 			}
 		};
 
-		raw_accessor get_raw_accessor(sequence_ref<const entity> entities)
+		raw_accessor get_raw_accessor(sequence_cref<entity> entities)
 		{
 			return raw_accessor(*this, entities);
 		}
 
 		raw_accessor get_raw_accessor()
 		{
-			auto entity_seq = make_sequence_ref(m_entities.begin(), m_entities.end());
+			auto entity_seq = sequence_cref(m_entities.begin(), m_entities.end());
 			return raw_accessor(*this, entity_seq);
 		}
 
 
-		template<typename SeqParam, typename StorageKeyBuilder>
-		auto get_allocate_accessor(sequence_ref<const entity, SeqParam> entities, StorageKeyBuilder&& builder)
+		template <typename SeqParam, typename StorageKeyBuilder>
+		auto get_allocate_accessor(sequence_cref<entity, SeqParam> entities, StorageKeyBuilder&& builder)
 		{
 			return allocate_accessor<SeqParam>(*this, entities, std::forward<StorageKeyBuilder>(builder));
 		}
@@ -307,6 +346,7 @@ namespace hyecs
 			using raw_accessor::raw_accessor;
 			deallocate_accessor(const deallocate_accessor&) = delete;
 			deallocate_accessor& operator=(const deallocate_accessor&) = delete;
+
 			deallocate_accessor(deallocate_accessor&& other) : raw_accessor(std::move(other))
 			{
 				ASSERTION_CODE(other.m_is_destruct_finished = true);
@@ -349,17 +389,16 @@ namespace hyecs
 			}
 
 			~deallocate_accessor() { assert(m_is_destruct_finished); }
-
 		};
 
-		deallocate_accessor get_deallocate_accessor(sequence_ref<const entity> entities)
+		deallocate_accessor get_deallocate_accessor(sequence_cref<entity> entities)
 		{
 			return deallocate_accessor(*this, entities);
 		}
 
-		void dynamic_for_each(sequence_ref<const uint32_t> component_indices, std::function<void(entity, sequence_ref<void*>)> func)
+		void dynamic_for_each(sequence_cref<uint32_t> component_indices, std::function<void(entity, sequence_ref<void*>)> func)
 		{
-			vector<void*> addrs(component_indices.size());//todo this allocation can be optimized
+			vector<void*> addrs(component_indices.size()); //todo this allocation can be optimized
 			for (const auto& entity : m_entities)
 			{
 				for (size_t i = 0; i < component_indices.size(); i++)
@@ -370,8 +409,22 @@ namespace hyecs
 			}
 		}
 
+		template <typename Callable>
+		void for_each(Callable&& func, sequence_cref<uint32_t> component_indices)
+		{
+			auto invoker = system_callable_invoker(std::forward<Callable>(func));
+
+			for (auto& e : m_entities)
+			{
+				invoker.invoke(
+					[&] { return e; },
+					[&] { return storage_key{}; },
+					[&](auto type, size_t index) { return m_component_storages[component_indices[index]]->at(e); }
+				);
+			}
+		}
 	};
 
-
-
+	template <typename SeqParam>
+	sequence_cref(sequence_ref<entity, SeqParam>) -> sequence_cref<entity, SeqParam>;
 }

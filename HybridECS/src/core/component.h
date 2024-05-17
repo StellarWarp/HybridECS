@@ -153,7 +153,7 @@ namespace hyecs
 	{
 	public:
 		using bit_set::bit_set;
-		component_bit_set(sequence_ref<const component_type_index> indices)
+		component_bit_set(sequence_cref< component_type_index> indices)
 		{
 			for (auto& index : indices)
 			{

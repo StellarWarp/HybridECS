@@ -1,5 +1,3 @@
 ﻿#include "pch.h"
-//#include "test_seq.h"
-//#include "core/archetype_registry_II.h"
-//#include "test_type.h"
 #include "test_archetype_registry.h"
+

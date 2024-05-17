@@ -1,44 +1,49 @@
 #pragma once
-#include "cross_archetype_storage.h"
-
+#include "query.h"
 namespace hyecs
 {
 
 	class cross_query
 	{
-		struct intensive_cross_archetype
+		entity_sparse_map<uint32_t> m_potential_entities;
+		entity_dense_set m_entities;
+		vector<query*> m_in_group_queries;
+
+		uint32_t group_count() const
 		{
-			archetype_index m_index;
-			dense_set<entity> entities;
-			//table set
-			vector<table*> tables;
-			//archetype set
-			vector<cross_archetype_storage*> archetypes;
+			return m_in_group_queries.size();
+		}
 
+	public:
 
-		};
-
-		struct archetype_access_info
+		cross_query(sequence_ref<query*> queries)
+			:m_in_group_queries(queries)
 		{
-			intensive_cross_archetype* storage;
-			struct group_info
+			for (auto q : queries)
 			{
-				vector<uint32_t> component_index;
-			};
-			vector<group_info> m_groups;
-		};
+				//todo register to add event
+			}
+		}
 
-
-		struct query_condition
+		void notify_super_query_add(entity e)
 		{
-			vector<component_type_index> all;
-			vector<component_type_index> any;
-			vector<component_type_index> none;
-		};
+			auto& counter = m_potential_entities[e];
+			counter += 1;
+			if (counter == group_count())
+				m_entities.insert(e);
+		}
 
-		dense_set<entity> m_entities;
-		vector<archetype_access_info> m_access_info;
-		query_condition m_condition;
+		void notify_super_query_remove(entity e)
+		{
+			auto& counter = m_potential_entities[e];
+			if (counter == group_count())
+				m_entities.erase(e);
+			counter -= 1;
+		}
+
+		
+		
+		
 
 	};
 }

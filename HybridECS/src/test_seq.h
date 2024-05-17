@@ -5,13 +5,13 @@
 
 //#include "core/entity.h"
 ////#include "meta/meta_utils.h"
-#include "core/sparse_table.h"
-#include "core/table.h"
+// #include "core/sparse_table.h"
+// #include "core/table.h"
 
-#include "core/archetype_storage.h"
+// #include "core/archetype_storage.h"
 //#include "core/component_storage.h"
-#include "core/tag_archetype_storage.h"
-#include "core/data_registry.h"
+// #include "core/tag_archetype_storage.h"
+// #include "core/data_registry.h"
 
 //#include "core/archetype_storage.h"
 //#include "core/archetype_storage.h"
@@ -19,26 +19,20 @@
 
 using namespace hyecs;
 
-template<typename SeqParam>
-void test_func(sequence_ref<const int, SeqParam> seq)
+template <typename SeqParam>
+void test_func(sequence_cref<int, SeqParam> seq)
 {
 	for (auto i : seq)
 	{
 		std::cout << i << std::endl;
 	}
 }
-//template<typename Seq>
-//void test_func_warp(Seq seq)
-//{
-//	test_func < >(seq);
-//}
 
 int main()
 {
+	sequence_cref<int> seq = {1, 2, 3, 4, 5};
 
-	sequence_ref<const int> seq = { 1, 2, 3, 4, 5 };
-
-	vector<int> vec = { 1, 2, 3, 4, 5 };
+	vector<int> vec = {1, 2, 3, 4, 5};
 	sequence_ref<int> seq2 = make_sequence_ref(vec);
 
 	std::cout << sizeof(seq) << std::endl;
@@ -53,7 +47,7 @@ int main()
 		std::cout << i << std::endl;
 	}
 
-	vector<int> vec2 = {  };
+	vector<int> vec2 = {};
 	auto seq4 = make_sequence_ref(vec2.begin(), vec2.end());
 
 	//print seq4
@@ -63,12 +57,13 @@ int main()
 	}
 
 
-	const vector<int> vec3 = { 1, 2, 3, 4, 5 };
+	const vector<int> vec3 = {1, 2, 3, 4, 5};
 	//sequence_ref<const int> seq6(vec3.data(), vec3.data() + vec3.size());
 
+	sequence_cref<int> csr1 = vec;
+	sequence_cref<int> csr2 = seq2;
 
-
-	test_func(seq2.as_const());
+	test_func(sequence_cref(seq2));
 
 	//sequence_ref<const int>::raw_type;
 
@@ -93,7 +88,4 @@ int main()
 
 
 	//sequence_ref<const int> seq8 = seq2;
-
-
-
 }

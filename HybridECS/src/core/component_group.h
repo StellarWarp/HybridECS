@@ -94,6 +94,9 @@ namespace hyecs
 	};
 	template<typename T>
 	struct is_static_component { static constexpr bool value = component_traits<std::decay_t<T>>::is_static; };
+	template<typename T>
+	struct is_tag_component { static constexpr bool value = component_traits<std::decay_t<T>>::is_tag; };
+
 }
 
 

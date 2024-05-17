@@ -19,16 +19,16 @@ namespace hyecs
 		query_condition() = default;
 
 		query_condition(
-			sequence_ref<const component_type_index> all,
-			sequence_ref<const component_type_index> any, 
-			sequence_ref<const component_type_index> none)
+			sequence_cref<component_type_index> all,
+			sequence_cref<component_type_index> any, 
+			sequence_cref<component_type_index> none)
 			: all_(all), any_(any), none_(none), all_bitset_(all), any_bitset_(any), none_bitset_(none)
 		{
 			compute_hash();
 		}
 		query_condition(
-			sequence_ref<const component_type_index> all,
-			sequence_ref<const component_type_index> any)
+			sequence_cref<component_type_index> all,
+			sequence_cref<component_type_index> any)
 			: all_(all), any_(any), all_bitset_(all), any_bitset_(any)
 		{
 			compute_hash();

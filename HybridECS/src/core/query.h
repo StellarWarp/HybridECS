@@ -20,7 +20,7 @@ namespace hyecs
 		vector<tag_archetype_storage*> m_tag_storages; //unordered no need to init added by notify_tag_archetype_add
 
 		table* m_table;
-		vector<component_storage*> m_component_storages; //corresponding to m_access_components
+		vector<component_storage*> m_component_storages; //all component storages include table , sorted
 		vector<component_type_index> m_access_components; //cache for component_type of m_comp_storages
 
 		dense_map<entity, storage_key> m_entities;
@@ -83,11 +83,19 @@ namespace hyecs
 #endif
 
 		void get_component_indices(
-			sorted_sequence_ref<const component_type_index> types,
+			sorted_sequence_cref<component_type_index> types,
 			sequence_ref<uint32_t> component_indices) const
 		{
 			get_sub_sequence_indices<component_type_index>(
-				m_access_components, types, component_indices);
+				sorted_sequence_cref(m_access_components), types, component_indices);
+		}
+
+		void get_component_indices(
+			sequence_cref<component_type_index> types,
+			sequence_ref<uint32_t> component_indices) const
+		{
+			get_sub_sequence_indices<component_type_index>(
+				sorted_sequence_cref(m_access_components), types, component_indices);
 		}
 
 		bool is_direct_query() const
@@ -218,11 +226,11 @@ namespace hyecs
 			{
 			}
 
-			vector<uint32_t> table_access_indices;
-			vector<uint32_t> tag_access_indices;
-			vector<uint32_t> table_access_order_map;
-			vector<uint32_t> tag_access_order_map;
-			vector<uint32_t> full_access_indices;
+			vector<uint32_t> table_access_indices; //use in table
+			vector<uint32_t> tag_i_to_storage_i;
+			vector<uint32_t> table_i_to_access_i;
+			vector<uint32_t> tag_i_to_access_i;
+			vector<uint32_t> access_i_to_storage_i;
 		};
 
 	private:
@@ -250,22 +258,24 @@ namespace hyecs
 				else table_access_list.push_back(comp);
 
 			info.table_access_indices.resize(table_access_list.size());
-			info.full_access_indices.resize(access_list.size());
-			info.tag_access_indices.reserve(tag_count);
-			info.tag_access_order_map.reserve(tag_count);
-			info.table_access_order_map.reserve(table_access_list.size());
+			info.access_i_to_storage_i.resize(access_list.size());
+			info.tag_i_to_storage_i.reserve(tag_count);
+			info.tag_i_to_access_i.reserve(tag_count);
+			info.table_i_to_access_i.reserve(table_access_list.size());
 
 			m_archetype_storage->get_component_indices(table_access_list, info.table_access_indices);
-			get_component_indices(access_list, info.full_access_indices);
+			get_component_indices(access_list, info.access_i_to_storage_i);
 			for (uint32_t i = 0; i < access_list.size(); i++)
 			{
 				if (access_list[i].is_tag())
 				{
-					info.tag_access_indices.push_back(info.full_access_indices[i]);
-					info.tag_access_order_map.push_back(i);
+					info.tag_i_to_storage_i.push_back(info.access_i_to_storage_i[i]);
+					info.tag_i_to_access_i.push_back(i);
 				}
 				else
-					info.table_access_order_map.push_back(i);
+				{
+					info.table_i_to_access_i.push_back(i);
+				}
 			}
 			return info;
 		}
@@ -286,7 +296,7 @@ namespace hyecs
 				break;
 			case mixed_access:
 				{
-					const auto full_component_count = info.full_access_indices.size();
+					const auto full_component_count = info.access_i_to_storage_i.size();
 					const auto table_component_count = info.table_access_indices.size();
 					vector<void*> cache(table_component_count + full_component_count); //todo this allocation can be optimized
 					sequence_ref<void*> table_components(cache.data(), cache.data() + table_component_count);
@@ -297,11 +307,11 @@ namespace hyecs
 						m_table->components_addresses(st_key, info.table_access_indices, table_components);
 						for (size_t i = 0; i < info.table_access_indices.size(); i++)
 						{
-							addresses[info.table_access_order_map[i]] = table_components[i];
+							addresses[info.table_i_to_access_i[i]] = table_components[i];
 						}
-						for (size_t i = 0; i < info.tag_access_indices.size(); i++)
+						for (size_t i = 0; i < info.tag_i_to_storage_i.size(); i++)
 						{
-							addresses[info.tag_access_order_map[i]] = m_component_storages[i]->at(entity);
+							addresses[info.tag_i_to_access_i[i]] = m_component_storages[info.tag_i_to_storage_i[i]]->at(entity);
 						}
 						func(entity, addresses);
 					}
@@ -309,15 +319,86 @@ namespace hyecs
 				break;
 			case sparse_access:
 				{
-					auto& component_indices = info.full_access_indices;
-					vector<void*> addresses(component_indices.size()); //todo this allocation can be optimized
+					auto& access_i_to_storage_i = info.access_i_to_storage_i;
+					vector<void*> addresses(access_i_to_storage_i.size()); //todo this allocation can be optimized
 					for (const auto& [entity,_] : m_entities)
 					{
-						for (size_t i = 0; i < component_indices.size(); i++)
+						for (size_t i = 0; i < access_i_to_storage_i.size(); i++)
 						{
-							addresses[i] = m_component_storages[component_indices[i]]->at(entity);
+							addresses[i] = m_component_storages[access_i_to_storage_i[i]]->at(entity);
 						}
 						func(entity, addresses);
+					}
+				}
+				break;
+			}
+		}
+
+		template <typename T>
+		struct is_param_tag
+		{
+			static constexpr bool value = component_traits<std::decay_t<T>>::is_tag;
+		};
+
+		template <typename Callable>
+		void for_each(Callable&& func, const access_info& info)
+		{
+			using params = typename function_traits<Callable>::args;
+			using component_param = typename params::template filter_with<is_static_component>;
+			using non_component_param = typename params::template filter_without<is_static_component>;
+
+			switch (m_query_type)
+			{
+			case full_set_access:
+				m_archetype_storage->for_each(std::forward<Callable>(func), info.table_access_indices);
+				break;
+			case mixed_access:
+				{
+					using table_component_param = typename component_param::template filter_without<is_param_tag>;
+					using tag_component_param = typename component_param::template filter_with<is_param_tag>;
+					const auto full_component_count = info.access_i_to_storage_i.size();
+					const auto table_component_count = info.table_access_indices.size();
+					std::array<void*, table_component_param::size> table_components;
+					system_callable_invoker invoker(std::forward<Callable>(func));
+
+					for (const auto& kv : m_entities)
+					{
+						//cpp 17 not support structured binding in lambda capture
+						const auto& entity = kv.first;
+						const auto& st_key = kv.second;
+						m_table->components_addresses(st_key, info.table_access_indices, table_components);
+						invoker.invoke(
+							[&] { return entity; },
+							[&] { return st_key; },
+							[&](auto type, size_t index)
+							{
+								using param_type = typename decltype(type)::type;
+								if constexpr (is_param_tag<param_type>::value)
+								{
+									constexpr size_t tag_i = tag_component_param::template index_of<param_type>;
+									return m_component_storages[info.tag_i_to_storage_i[tag_i]]->at(entity);
+								}
+								else
+								{
+									return table_components[table_component_param::template index_of<param_type>];
+								}
+							});
+					}
+				}
+				break;
+			case sparse_access:
+				{
+					auto& component_indices = info.access_i_to_storage_i;
+					system_callable_invoker invoker(std::forward<Callable>(func));
+					for (const auto& kv : m_entities)
+					{
+						//cpp 17 not support structured binding in lambda capture
+						const auto& entity = kv.first;
+						invoker.invoke(
+							[&] { return entity; },
+							[&] { return storage_key{}; },
+							[&](auto type, size_t index) { return m_component_storages[component_indices[index]]->at(entity); }
+						);
 					}
 				}
 				break;
@@ -339,7 +420,7 @@ namespace hyecs
 		private:
 			friend query;
 
-			access_info(sequence_ref<const component_type_index> access_list)
+			access_info(sequence_cref<component_type_index> access_list)
 				: access_list(access_list)
 			{
 			}
@@ -347,7 +428,7 @@ namespace hyecs
 			struct archetype_access_info
 			{
 				archetype_storage* storage;
-				sequence_ref<const uint32_t> component_indices;
+				sequence_cref<uint32_t> component_indices;
 			};
 
 			struct table_query_access_info
@@ -393,6 +474,7 @@ namespace hyecs
 		query(const query_condition& condition) ASSERTION_CODE(: m_condition(condition))
 		{
 		}
+
 		query(const query&) = delete;
 		query& operator=(const query&) = delete;
 
@@ -420,7 +502,7 @@ namespace hyecs
 			}
 		}
 
-		const access_info& get_access_info(sequence_ref<const component_type_index> access_list)
+		const access_info& get_access_info(sequence_cref< component_type_index> access_list)
 		{
 			access_hash hash = archetype::addition_hash(0, append_component(access_list));
 			if (auto iter = m_access_infos.find(hash); iter != m_access_infos.end())
@@ -462,10 +544,34 @@ namespace hyecs
 			}
 		}
 
-		template<typename... T>
-		void for_each(T&&... args)
+		template <typename T>
+		struct is_rw_component_param
 		{
-			
+			static constexpr bool value =
+				std::is_reference_v<T>
+				&& !std::is_const_v<std::remove_reference_t<T>>;
+		};
+
+		template <typename Callable>
+		void for_each(Callable&& func, const access_info& acc_info)
+		{
+			using params = typename function_traits<Callable>::args;
+			using component_param = typename params::template filter_with<is_static_component>;
+			using non_component_param = typename params::template filter_without<is_static_component>;
+			using rw_param = typename component_param::template filter_with<is_rw_component_param>;
+			using ro_param = typename component_param::template filter_without<is_rw_component_param>;
+
+			std::cout << type_name<rw_param> << std::endl;
+			std::cout << type_name<ro_param> << std::endl;
+
+			for (const auto& [storage, component_indices] : acc_info.archetype_access_infos)
+			{
+				storage->for_each(std::forward<Callable>(func), component_indices);
+			}
+			for (const auto& info : acc_info.table_query_access_infos)
+			{
+				info.query->for_each<Callable>(std::forward<Callable>(func), info.access_info);
+			}
 		}
 	};
 }

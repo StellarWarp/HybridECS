@@ -110,7 +110,24 @@ namespace hyecs
 				delete page;
 		}
 
+	private:
 
+		auto page_for_index(uint32_t page_index)
+		{
+			if (pages.size() <= page_index)
+				pages.resize(page_index + 1);
+			if (!pages[page_index])
+				pages[page_index] = new page();
+			return pages[page_index];
+		}
+
+
+		auto pair_for_location(table_location loc)
+		{
+			return page_for_index(loc.page_index)->at(loc.page_offset);
+		}
+
+	public:
 
 
 		template<typename... Args>
@@ -119,21 +136,13 @@ namespace hyecs
 			//e is first argument
 			auto e = std::get<0>(std::forward_as_tuple(args...));
 			auto [page_index, page_offset] = table_location(e.id());
-			if (pages.size() <= page_index)
-				pages.resize(page_index + 1);
-			if (!pages[page_index])
-				pages[page_index] = new page();
-			auto& pair = pages[page_index]->emplace(page_offset, std::forward<Args>(args)...);
+			auto& pair = page_for_index(page_index)->emplace(page_offset, std::forward<Args>(args)...);
 		}
 
 		void insert(entity_value_pair&& pair)
 		{
 			auto [page_index, page_offset] = table_location(pair.e.id());
-			if (pages.size() <= page_index)
-				pages.resize(page_index + 1);
-			if (!pages[page_index])
-				pages[page_index] = new page();
-			auto& pair = pages[page_index]->emplace(page_offset, std::move(pair));
+			auto& pair = page_for_index(page_index)->emplace(page_offset, std::move(pair));
 		}
 
 		void insert(entity e)
@@ -165,6 +174,12 @@ namespace hyecs
 			auto& pair = pages[page_index]->at(page_offset);
 			assert(pair.e != null_entity);
 			assert(pair.e.version() == e.version());
+			return pair.value;
+		}
+
+		value_type& operator[](entity e)
+		{
+			auto& pair = pair_for_location(table_location(e.id()));
 			return pair.value;
 		}
 
@@ -258,15 +273,50 @@ namespace hyecs
 
 		iterator begin()
 		{
-			return iterator(m_dense.begin());
+			return iterator{m_dense.begin()};
 		}
 
 		end_iterator end()
 		{
 			return m_dense.end();
 		}
+	};
 
 
+	class entity_dense_set : protected raw_entity_dense_map
+	{
+		using super = raw_entity_dense_map;
+	public:
+		entity_dense_set() : super(0) {}
+		void insert(entity e)
+		{
+			allocate_value(e);
+		}
+		void erase(entity e)
+		{
+			deallocate_value(e);
+		}
+
+		class iterator : public raw_entity_dense_map::iterator
+		{
+			using super = raw_entity_dense_map::iterator;
+		public:
+			iterator(super&& it) : super(std::move(it)) {}
+			entity operator*()
+			{
+				return raw_entity_dense_map::iterator::operator*().e;
+			}
+		};
+
+		iterator begin()
+		{
+			return iterator{super::begin()};
+		}
+
+		end_iterator end()
+		{
+			return super::end();
+		}
 	};
 
 }

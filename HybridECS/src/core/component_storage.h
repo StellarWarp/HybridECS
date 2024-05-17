@@ -13,7 +13,6 @@ namespace hyecs
 
 		//todo notify addition/removal of components
 	public:
-
 		component_storage(component_type_index index) :
 			m_component_type(index),
 			m_storage(index.type_index().size())
@@ -32,7 +31,7 @@ namespace hyecs
 			return m_storage.at(e);
 		}
 
-		template<typename T>
+		template <typename T>
 		T& at(entity e)
 		{
 			return *(T*)at(e);
@@ -43,7 +42,7 @@ namespace hyecs
 			m_storage.erase(e);
 		}
 
-		void erase(sequence_ref<const entity> entities)
+		void erase(sequence_cref<entity> entities)
 		{
 			for (auto e : entities)
 			{
@@ -57,7 +56,7 @@ namespace hyecs
 		//	m_storage.emplace(e, std::forward<Args>(args)...);
 		//}
 
-		void emplace(sequence_ref<const entity> entities,const generic::constructor& constructor)
+		void emplace(sequence_cref<entity> entities, const generic::constructor& constructor)
 		{
 			for (auto e : entities)
 			{
@@ -76,8 +75,8 @@ namespace hyecs
 			m_storage.deallocate_value(e);
 		}
 
-		template<typename SeqParam = const entity*>
-		void allocate_components(sequence_ref<const entity, SeqParam> entities, sequence_ref<void*> addrs)
+		template <typename SeqParam = const entity*>
+		void allocate_components(sequence_cref<entity, SeqParam> entities, sequence_ref<void*> addrs)
 		{
 			auto e_iter = entities.begin();
 			auto a_iter = addrs.begin();
@@ -88,14 +87,6 @@ namespace hyecs
 				++a_iter;
 			}
 		}
-
-
-
-
-
-
-
-
 
 
 		//void move_into(entity e, void* data)
@@ -110,14 +101,16 @@ namespace hyecs
 		//	m_component_type.copy_constructor(ptr, data);
 		//}
 
-		template<typename T>
+		template <typename T>
 		class accessor
 		{
 			const raw_entity_dense_map* m_storage;
 
-
 		public:
-			accessor(const raw_entity_dense_map& storage) : m_storage(&storage) {}
+			accessor(const raw_entity_dense_map& storage) : m_storage(&storage)
+			{
+			}
+
 			static constexpr bool is_raw_accessor = std::is_same_v<std::decay_t<T>, void*>;
 			static_assert(!is_raw_accessor || !std::is_reference_v<T>, "Raw accessors cannot be references");
 
@@ -126,8 +119,9 @@ namespace hyecs
 				raw_entity_dense_map::iterator m_iter;
 
 			public:
-
-				iterator(raw_entity_dense_map::iterator iter) : m_iter(iter) {}
+				iterator(raw_entity_dense_map::iterator iter) : m_iter(iter)
+				{
+				}
 
 				auto operator*() -> std::conditional_t<is_raw_accessor, T, T&>
 				{
@@ -153,20 +147,20 @@ namespace hyecs
 				{
 					return m_iter != other.m_iter;
 				}
-
 			};
 
 			iterator begin()
 			{
 				return m_storage->begin();
 			}
+
 			iterator end()
 			{
 				return m_storage->end();
 			}
 		};
 
-		template<typename T>
+		template <typename T>
 		accessor<T> get_accessor()
 		{
 			assert(m_component_type == generic::type_info::of<T>());
@@ -178,11 +172,11 @@ namespace hyecs
 		class component_allocate_accessor
 		{
 			raw_entity_dense_map* m_storage;
-			sequence_ref<const entity> m_entities;
+			sequence_cref<entity> m_entities;
 			vector<void*> m_components;
 
 		public:
-			component_allocate_accessor(raw_entity_dense_map& storage, sequence_ref<const entity> entities) :
+			component_allocate_accessor(raw_entity_dense_map& storage, sequence_cref<entity> entities) :
 				m_storage(&storage),
 				m_entities(entities),
 				m_components(entities.size())
@@ -201,30 +195,40 @@ namespace hyecs
 			{
 				sequence_ref<void*>::iterator m_current;
 				sequence_ref<void*>::iterator m_end;
+
 			public:
 				iterator(sequence_ref<void*> components)
-					: m_current(components.begin()), m_end(components.end()) {}
+					: m_current(components.begin()), m_end(components.end())
+				{
+				}
 
-				iterator& operator++() { m_current++; return *this; }
-				iterator operator++(int) { iterator copy = *this; ++(*this); return copy; }
+				iterator& operator++()
+				{
+					m_current++;
+					return *this;
+				}
+
+				iterator operator++(int)
+				{
+					iterator copy = *this;
+					++(*this);
+					return copy;
+				}
+
 				void* operator*() const { return *m_current; }
 				bool operator==(const iterator& other) const { return m_current == other.m_current; }
 				bool operator!=(const iterator& other) const { return !(*this == other); }
 				bool operator==(const end_iterator& other) const { return m_current == m_end; }
 				bool operator!=(const end_iterator& other) const { return !operator==(other); }
 			};
+
 			iterator begin() { return iterator(m_components); }
 			end_iterator end() { return {}; }
 		};
 
-		component_allocate_accessor allocate(sequence_ref<const entity> entities)
+		component_allocate_accessor allocate(sequence_cref<entity> entities)
 		{
 			return component_allocate_accessor(m_storage, entities);
 		}
-
-
-
-
-
 	};
 }
