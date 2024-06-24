@@ -1,11 +1,10 @@
 #pragma once
-#include <complex.h>
-
 #include "data_registry.h"
+
 namespace hyecs
 {
 	template <auto Identifier>
-	class static_data_registry : public data_registry
+	class immediate_data_registry : public data_registry
 	{
 
 	public:
@@ -155,8 +154,7 @@ namespace hyecs
 
 		struct builder_context
 		{
-			static_data_registry& registry;
-
+			immediate_data_registry& registry;
 		};
 
 		
@@ -222,15 +220,9 @@ namespace hyecs
 				
 			}
 			
-			constexpr auto group_condition()
+			auto group_condition()
 			{
-				// auto group_set = get_group_set<None...>(get_group_set<Any...>(get_group_set<All...>(std::index_sequence<>{})));
-				// std::cout << "group set: " << type_name<decltype(group_set)> << std::endl;
-				// constexpr size_t N = group_set.size();
-				// for_each_arg_acc(
-				// 	type_list<>,
-				// 	[&](,auto group_cond_list)
-				// )
+		
 				
 			}
 
@@ -250,7 +242,8 @@ namespace hyecs
 				group_condition();
 
 
-				static_data_registry& registry = context.registry;
+
+				immediate_data_registry& registry = context.registry;
 
 				static query& q = registry.get_query({
 					{registry.component_types<All...>()},

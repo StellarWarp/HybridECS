@@ -73,6 +73,11 @@ namespace hyecs
 			type_hash hash;
 			const char* name;
 
+			type_info(size_t size, copy_constructor_ptr copy_constructor, move_constructor_ptr move_constructor, destructor_ptr destructor, type_hash hash, const char* name)
+				: size(size), copy_constructor(copy_constructor), move_constructor(move_constructor), destructor(destructor), hash(hash), name(name)
+			{
+			}
+
 		private:
 			type_info() = delete;
 			type_info(const type_info&) = delete;

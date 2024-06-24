@@ -55,39 +55,39 @@ namespace hyecs
 		return filter_args<Condition>(std::tuple<>{}, args...);
 	}
 
+	template <class T>
+	struct uncheck_pointer_traits;
 
-	//hack
-	template <typename T>
-	T* pointer_from_vector_iterator(const typename vector<T>::iterator& it)
-	{
-#ifdef HYECS_USING_STD_VECTOR
+	template <class T>
+	[[nodiscard]] constexpr T* uncheck_to_address(T* const ptr) noexcept {
+		static_assert(!std::is_function_v<T>, "N4950 [pointer.conversion]/1: Mandates: T is not a function type.");
+		return ptr;
+	}
+	template <class Iter>
+	[[nodiscard]] constexpr auto uncheck_to_address(const Iter& it) noexcept {
+		if constexpr (requires { uncheck_pointer_traits<Iter>::to_address(it); })
+			return uncheck_pointer_traits<Iter>::to_address(it);
+		else if constexpr (requires { std::pointer_traits<Iter>::to_address(it); })
+			return std::pointer_traits<Iter>::to_address(it);
+		else
+			return uncheck_to_address(it.operator->());
+	}
+
 #ifdef _DEBUG
 #ifdef _MSC_VER
-		return *((T**)&(it) + 2);
-#endif
-#endif
-#endif
-		return it.operator->();
-	}
-
 	template <typename T>
-	const T* pointer_from_vector_iterator(const typename vector<T>::const_iterator& it)
+	[[nodiscard]] constexpr auto uncheck_to_address(const std::_Vector_iterator<T>& it)
 	{
-#ifdef HYECS_USING_STD_VECTOR
-#ifdef _DEBUG
-#ifdef _MSC_VER
-		return *((T**)&(it) + 2);
-#endif
-#endif
-#endif
-		return it.operator->();
+		return it._Ptr;
 	}
+	template <typename T>
+	[[nodiscard]] constexpr auto uncheck_to_address(const std::_Vector_const_iterator<T>& it)
+	{
+		return it._Ptr;
+	}
+#endif
+#endif
 
-	template <typename T, size_t N>
-	T* pointer_from_array_iterator(const typename std::array<T, N>::iterator& it)
-	{
-		return it.operator->();
-	}
 
 	//extension for std::initializer_list
 	template <typename T>
@@ -166,7 +166,7 @@ namespace hyecs
 	template <typename T, typename Ctx, typename CtxTransform>
 	auto for_each_arg_acc_impl(Ctx ctx, CtxTransform ctx_transform, T&& arg)
 	{
-		return ctx_transform(std::forward<T>(arg),ctx);
+		return ctx_transform(std::forward<T>(arg), ctx);
 	}
 
 	template <typename T, typename... Ts, typename Ctx, typename CtxTransform>
@@ -174,14 +174,14 @@ namespace hyecs
 		T&& arg, Ts&&... args)
 	{
 		return for_each_arg_acc_impl(
-			ctx_transform(std::forward<T>(arg),ctx),
+			ctx_transform(std::forward<T>(arg), ctx),
 			std::forward<Ts>(args)...
 		);
 	}
 
 	template <typename... T, typename Ctx, typename CtxTransform>
 	auto for_each_arg_acc(Ctx ctx, CtxTransform ctx_transform,
-	                      T&&... args)
+		T&&... args)
 	{
 		return for_each_arg_acc_impl(ctx, ctx_transform, std::forward<T>(args)...);
 	}

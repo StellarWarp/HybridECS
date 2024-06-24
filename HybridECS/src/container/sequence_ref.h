@@ -4,79 +4,43 @@
 
 namespace hyecs
 {
-	//template<typename T, typename = void>
-	//struct iterator_of
-	//{
-	//	using type = T*;
-	//};
-
-	//template<typename T>
-	//struct iterator_of<T, std::enable_if_t<has_member_type_iterator_v<T>>>
-	//{
-	//	using type = typename T::iterator;
-	//};
-
-	template <typename>
-	struct is_array_iterator {
-		static constexpr bool value = false;
-	};
-
-	template <typename Iter>
-	struct is_vector_iterator
-	{
-		static constexpr bool test()
-		{
-			if constexpr (std::is_pointer_v<Iter>)
-				return false;
-			else if constexpr (std::is_same_v<typename vector<typename Iter::value_type>::iterator, Iter>
-				|| std::is_same_v<typename vector<typename Iter::value_type>::const_iterator, Iter>)
-				return true;
-			return false;
-		}
-
-		static constexpr bool value = test();
-	};
-
-	template <typename Iter>
-	static constexpr bool is_vector_or_array_iterator_v = is_vector_iterator<Iter>::value;
-	template <typename Iter>
-	static constexpr bool is_general_iterator_v =
-		has_member_type_value_type_v<Iter> && has_operator_dereference_v<Iter> && !is_vector_or_array_iterator_v<Iter>;
-
-
-	template <typename T, typename Iter = T*, typename = void>
+	template <typename T, typename Iter = T*>
 	class sequence_ref;
 
 #define HYECS_sequence_ref_template_guides(sequence_ref_class)\
-	template <typename T>\
-	sequence_ref_class(vector<T>) -> sequence_ref_class<T>;\
-	template <typename T, size_t N>\
-	sequence_ref_class(std::array<T, N>) -> sequence_ref_class<T>;\
-	\
-	template <typename Container, std::enable_if_t<has_member_type_value_type_v<Container>, int> = 0>\
-	sequence_ref_class(Container&) -> sequence_ref_class<typename Container::value_type, Container>;\
-	\
-	template <typename Iter, std::enable_if_t<is_general_iterator_v<Iter>, int> = 0>\
-	sequence_ref_class(Iter, Iter) -> sequence_ref_class<typename Iter::value_type, Iter>;\
-	template <typename Iter, std::enable_if_t<std::is_pointer_v<Iter>, int> = 0>\
-	sequence_ref_class(Iter, Iter) -> sequence_ref_class<std::decay_t<std::remove_pointer_t<Iter>>, Iter>;\
-	template <typename Iter, std::enable_if_t<is_vector_or_array_iterator_v<Iter>, int> = 0>\
-	sequence_ref_class(Iter, Iter) -> sequence_ref_class<typename Iter::value_type>;
+	template <typename Container>																		\
+		requires(std::ranges::contiguous_range<Container>)												\
+	sequence_ref_class(Container&)->sequence_ref_class<typename std::ranges::range_value_t<Container>>;\
+	template <typename Container>																		\
+		requires(!std::ranges::contiguous_range<Container>)		\
+	sequence_ref_class(Container&)->sequence_ref_class<typename std::iter_value_t<std::ranges::iterator_t<Container>>, Container>;\
+																										\
+	template <typename Iter>																			\
+		requires (std::contiguous_iterator<Iter>)														\
+	sequence_ref_class(Iter, Iter)->sequence_ref_class<typename std::iterator_traits<Iter>::value_type>;\
+	template <typename Iter>																			\
+		requires (!std::contiguous_iterator<Iter>)														\
+	sequence_ref_class(Iter, Iter)->sequence_ref_class<typename std::iterator_traits<Iter>::value_type, Iter>;\
+	template <typename... T> \
+		requires (type_list<T...>::is_same && sizeof...(T) > 0)\
+	sequence_ref_class(T...)->sequence_ref_class<typename type_list<T...>::get<0>>;
 
-	HYECS_sequence_ref_template_guides(sequence_ref)
-	
-	// template <typename T>
-	// sequence_ref(vector<T>) -> sequence_ref<T>;
-	// template <typename T, size_t N>
-	// sequence_ref(std::array<T, N>) -> sequence_ref<T>;
-	// template <typename Container, std::enable_if_t<has_member_type_value_type_v<Container>, int>  = 0>
-	// sequence_ref(Container&) -> sequence_ref<typename Container::value_type, Container>;
-	// template <typename Iter, std::enable_if_t<is_general_iterator_v<Iter>, int>  = 0>
-	// sequence_ref(Iter, Iter) -> sequence_ref<typename Iter::value_type, Iter>;
-	// template <typename Iter, std::enable_if_t<std::is_pointer_v<Iter>, int>  = 0>
-	// sequence_ref(Iter, Iter) -> sequence_ref<std::decay_t<std::remove_pointer_t<Iter>>, Iter>;
-	// template <typename Iter, std::enable_if_t<is_vector_or_array_iterator_v<Iter>, int>  = 0>
-	// sequence_ref(Iter, Iter) -> sequence_ref<typename Iter::value_type>;
+
+	HYECS_sequence_ref_template_guides(sequence_ref);
+
+	//template <typename Container>
+	//	requires(std::ranges::contiguous_range<Container>)
+	//sequence_ref(Container&)->sequence_ref<typename std::ranges::range_value_t<Container>>;
+	//template <typename Container>
+	//	requires(std::ranges::common_range<Container> && !std::ranges::contiguous_range<Container>)
+	//sequence_ref(Container&)->sequence_ref<typename Container::value_type, Container>;
+	//
+	//template <typename Iter>
+	//	requires (std::contiguous_iterator<Iter>)
+	//sequence_ref(Iter, Iter)->sequence_ref<typename std::iterator_traits<Iter>::value_type>;
+	//template <typename Iter>
+	//	requires (!std::contiguous_iterator<Iter>)
+	//sequence_ref(Iter, Iter)->sequence_ref<typename std::iterator_traits<Iter>::value_type, Iter>;
 
 	template <typename T, typename SeqParam = const T*>
 	class sequence_cref : public sequence_ref<const T, SeqParam>
@@ -91,27 +55,13 @@ namespace hyecs
 		//}
 	};
 
-	HYECS_sequence_ref_template_guides(sequence_cref)
-
-	// template <typename T>
-	// sequence_cref(vector<T>) -> sequence_cref<T>;
-	// template <typename T, size_t N>
-	// sequence_cref(std::array<T, N>) -> sequence_cref<T>;
-	// template <typename Container, std::enable_if_t<has_member_type_value_type_v<Container>, int>  = 0>
-	// sequence_cref(Container&) -> sequence_cref<typename Container::value_type, Container>;
-	// template <typename Iter, std::enable_if_t<is_general_iterator_v<Iter>, int>  = 0>
-	// sequence_cref(Iter, Iter) -> sequence_cref<typename Iter::value_type, Iter>;
-	// template <typename Iter, std::enable_if_t<std::is_pointer_v<Iter>, int>  = 0>
-	// sequence_cref(Iter, Iter) -> sequence_cref<std::decay_t<std::remove_pointer_t<Iter>>, Iter>;
-	// template <typename Iter, std::enable_if_t<is_vector_or_array_iterator_v<Iter>, int>  = 0>
-	// sequence_cref(Iter, Iter) -> sequence_cref<typename Iter::value_type>;
-
+	HYECS_sequence_ref_template_guides(sequence_cref);
 
 	template <typename T, typename Iter>
-	class sequence_ref<T, Iter, std::enable_if_t<std::is_convertible_v<decltype(*std::declval<Iter>()), T>>>
+		requires (std::input_or_output_iterator<Iter>)
+	class sequence_ref<T, Iter>
 	{
 	protected:
-		// static_assert(!std::is_const_v<T>);
 		using decay_type = std::decay_t<T>;
 
 	public:
@@ -134,8 +84,7 @@ namespace hyecs
 			}
 		};
 
-		//reqiured for non-contiguous iterators whith has no operator-()
-		static const bool is_contiguous = has_operator_minus_v<iterator> && has_operator_plus_v<iterator, uint32_t>;
+		static const bool is_contiguous = std::contiguous_iterator<Iter>;
 		using optional_size = std::conditional_t<is_contiguous, empty_t, size_t>;
 
 	protected:
@@ -172,7 +121,7 @@ namespace hyecs
 			new(this) sequence_ref(std::move(other));
 			return *this;
 		}
-		
+
 
 		template <typename U, typename UIter>
 		constexpr sequence_ref(const sequence_ref<U, UIter>& other) noexcept
@@ -195,34 +144,16 @@ namespace hyecs
 			: m_begin(_First_arg), m_end(_Last_arg), m_size(_Last_arg - _First_arg)
 		{
 		}
-
 		constexpr sequence_ref(iterator _First_arg, iterator _Last_arg, size_t _size) noexcept
 			: m_begin(_First_arg), m_end(_Last_arg), m_size(_size)
 		{
 		}
 
-		constexpr sequence_ref(const typename vector<decay_type>::iterator& begin, const typename vector<decay_type>::iterator& end) noexcept
-			: m_begin(pointer_from_vector_iterator<decay_type>(begin)), m_end(pointer_from_vector_iterator<decay_type>(end))
-		{
-		}
-
-		constexpr sequence_ref(const typename vector<decay_type>::const_iterator& begin, const typename vector<decay_type>::const_iterator& end) noexcept
-			: m_begin(pointer_from_vector_iterator<decay_type>(begin)), m_end(pointer_from_vector_iterator<decay_type>(end))
-		{
-		}
-
-		template <size_t N>
-		constexpr sequence_ref(const typename std::array<decay_type, N>::iterator& begin, const typename std::array<decay_type, N>::iterator& end) noexcept
-			: m_begin(pointer_from_array_iterator<decay_type, N>(begin)), m_end(pointer_from_array_iterator<decay_type, N>(end))
-		{
-		}
-
-		template <size_t N>
-		constexpr sequence_ref(const typename std::array<decay_type, N>::const_iterator& begin, const typename std::array<decay_type, N>::const_iterator& end) noexcept
-			: m_begin(pointer_from_array_iterator<decay_type, N>(begin)), m_end(pointer_from_array_iterator<decay_type, N>(end))
-		{
-		}
-
+		template <typename UIter> requires std::contiguous_iterator<UIter>
+		constexpr sequence_ref(UIter _First_arg, UIter _Last_arg) noexcept
+			: m_begin(uncheck_to_address(_First_arg)),
+			m_end(uncheck_to_address(_Last_arg))
+		{}
 
 		constexpr sequence_ref(initializer_list<decay_type> list) noexcept
 			: m_begin(list.begin()), m_end(list.end())
@@ -234,34 +165,11 @@ namespace hyecs
 		{
 		}
 
-		template <typename U = decay_type>
-		constexpr sequence_ref(vector<U>& vec) noexcept
-			: m_begin(vec.data()), m_end(vec.data() + vec.size())
-		{
-		}
-
-		template <typename U = decay_type>
-		constexpr sequence_ref(const vector<U>& vec) noexcept
-			: m_begin(vec.data()), m_end(vec.data() + vec.size())
-		{
-		}
-
-		template <typename U = decay_type, size_t N>
-		constexpr sequence_ref(std::array<U, N>& arr) noexcept
-			: m_begin(arr.data()), m_end(arr.data() + arr.size())
-		{
-		}
-
-		template <typename U = decay_type, size_t N>
-		constexpr sequence_ref(const std::array<U, N>& arr) noexcept
-			: m_begin(arr.data()), m_end(arr.data() + arr.size())
-		{
-		}
-
-
 		template <typename Container>
+			requires (std::ranges::contiguous_range<Container> || std::ranges::random_access_range<Container>)
 		constexpr sequence_ref(Container& container) noexcept
-			: m_begin(container.begin()), m_end(container.end())
+			: m_begin(uncheck_to_address(container.begin())),
+			m_end(uncheck_to_address(container.end()))
 		{
 			if constexpr (!std::is_same_v<optional_size, empty_t>)
 				m_size = container.size();
@@ -284,6 +192,10 @@ namespace hyecs
 			else
 				return m_size;
 		}
+		[[nodiscard]] constexpr bool empty() const noexcept
+		{
+			return size() == 0;
+		}
 
 		const T& operator[](size_t index) const
 		{
@@ -302,7 +214,7 @@ namespace hyecs
 		operator initializer_list<decay_type>() const
 		{
 			if constexpr (is_contiguous)
-				return {m_begin, m_end};
+				return { m_begin, m_end };
 			else
 				static_assert(is_contiguous, "operator initializer_list<T>() is only available for contiguous iterators");
 		}
@@ -323,17 +235,12 @@ namespace hyecs
 
 		template <typename... Args>
 		auto cast_tuple() { return cast_tuple<Args...>(std::index_sequence_for<Args...>{}); }
-
-		// operator sequence_ref<const T>() const
-		// {
-		// 	return {m_begin, m_end};
-		// }
 	};
 
 
-	template <typename T, typename Container>
-	class sequence_ref<T, Container, std::enable_if_t<
-		                   has_member_type_iterator_v<Container> && !has_operator_dereference_v<Container>>>
+	template <typename T, typename Container> 
+		requires (has_member_type_iterator_v<Container>)
+	class sequence_ref<T, Container>
 	{
 	public:
 		using value_type = T;
@@ -341,7 +248,7 @@ namespace hyecs
 		using const_reference = T&;
 		using size_type = size_t;
 
-		using iterator = typename Container::iterator;
+		using iterator = std::ranges::iterator_t<Container>;
 		using container = Container;
 
 	private:
@@ -355,7 +262,7 @@ namespace hyecs
 
 		sequence_cref<T, const Container> as_const() const
 		{
-			return {m_container};
+			return { m_container };
 		}
 
 
@@ -373,6 +280,11 @@ namespace hyecs
 		{
 			return m_container.size();
 		}
+
+		[[nodiscard]] constexpr bool empty() const noexcept
+		{
+			return size() == 0;
+		}
 	};
 
 
@@ -389,7 +301,7 @@ namespace hyecs
 		{
 		};
 	};
-	
+
 
 	template <typename T, typename Option = const T*>
 	class sorted_sequence_cref : public sequence_cref<T, Option>
@@ -405,19 +317,8 @@ namespace hyecs
 		};
 	};
 
-	// template <typename T>
-	// sorted_sequence_cref(vector<T>) -> sorted_sequence_cref<T>;
-	// template <typename T, size_t N>
-	// sorted_sequence_cref(std::array<T, N>) -> sorted_sequence_cref<T>;
-	// template <typename Container, std::enable_if_t<has_member_type_value_type_v<Container>, int>  = 0>
-	// sorted_sequence_cref(Container&) -> sorted_sequence_cref<typename Container::value_type, Container>;
-	// template <typename Iter, std::enable_if_t<has_member_type_value_type_v<Iter>, int>  = 0>
-	// sorted_sequence_cref(Iter, Iter) -> sorted_sequence_cref<typename Iter::value_type, Iter>;
-	// template <typename Iter, std::enable_if_t<std::is_pointer_v<Iter>, int>  = 0>
-	// sorted_sequence_cref(Iter, Iter) -> sorted_sequence_cref<std::decay_t<std::remove_pointer_t<Iter>>, Iter>;
-
-	HYECS_sequence_ref_template_guides(sorted_sequence_ref)
-	HYECS_sequence_ref_template_guides(sorted_sequence_cref)
+	HYECS_sequence_ref_template_guides(sorted_sequence_ref);
+	HYECS_sequence_ref_template_guides(sorted_sequence_cref);
 
 
 	template <typename T, size_t N>
@@ -439,7 +340,7 @@ namespace hyecs
 		return sorted;
 	}
 
-	template <typename T>
+	template <typename T,bool Assure = true>
 	void get_sub_sequence_indices(
 		sorted_sequence_cref<T> sequence,
 		sorted_sequence_cref<T> sub_sequence,
@@ -452,21 +353,46 @@ namespace hyecs
 		{
 			assert(index <= sequence.size());
 			const auto& elem = *sub_iter;
-			if (elem < sequence[index])
+			if constexpr (Assure)
 			{
-				sub_iter++;
-				write_iter++;
-			}
-			else if (elem == sequence[index])
-			{
-				*write_iter = index;
-				write_iter++;
-				sub_iter++;
-				index++;
+				ASSERTION_CODE(
+					if (elem < sequence[index])
+					{
+						sub_iter++;
+						write_iter++;
+						assert(false);//element not found
+					}
+				);
+				if (elem == sequence[index])
+				{
+					*write_iter = index;
+					write_iter++;
+					sub_iter++;
+					index++;
+				}
+				else
+				{
+					index++;
+				}
 			}
 			else
 			{
-				index++;
+				if (elem < sequence[index])
+				{
+					sub_iter++;
+					write_iter++;
+				}
+				else if (elem == sequence[index])
+				{
+					*write_iter = index;
+					write_iter++;
+					sub_iter++;
+					index++;
+				}
+				else
+				{
+					index++;
+				}
 			}
 		}
 	}

@@ -54,8 +54,22 @@ namespace hyecs {
 				is_unique_helper<Us...>::value;
 		};
 
+		template <typename... Us> struct is_same_helper;
+		template <> struct is_same_helper<> {
+			static constexpr bool value = true;
+		};
+		template <typename U> struct is_same_helper<U> {
+			static constexpr bool value = true;
+		};
+		template <typename U0, typename U1, typename... Us> 
+		struct is_same_helper<U0, U1, Us...> {
+			static constexpr bool value = std::is_same_v<U0, U1> &&
+				is_same_helper<U1,Us...>::value;
+		};
+
 	public:
 		static constexpr bool is_unique = is_unique_helper<T...>::value;
+		static constexpr bool is_same = is_same_helper<T...>::value;
 
 	private:
 		template <typename... Us> struct pop_front_helper;
@@ -274,8 +288,8 @@ namespace hyecs {
 	template <typename T, typename... Ts, typename Callable>
 	auto for_each_type_impl(Callable callable, type_list<T, Ts...>)
 	{
-		static_assert(std::is_invocable_v<Callable, T>);
-		using invoke_result = std::invoke_result_t<Callable, T>;
+		static_assert(std::is_invocable_v<Callable, type_wrapper<T>>);
+		using invoke_result = std::invoke_result_t<Callable, type_wrapper<T>>;
 		using next_list = type_list<Ts...>;
 		if constexpr (std::is_void_v<invoke_result>)
 		{
@@ -283,12 +297,13 @@ namespace hyecs {
 			for_each_type_impl(callable, next_list{});
 		}
 		else
-			return callable(type_wrapper<T>{}), for_each_type_impl(callable, next_list{});
+			return callable(type_wrapper<T>{});//terminate if return non void
 	}
 	template <typename... T, typename Callable>
 	auto for_each_type(Callable callable, type_list<T...> list)
 	{
-		return for_each_type_impl(callable, list);
+		(callable(type_wrapper<T>{}), ...);
+		//return for_each_type_impl(callable, list);
 	}
 
 } // namespace hyecs

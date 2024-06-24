@@ -47,40 +47,7 @@
     <ClInclude Include="src\container\variant_vector.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="src\core\old\Application.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="src\core\old\ArchtypeData.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="src\core\old\CoreComponent.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="src\core\entity.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="src\core\old\EntityManager.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="src\core\old\ICompomemt.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="src\core\old\ISystem.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="src\core\old\Query.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="src\core\old\QueryBuilder.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="src\core\old\Reflection.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="src\core\old\SystemManager.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="src\core\old\World.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="src\lib\glm_lib.h">
@@ -128,9 +95,6 @@
     <ClInclude Include="src\core\archetype_storage.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="src\core\discard\archetype_registry.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="src\container\vaildref_map.h">
       <Filter>头文件</Filter>
     </ClInclude>
@@ -150,9 +114,6 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="src\core\cross_query.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="src\core\discard\graph_archetype_registry.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="src\core\component_group.h">
@@ -227,9 +188,6 @@
     <ClInclude Include="src\utils\utils.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="src\core\static_data_registry.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="src\core\archetype_registry.h">
       <Filter>头文件</Filter>
     </ClInclude>
@@ -257,8 +215,21 @@
     <ClInclude Include="src\test_sparse_table.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="src\core\system_callable_invoker.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\static_data_registry.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\query_api.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\container\small_vector.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="src\NatvisFile.natvis" />
+    <Natvis Include="src\small_vector.natvis" />
   </ItemGroup>
 </Project>

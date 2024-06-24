@@ -55,5 +55,10 @@
 	<Type Name="hyecs::generic::type_index">
 		<DisplayString>{{ name={m_info->name} }}</DisplayString>
 	</Type>
+	
+	
+	
+	
+
 
 </AutoVisualizer>

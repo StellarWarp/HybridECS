@@ -2,13 +2,13 @@
 
 #include "stl_container.h"
 #include "generic_container.h"
-//#include "entt/dense_map.h"
-//#include "entt/dense_set.h"
 #include "vaildref_map.h"
 #include "fixed_vector.h"
 #include "bit_set.h"
 #include "sequence_ref.h"
 #include "raw_segmented_vector.h"
+#include "small_vector.h"
+
 namespace hyecs
 {
 
@@ -29,6 +29,14 @@ namespace hyecs
 	>
 	using dense_set = unordered_set<T, Hash, Equal, Alloc>;
 
+	using gch::small_vector;
+
+	//template <
+	//	typename T,
+	//	unsigned InlineCapacity = gch::default_buffer_size<std::allocator<T>>::value,
+	//	typename Allocator = std::allocator<T>
+	//>
+	//using small_vector = gch::small_vector<T, InlineCapacity, Allocator>
 
 
 }

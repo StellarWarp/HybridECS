@@ -4,6 +4,7 @@
 
 namespace hyecs
 {
+	//the tag arch that shares a same table
 	//no need condition info for tag query, condition is processed by archetype_registry
 	class table_tag_query
 	{
@@ -238,6 +239,8 @@ namespace hyecs
 		map<access_hash, access_info> m_access_infos;
 
 	public:
+		size_t entity_count() const { return m_entities.size(); }
+
 		const access_info& get_access_info(sequence_ref<component_type_index> access_list)
 		{
 			access_hash hash = archetype::addition_hash(0, append_component(access_list));
@@ -478,8 +481,22 @@ namespace hyecs
 		query(const query&) = delete;
 		query& operator=(const query&) = delete;
 
+		size_t entity_count() const
+		{
+			size_t count = 0;
+			for (const auto storage : m_archetype_storages)
+			{
+				count += storage->entity_count();
+			}
+			for (const auto query : m_tag_table_queries)
+			{
+				count += query->entity_count();
+			}
+			return count;
+		}
+
 #ifdef HYECS_DEBUG
-		const query_condition& condition() const { return m_condition; }
+		const query_condition& condition_debug() const { return m_condition; }
 #  endif
 		void notify_table_query_add(table_tag_query* query)
 		{
@@ -502,7 +519,7 @@ namespace hyecs
 			}
 		}
 
-		const access_info& get_access_info(sequence_cref< component_type_index> access_list)
+		const access_info& get_access_info(sequence_cref<component_type_index> access_list)
 		{
 			access_hash hash = archetype::addition_hash(0, append_component(access_list));
 			if (auto iter = m_access_infos.find(hash); iter != m_access_infos.end())
@@ -572,6 +589,35 @@ namespace hyecs
 			{
 				info.query->for_each<Callable>(std::forward<Callable>(func), info.access_info);
 			}
+		}
+
+		friend class iteration_distributor;
+		class iteration_distributor
+		{
+			query& m_query;
+
+			iteration_distributor(query& q,size_t num) : m_query(q)
+			{
+				auto entity_count = m_query.entity_count();
+				size_t average = entity_count / num;
+
+			}
+			
+			class iterator
+			{
+			public:
+				void component_addresses(sequence_ref<void*> out_address)
+				{
+					
+				}
+			};
+
+			
+		};
+
+		auto distribute(size_t num, const access_info& acc_info) -> iteration_distributor
+		{
+			
 		}
 	};
 }

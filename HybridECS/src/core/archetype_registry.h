@@ -76,7 +76,7 @@ namespace hyecs
 				arch_query_node->tag_condition(),
 				arch_query_node->is_full_set(),
 				arch_query_node->is_direct_set(),
-				notify_adding_tag, notify_partial_convert});
+				notify_adding_tag, notify_partial_convert });
 			arch_query_node->add_notify_adding_tag_archetype_callback(std::move(notify_adding_tag));
 			arch_query_node->add_notify_partial_convert_callback(std::move(notify_partial_convert));
 		}
@@ -88,7 +88,7 @@ namespace hyecs
 				query_node->condition().hash(),
 				query_node->condition(),
 				archetype_query_addition_callback
-			});
+				});
 			query_node->add_callback(std::move(archetype_query_addition_callback));
 		}
 
@@ -127,6 +127,8 @@ namespace hyecs
 			if (auto iter = m_archetype_query_nodes.find(q_hash); iter != m_archetype_query_nodes.end())
 			{
 				auto instance_node = &(*iter).second;
+				//the pure tag arch-query is impossible to reuse across pure tag query
+				assert(!instance_node->archetype_node()->archetype().empty());
 				if (instance_node->isolated())
 				{
 					auto super_set = instance_node->archetype_node()->direct_query_node();
@@ -146,14 +148,20 @@ namespace hyecs
 
 		const archetype_query_node* get_archetype_query_node(
 			const archetype_query_node* superset,
-			const query_node* target_query)
+			const query_node* target_query,
+			const query_condition tag_condition
+		)
 		{
+			ASSERTION_CODE(
+			if(tag_condition.all().empty() && tag_condition.anys().empty() && !tag_condition.none().empty())
+				assert(false)//havent support for untaged part query yet
+			);
+
 			if (target_query->type() == query_node::untag)
 			{
-				assert(superset->type() == archetype_query_node::full_set);
+				assert(superset->is_direct_set());
 				return superset;
 			}
-			decltype(auto) tag_condition = target_query->tag_condition();
 			auto q_hash = archetype_query_hash(superset->archetype_node()->archetype(), tag_condition);
 			if (auto iter = m_archetype_query_nodes.find(q_hash); iter != m_archetype_query_nodes.end())
 			{
@@ -177,6 +185,7 @@ namespace hyecs
 		{
 			auto& arch_q_nodes = query->archetype_query_nodes();
 			auto base_arch_node = tag_arch_node->base_archetype_node();
+			//add arch to arch query if it's exist and isolated
 			if (auto it = arch_q_nodes.find(base_arch_node); it != arch_q_nodes.end())
 			{
 				auto instance_node = it->second;
@@ -184,12 +193,58 @@ namespace hyecs
 				if (instance_node->isolated())
 					mut_instance_node->add_matched(tag_arch_node);
 			}
-			else
+			else//if not exist create a new arch query
 			{
 				auto instance_node = get_archetype_node_for_pure_tag_q(base_arch_node, query->tag_condition());
 				instance_node->add_matched(tag_arch_node);
 				query->add_matched(instance_node);
 			}
+		};
+
+		void try_add_arch_query_to_subquery(
+			query_node* subquery,
+			const archetype_query_node* arch_query,
+			archetype_index arch,
+			const query_condition* base_condition_opt = nullptr,
+			const query_condition* tag_condition_opt = nullptr
+		)
+		{
+			decltype(auto) condition = subquery->condition();
+			std::optional<query_condition> base_condition_stack = std::nullopt;
+			if (!base_condition_opt) base_condition_stack = condition.base_incomplete_condition();
+			auto& base_condition = base_condition_opt ? *base_condition_opt : base_condition_stack.value();
+
+			// base filter
+			if (!base_condition.match_all_none(arch)) return;
+
+			query_condition tag_condition = tag_condition_opt ? *tag_condition_opt : condition.tag_incomplete_condition();
+
+			const auto& comp_mask = arch.component_mask();
+			small_vector<uint32_t> maintain_any_index;
+
+			auto& anys = condition.anys();
+			for (uint32_t i = 0; i < anys.size(); i++)
+			{
+				auto& any = anys[i];
+				if (!query_condition::match_any(comp_mask, any))//if any is empty it will be remove
+					if (!tag_condition.anys()[i].empty())
+						maintain_any_index.push_back(i);
+					else
+						return;
+			}
+
+			if (maintain_any_index.empty())
+				if (tag_condition.all().empty() && tag_condition.none().empty())
+				{
+					assert(arch_query->is_direct_set());
+					subquery->add_matched(arch_query);
+					return;
+				}
+			// tag filter
+			tag_condition.filter_anys_by_index(maintain_any_index);
+			tag_condition.completion();
+			//find or create new tag_archetype_node
+			subquery->add_matched(get_archetype_query_node(arch_query, subquery, tag_condition));
 		};
 
 
@@ -204,9 +259,9 @@ namespace hyecs
 			ASSERTION_CODE(
 				for (auto comp : adding) assert(!comp.is_tag());
 			for (auto comp : removings) assert(!comp.is_tag());
-			);
+				);
 
-			if (arch == archetype_index::empty_archetype)
+			if (arch .empty())
 			{
 				uint64_t arch_hash = origin_arch.hash();
 				arch_hash = archetype::addition_hash(arch_hash, adding);
@@ -217,30 +272,12 @@ namespace hyecs
 			}
 			archetype_query_node* full_node = add_archetype_node(arch);
 
-			auto try_add_arch_query_to_subquery =
-				[this](query_node* subquery, archetype_query_node* full_node, archetype_index arch)
-				{
-					if (subquery->condition().match_all_none(arch))
-					{
-						decltype(auto) tag_condition = subquery->tag_condition();
-						if (subquery->condition().match_any(arch))
-						{
-							assert(full_node->is_full_set());
-							if (tag_condition.all().empty() && tag_condition.none().empty())
-								subquery->add_matched(full_node);
-							else
-								subquery->add_matched(get_archetype_query_node(full_node, subquery));
-						}
-						else if (!tag_condition.any().empty())
-						{
-							subquery->add_matched(get_archetype_query_node(full_node, subquery));
-						}
-					}
-				};
+
 
 			uint64_t iterate_version = seqence_allocator<query_node>::allocate();
 
-			if (origin_arch != archetype_index::empty_archetype)
+			//update for original arch related queries
+			if (!origin_arch.empty())
 			{
 				auto& origin_arch_node = m_archetype_nodes.at(origin_arch.hash());
 				if (removings.size() != 0)
@@ -253,7 +290,7 @@ namespace hyecs
 					for (auto query : origin_arch_node.related_queries())
 					{
 						query->iterate_version = iterate_version;
-						if (query->type() == query_node::untag)
+						if (query->type() == query_node::untag)//optimize for untag case
 						{
 							if (query->condition().match_none(arch))
 								query->add_matched(full_node);
@@ -266,7 +303,7 @@ namespace hyecs
 
 			}
 
-			//single layer iteraton : subquery try add
+			//single layer iteration : subquery try add
 			for (decltype(auto) component : adding)
 			{
 				auto com_node_hash = archetype::addition_hash(0, { component });
@@ -371,8 +408,8 @@ namespace hyecs
 				return &(*iter).second;
 
 			//todo optimize this
-			query_condition base_condition = condition.base_condition();
-			query_condition tag_condition = condition.tag_condition();
+			query_condition base_condition = condition.base_incomplete_condition();
+			query_condition tag_condition = condition.tag_incomplete_condition();
 
 			assert(!condition.all().empty());	//todo: support no all condition 
 
@@ -398,32 +435,47 @@ namespace hyecs
 					min_initial_set_size = initial_set->size();
 				}
 			}
+
 			if (q_type != query_node::pure_tag)
 			{
-				// base filter phase
-				vector<const archetype_query_node*> filter_set;
-				filter_set.reserve(initial_set->size());
-				for (auto& [arch_node, q_node] : *initial_set)
+				for (auto& [arch_node, arch_q_node] : *initial_set)
 				{
-					if (base_condition.match_all_none(arch_node->archetype()))
-						if (condition.match_any(arch_node->archetype()))
-						{
-							if (tag_condition.all().empty() && tag_condition.none().empty() && q_node->is_full_set())
-								node->add_matched(q_node);
-							else
-								filter_set.push_back(q_node);
-						}
-						else if (!tag_condition.any().empty())
-						{
-							filter_set.push_back(q_node);
-						}
-				}
-				// tag filter phase
-				for (auto arch_qnode : filter_set)
-				{
-					//find or create new tag_archetype_node
-					const archetype_query_node* qnode = get_archetype_query_node(arch_qnode, node);
-					node->add_matched(qnode);
+					try_add_arch_query_to_subquery(node, arch_q_node, arch_node->archetype(), &base_condition, &tag_condition);
+					//// base filter
+					//if (!base_condition.match_all_none(arch_node->archetype()))
+					//	continue;
+					//const auto& comp_mask = arch_node->archetype().component_mask();
+					//small_vector<uint32_t> maintain_any_index;
+					//bool discard = false;
+					//auto& anys = condition.anys();
+					//for (uint32_t i = 0; i < anys.size(); i++)
+					//{
+					//	auto& any = anys[i];
+					//	if (!query_condition::match_any(comp_mask, any))
+					//		if (!tag_condition.anys()[i].empty())
+					//		{
+					//			maintain_any_index.push_back(i);
+					//		}
+					//		else
+					//		{
+					//			discard = true;
+					//			break;
+					//		}
+					//}
+					//if (discard) continue;
+
+					//if (maintain_any_index.empty())
+					//	if (tag_condition.all().empty() && tag_condition.none().empty())
+					//	{
+					//		assert(arch_q_node->is_direct_set());
+					//		node->add_matched(arch_q_node);
+					//		continue;
+					//	}
+					//// tag filter
+					//tag_condition.filter_anys_by_index(maintain_any_index);
+					////find or create new tag_archetype_node
+					//node->add_matched(get_archetype_query_node(arch_q_node, node, tag_condition));
+
 				}
 			}
 			else // pure_tag
@@ -449,9 +501,9 @@ namespace hyecs
 		{
 			query_node* node;
 			if (component.is_tag())
-				node = &m_query_nodes.emplace(component.hash(), query_node({component}, query_node::pure_tag));
+				node = &m_query_nodes.emplace(component.hash(), query_node({ component }, query_node::pure_tag));
 			else
-				node = &m_query_nodes.emplace(component.hash(), query_node({component}, query_node::untag));
+				node = &m_query_nodes.emplace(component.hash(), query_node({ component }, query_node::untag));
 			invoke_query_addition(node);
 		}
 

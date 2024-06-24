@@ -37,7 +37,7 @@ namespace hyecs
 		}
 
 	public:
-		size_t size() const { return m_entities.size(); }
+		size_t entity_count() const { return m_entities.size(); }
 		const dense_set<entity>& get_entities() { return m_entities; }
 
 		void add_callback_on_entity_add(std::function<void(entity, storage_key)> callback)

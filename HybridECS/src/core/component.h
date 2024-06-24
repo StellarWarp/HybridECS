@@ -1,11 +1,9 @@
 #pragma once
-#include "../lib/std_lib.h"
 #include "../container/container.h"
 #include "../container/generic_type.h"
 #include "component_group.h"
 namespace hyecs
 {
-
 	class component_type_info
 	{
 		generic::type_index_container_cached m_type_index;

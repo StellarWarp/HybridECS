@@ -1,5 +1,5 @@
 #pragma once
-#include "container/container.h"
+#include "../container/container.h"
 #include "entity.h"
 namespace hyecs
 {
@@ -13,6 +13,8 @@ namespace hyecs
 		struct empty_t {};
 
 		using value_type = std::conditional_t<std::is_void_v<T>, empty_t, T>;
+		static constexpr bool is_map = !std::is_empty_v<value_type>;
+		static constexpr bool is_set = std::is_empty_v<value_type>;
 
 		struct entity_value_pair
 		{
@@ -21,17 +23,21 @@ namespace hyecs
 		};
 
 
-		static constexpr size_t page_byte_size = 4096;
+		//static constexpr size_t page_byte_size = 4096;
+		//static constexpr size_t page_capacity = page_byte_size / sizeof(entity_value_pair);
+		static constexpr size_t max_page_byte_size = 4096;
+		//choose a page_capacity of power of 2 
+		static constexpr size_t page_capacity = []() -> size_t{
+			for (size_t capacity = 1;; capacity *= 2)
+				if (capacity * sizeof(entity_value_pair) > max_page_byte_size)
+					return capacity / 2;
+			return 0;
+		}();
+		static constexpr size_t page_byte_size = page_capacity * sizeof(entity_value_pair);
 
-
-
-		static constexpr bool is_map = !std::is_empty_v<value_type>;
-		static constexpr bool is_set = std::is_empty_v<value_type>;
-		static constexpr size_t page_capacity = page_byte_size / sizeof(entity_value_pair);
-		static constexpr size_t page_offset_bits = std::bit_width(page_capacity - 1);
+		static_assert(std::has_single_bit(page_capacity), "for optimization");
+		
 		using table_offset_t = uint32_t;
-		static constexpr table_offset_t page_offset_mask = (1 << page_offset_bits) - 1;
-		static constexpr table_offset_t page_index_mask = ~page_offset_mask;
 
 		struct table_location
 		{

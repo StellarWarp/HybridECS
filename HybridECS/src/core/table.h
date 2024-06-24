@@ -34,6 +34,7 @@ namespace hyecs
 		public:
 			size_t size() const { return m_size; }
 			byte* data() { return m_data.data(); }
+			const byte* data() const { return m_data.data(); }
 
 			sequence_ref<entity> entities()
 			{
@@ -77,6 +78,7 @@ namespace hyecs
 		//todo add allocator for vec?
 		vector<chunk*> m_chunks;
 		size_t m_chunk_capacity;
+		size_t m_entity_count;
 		uint32_t m_chunk_offset_bits;
 		table_index_t m_table_index;
 
@@ -178,15 +180,21 @@ namespace hyecs
 
 		table(const table& other) = delete;
 
-		table(table&& other) :
+		table(table&& other) noexcept :
 			m_allocator(std::move(other.m_allocator)),
 			m_notnull_components(std::move(other.m_notnull_components)),
 			m_chunks(std::move(other.m_chunks)),
 			m_chunk_capacity(std::move(other.m_chunk_capacity)),
+			m_chunk_offset_bits(std::move(other.m_chunk_offset_bits)),
+			m_table_index(std::move(other.m_table_index)),
 			m_free_indices(std::move(other.m_free_indices)),
-			m_free_chunks(std::move(other.m_free_chunks))
+			m_free_chunks(std::move(other.m_free_chunks)),
+			m_on_entity_add(std::move(other.m_on_entity_add)),
+			m_on_entity_remove(std::move(other.m_on_entity_remove)),
+			m_on_entity_move(std::move(other.m_on_entity_move))
 		{
 		}
+
 
 		void add_callback_on_entity_add(std::function<void(entity, storage_key)> callback)
 		{
@@ -329,6 +337,7 @@ namespace hyecs
 				if (chunk->size() == m_chunk_capacity)
 					m_free_chunks.push({chunk, chunk_index});
 				chunk->decrease_size(sorted_indices.size());
+				m_entity_count -= sorted_indices.size();
 
 				//todo swap / deallocate chunk
 
@@ -344,6 +353,11 @@ namespace hyecs
 
 	private:
 		static byte* component_address(chunk* chunk, uint32_t chunk_offset, uint32_t comp_offset, uint32_t comp_size)
+		{
+			return chunk->data() + comp_offset + chunk_offset * comp_size;
+		}
+
+		static const byte* component_address(const chunk* chunk, uint32_t chunk_offset, uint32_t comp_offset, uint32_t comp_size)
 		{
 			return chunk->data() + comp_offset + chunk_offset * comp_size;
 		}
@@ -797,6 +811,7 @@ namespace hyecs
 		auto get_allocate_accessor(sequence_cref<entity, SeqParam> entities, StorageKeyBuilder builder)
 		{
 			static_assert(std::is_invocable_v<StorageKeyBuilder, entity, storage_key>);
+			m_entity_count += entities.size();
 			return allocate_accessor(*this, entities, builder);
 		}
 
@@ -855,6 +870,19 @@ namespace hyecs
 			return deallocate_accessor(*this, entities_table_offsets);
 		}
 
+		size_t entity_count() const
+		{
+			ASSERTION_CODE(
+				size_t sum_size = 0;
+				for(auto chunk:m_chunks)
+				{
+				sum_size += chunk->size();
+				}
+				assert(sum_size == m_entity_count);
+			);
+			return m_entity_count;
+		}
+
 		//[[nodiscard]]
 		//table_offset_t emplace(entity e, sorted_sequence_ref<const generic::constructor> constructors)
 		//{
@@ -877,17 +905,17 @@ namespace hyecs
 		//}
 
 
-		void delete_entity(table_offset_t table_offset)
-		{
-			auto index = chunk_index_offset(table_offset);
-			m_free_indices.push(index);
-			auto chunk = m_chunks[index.chunk_index];
-			for (auto& type : m_notnull_components)
-			{
-				byte* data = component_address(chunk, index.chunk_offset, type);
-				type.destructor(data, 1);
-			}
-		}
+		// void delete_entity(table_offset_t table_offset)
+		// {
+		// 	auto index = chunk_index_offset(table_offset);
+		// 	m_free_indices.push(index);
+		// 	auto chunk = m_chunks[index.chunk_index];
+		// 	for (auto& type : m_notnull_components)
+		// 	{
+		// 		byte* data = component_address(chunk, index.chunk_offset, type);
+		// 		type.destructor(data, 1);
+		// 	}
+		// }
 
 	private:
 		//using Callable = std::function<void(entity, sequence_ref<void*>)>;
@@ -1045,6 +1073,10 @@ namespace hyecs
 
 			class iterator
 			{
+			public:
+				using value_type = entity;
+				using difference_type = std::ptrdiff_t;
+
 			protected:
 				chunk_seq::iterator m_chunk_iter;
 				chunk_seq::iterator m_chunk_end;
@@ -1170,6 +1202,179 @@ namespace hyecs
 		table_offset_accessor get_table_offsets()
 		{
 			return table_offset_accessor(this);
+		}
+
+
+		class chunk_accessor
+		{
+		public:
+			using chunk_seq = sequence_cref<chunk*>;
+
+		private:
+			const table* m_table;
+			sequence_cref<uint32_t> m_access_component_offsets;
+			sequence_cref<uint32_t> m_chunk_component_sizes;
+
+		public:
+			chunk_accessor(const table* table,
+			               const sequence_cref<uint32_t>& access_component_offsets,
+			               const sequence_cref<uint32_t>& chunk_component_sizes) :
+				m_table(table),
+				m_access_component_offsets(access_component_offsets),
+				m_chunk_component_sizes(chunk_component_sizes)
+			{
+			}
+
+			class chunk_iterator
+			{
+				chunk_seq::iterator m_chunk;
+				chunk_seq::iterator m_end_chunk;
+				sequence_cref<uint32_t> m_access_component_offsets;
+				sequence_cref<uint32_t> m_chunk_component_sizes;
+
+			public:
+				chunk_iterator(const chunk_seq& chunk_range,
+				               const sequence_cref<uint32_t>& access_component_offsets,
+				               const sequence_cref<uint32_t>& chunk_component_sizes) :
+					m_chunk(chunk_range.begin()),
+					m_end_chunk(chunk_range.end()),
+					m_access_component_offsets(access_component_offsets),
+					m_chunk_component_sizes(chunk_component_sizes)
+				{
+				}
+
+				chunk_iterator& operator++()
+				{
+					m_chunk++;
+					return *this;
+				}
+
+				void operator++(int) { ++(*this); }
+
+				bool operator==(const end_iterator&) const
+				{
+					return m_chunk == m_end_chunk;
+				}
+
+				bool operator!=(const end_iterator&) const
+				{
+					return !operator==(end_iterator{});
+				}
+
+
+				class iterator
+				{
+					chunk* m_chunk;
+					uint32_t m_offset;
+					sequence_cref<uint32_t> m_access_component_offsets;
+					sequence_cref<uint32_t> m_chunk_component_sizes;
+
+				public:
+					iterator(chunk* chunk,
+					         const sequence_cref<uint32_t>& access_component_offsets,
+					         const sequence_cref<uint32_t>& chunk_component_sizes) :
+						m_chunk(chunk),
+						m_offset(0),
+						m_access_component_offsets(access_component_offsets),
+						m_chunk_component_sizes(chunk_component_sizes)
+					{
+					}
+
+					iterator& operator++()
+					{
+						m_offset++;
+						return *this;
+					}
+
+					void operator++(int) { ++(*this); }
+
+					void addresses(sequence_ref<void*> addr)
+					{
+						for (uint32_t i = 0; i < m_access_component_offsets.size(); i++)
+						{
+							addr[i] = component_address(m_chunk, m_offset,
+							                            m_access_component_offsets[i],
+							                            m_chunk_component_sizes[i]);
+						}
+					}
+
+					bool operator==(const end_iterator&) const
+					{
+						return m_offset == m_chunk->size();
+					}
+
+					bool operator!=(const end_iterator&) const
+					{
+						return !operator==(end_iterator{});
+					}
+				};
+
+				iterator begin()
+				{
+					return {*m_chunk, m_access_component_offsets, m_chunk_component_sizes};
+				}
+
+				end_iterator end()
+				{
+					return end_iterator{};
+				}
+			};
+
+			chunk_iterator begin()
+			{
+				return {m_table->m_chunks, m_access_component_offsets, m_chunk_component_sizes};
+			}
+
+			end_iterator end()
+			{
+				return end_iterator{};
+			}
+
+			class distribute
+			{
+				chunk_accessor& m_accessor;
+				size_t distributed_count = 0;
+				size_t required_count = 0;
+				size_t average_count = 0;
+				size_t entity_count;
+				chunk_seq::iterator chunks_begin;
+				chunk_seq::iterator chunks_end;
+
+			public:
+				distribute(chunk_accessor& accessor, size_t iterator_count) :
+					m_accessor(accessor),
+					required_count(iterator_count)
+				{
+					entity_count = accessor.m_table->entity_count();
+					average_count = entity_count / required_count;
+					chunk_seq chunks = accessor.m_table->m_chunks;
+					chunks_begin = chunks.begin();
+					chunks_end = chunks.end();
+				}
+
+				chunk_iterator next() //todo need to improve the distribute alg
+				{
+					assert(distributed_count < required_count);
+					size_t work_load = 0;
+					auto begin = chunks_begin;
+					auto end = chunks_begin;
+					while (end != chunks_end)
+					{
+						work_load += (*end)->size();
+						end++;
+						if (work_load > average_count)
+							break;
+					}
+					distributed_count++;
+					return {{begin, end}, m_accessor.m_access_component_offsets, m_accessor.m_chunk_component_sizes};
+				}
+			};
+		};
+
+		chunk_accessor get_chunk_accessor(const sequence_cref<uint32_t>& access_component_offsets,
+		                                  const sequence_cref<uint32_t>& access_component_sizes)
+		{
+			return chunk_accessor(this, access_component_offsets, access_component_sizes);
 		}
 	};
 }

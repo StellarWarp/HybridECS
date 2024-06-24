@@ -171,12 +171,13 @@ namespace hyecs
 		const component_bit_set& component_mask() const { return m_component_mask; }
 		bool operator==(const archetype& other) const { return m_hash == other.m_hash; }
 		uint64_t hash() const { return m_hash; }
-		uint64_t excludsive_hash() const { return m_untag_hash; }
+		uint64_t untag_hash() const { return m_untag_hash; }
 		component_type_index operator[](size_t index) const { return m_component_types[index]; }
 		const component_type_index* begin() const { return m_component_types.data(); }
 		const component_type_index* end() const { return m_component_types.data() + m_component_types.size(); }
 		bool is_tag() const { return m_untag_hash != m_hash; }
 		size_t component_count() const { return m_component_types.size(); }
+		bool empty() const { return m_component_types.size() == 0; }
 		component_group_index group() const { return m_group; }
 
 		//size_t untag_component_count() const
@@ -200,12 +201,12 @@ namespace hyecs
 	public:
 		inline static const archetype empty_archetype;
 
-		archetype_index() : m_archetype(&empty_archetype) {}
+		archetype_index() : m_archetype(&empty_archetype) {};
 		archetype_index(const archetype& archetype) : m_archetype(&archetype) {}
 
 		const archetype& get_info() const { return *m_archetype; }
 		const uint64_t hash() const { return m_archetype->hash(); }
-		const uint64_t exclusive_hash() const { return m_archetype->excludsive_hash(); }
+		const uint64_t exclusive_hash() const { return m_archetype->untag_hash(); }
 		const uint64_t hash(append_component addition_components) const { return archetype::addition_hash(m_archetype->hash(), addition_components); }
 		const uint64_t hash(remove_component removal_components) const { return archetype::subtraction_hash(m_archetype->hash(), removal_components); }
 		bool is_tag() const { return m_archetype->is_tag(); }
@@ -216,17 +217,21 @@ namespace hyecs
 
 		bool operator==(const archetype_index& other) const
 		{
-			ASSERTION_CODE(
-				if (m_archetype != other.m_archetype && m_archetype != nullptr && other.m_archetype != nullptr)
-					assert(m_archetype->hash() != other.m_archetype->hash());//multiple location of same archetype
-			);
-			return m_archetype == other.m_archetype;
+			//ASSERTION_CODE(
+			//	if (m_archetype != other.m_archetype && m_archetype != nullptr && other.m_archetype != nullptr)
+			//		assert(m_archetype->hash() != other.m_archetype->hash());//multiple location of same archetype
+			//);
+			//return m_archetype == other.m_archetype;
+
+			//allow multiple location
+			return m_archetype->hash() == other.m_archetype->hash();
 		}
 
 		bool operator!=(const archetype_index& other) const { return m_archetype != other.m_archetype; }
 		auto begin() const { return m_archetype->begin(); }
 		auto end() const { return m_archetype->end(); }
 		uint32_t component_count() const { return m_archetype->component_count(); }
+		bool empty() const { return m_archetype->empty(); }
 
 		component_type_index operator[](size_t index) const { return (*m_archetype)[index]; }
 	};

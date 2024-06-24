@@ -1,8 +1,6 @@
 #pragma once
-#include "archetype.h"
 #include "table.h"
 #include "sparse_table.h"
-#include "entity.h"
 #include "storage_key_registry.h"
 
 namespace hyecs
@@ -73,6 +71,14 @@ namespace hyecs
 		archetype_index archetype() const
 		{
 			return m_index;
+		}
+
+		size_t entity_count() const
+		{
+			return std::visit([](auto& t)
+			{
+				return t.entity_count();
+			}, m_table);
 		}
 
 		const storage_key_registry::group_key_accessor& get_key_registry() const
@@ -262,7 +268,6 @@ namespace hyecs
 			auto table_ptr = std::make_unique<table>(std::move(std::get<table>(m_table)));
 			m_table.emplace<sparse_table>(sorted_sequence_cref(m_component_storages));
 			auto entities = table_ptr->get_entities();
-			auto entities_seq = entities;
 			auto src_accessor = table_ptr->get_raw_accessor();
 			auto dest_accessor = std::get<sparse_table>(m_table).get_allocate_accessor(
 				sequence_cref(entities),
@@ -350,6 +355,10 @@ namespace hyecs
 			std::variant<sparse_allocate_accessor, chunk_allocate_accessor> m_accessor;
 
 		public:
+			allocate_accessor()
+			{
+			};
+
 			allocate_accessor(sparse_allocate_accessor&& accessor)
 				: m_accessor(std::move(accessor))
 			{
@@ -489,16 +498,14 @@ namespace hyecs
 				using table_type = std::decay_t<decltype(t)>;
 				if constexpr (std::is_same_v<table_type, sparse_table>)
 				{
-					if (t.size() + entities.size() > sparse_to_chunk_convert_limit)
+					if (t.entity_count() + entities.size() > sparse_to_chunk_convert_limit)
 						sparse_convert_to_chunk();
 				}
 			}, m_table);
 
-			return std::visit([&](auto& t)
+			return std::visit([&]<typename table_type>(table_type& t)
 			{
-				using table_type = std::decay_t<decltype(t)>;
-
-				return std::move(allocate_accessor(t.get_allocate_accessor(entities, [this](entity e, storage_key s)
+				return allocate_accessor(t.get_allocate_accessor(entities, [this](entity e, storage_key s)
 				{
 					if constexpr (std::is_same_v<table_type, table>)
 					{
@@ -508,10 +515,9 @@ namespace hyecs
 					{
 						//todo
 					}
-				})));
+				}));
 			}, m_table);
 		}
-
 
 		void dynamic_for_each(sequence_cref<uint32_t> component_indices, std::function<void(entity, sequence_ref<void*>)> func)
 		{

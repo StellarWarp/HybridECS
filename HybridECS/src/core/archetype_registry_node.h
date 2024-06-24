@@ -56,7 +56,7 @@ namespace hyecs
 
 	using archetype_query_index = uint64_t;
 
-	archetype_query_index archetype_query_hash(archetype_index arch, const query_condition& tag_condition)
+	inline archetype_query_index archetype_query_hash(archetype_index arch, const query_condition& tag_condition)
 	{
 		return arch.hash() + tag_condition.hash();
 	}
@@ -128,26 +128,28 @@ namespace hyecs
 				[this](tag_archetype_node* node) { try_match(node); });
 		}
 
+		//construct instance archetype-query
 		archetype_query_node(
 			const archetype_query_node* superset,
 			const query_condition& tag_condition)
 			: m_base_archetype_node(superset->archetype_node()),
 			m_tag_condition(tag_condition),
-			m_type(full_set),
+			m_type(superset->type()),
 			m_is_isolated(false)
 		{
 			assert(!tag_condition.empty());
 			m_tag_archetype_nodes.reserve(superset->m_tag_archetype_nodes.size());
-			if (!tag_condition.match(m_base_archetype_node->archetype()))
-				m_type = partial_set;
+			//if (!tag_condition.match(m_base_archetype_node->archetype()))//what the fuck
+			//	m_type = partial_set;
 
-			for (auto& node : superset->m_tag_archetype_nodes)
+			for (auto& node : superset->m_tag_archetype_nodes)//try match each tag-arch in superset
 			{
 				if (tag_condition.match(node->archetype()))
 					m_tag_archetype_nodes.push_back(node);
 				else
 					m_type = partial_set;
 			}
+			//listen the tag-arch addition from superset
 			auto mut_superset = const_cast<archetype_query_node*>(superset);
 			mut_superset->m_notify_adding_tag_callbacks.emplace_back(
 				[this](tag_archetype_node* node)
@@ -174,6 +176,10 @@ namespace hyecs
 		void add_matched(tag_archetype_node* node)
 		{
 			m_tag_archetype_nodes.push_back(node);
+			ASSERTION_CODE(
+				if (m_base_archetype_node->archetype().empty())
+					assert(m_notify_adding_tag_callbacks.size() == 0);
+			);
 			for (auto& callback : m_notify_adding_tag_callbacks)
 				callback(node);
 			for (auto& callback : m_archetype_addition_callbacks)
@@ -262,12 +268,14 @@ namespace hyecs
 		query_condition tag_condition() const
 		{
 			if (m_type == untag) return query_condition();
+			else if (m_type == pure_tag) return m_condition;
 			return condition().tag_condition();
 		}
 
 		query_condition base_condition() const
 		{
 			if (m_type == untag) return m_condition;
+			else if (m_type == pure_tag) return query_condition();
 			return condition().base_condition();
 		}
 

@@ -44,7 +44,7 @@ namespace hyecs
 		}
 	};
 
-	static constexpr entity null_entity = entity();
+	inline constexpr entity null_entity = entity();
 
 	template<typename T>
 	struct is_entity : std::is_same<T, entity> {};
