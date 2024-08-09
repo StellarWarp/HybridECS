@@ -1,0 +1,6 @@
+[
+{
+  "directory": "C:\\Users\\Estelle\\source\\repos\\Delegate",
+  "arguments": ["C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\cl.exe", "/c", "/Zc:__cplusplus", "/nologo", "/O2", "/fp:fast", "/std:c++latest", "/EHsc", "/DNDEBUG", "/Fobuild\\.objs\\Delegate\\windows\\x64\\release\\src\\main.cpp.obj", "src\\main.cpp"],
+  "file": "src\\main.cpp"
+}]
