@@ -1,7 +1,6 @@
 #include <iostream>
 #include <memory>
-#include "delegate.h"
-
+#include "multicast_delegate.h"
 class Test
 {
 };
