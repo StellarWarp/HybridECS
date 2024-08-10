@@ -86,77 +86,139 @@ public:
     }
 };
 
-class reference_handler_interface
+template<typename Owner,typename Target>
+class bi_ref
+{
+    template<class U,class V>
+    friend class bi_ref;
+
+    Target* ptr = nullptr;
+    bi_ref<Target, Owner>* referencer;
+
+    void on_referencer_set(bi_ref<Target, Owner>* new_ref)
+    {
+        referencer = new_ref;
+        ptr = new_ref->owner;
+    }
+
+    void on_referencer_remove()
+    {
+        referencer = nullptr;
+        ptr = nullptr;
+    }
+
+public:
+    bi_ref() {}
+    bi_ref(bi_ref<Target, Owner>* ref) noexcept {bind(ref);}
+
+    bi_ref(const bi_ref&) = delete;
+
+    bi_ref(bi_ref&& other) noexcept
+        : ptr(other.ptr), owner(other.owner), referencer(other.referencer)
+    {
+        referencer->on_referencer_set(this);
+        other.on_referencer_remove();
+    }
+    bi_ref(Owner* new_owner, bi_ref&& other) noexcept
+    : ptr(other.ptr), owner(new_owner), referencer(other.referencer)
+    {
+        referencer->on_referencer_set(this);
+        other.on_referencer_remove();
+    }
+    bi_ref& operator=(bi_ref&& other) noexcept
+    {
+        if (this != &other)
+        {
+            if(referencer) referencer->on_referencer_remove();
+            ptr = other.ptr;
+            owner = other.owner;
+            referencer = other.referencer;
+            referencer->on_referencer_set(this);
+            other.on_referencer_remove();
+        }
+        return *this;
+    }
+
+    ~bi_ref()
+    {
+        if(referencer) referencer->on_referencer_remove();
+    }
+
+    void bind(bi_ref<Target, Owner>* ref)
+    {
+        on_referencer_set(ref);
+        ref->on_referencer_set(this);
+    }
+
+    void unbind()
+    {
+        referencer->on_referencer_remove();
+        on_referencer_remove();
+    }
+
+    Target* get() const { return ptr; }
+
+    void notify_owner_change(Owner* new_owner)
+    {
+        owner = new_owner;
+        referencer->ptr = new_owner;
+    }
+
+    operator bool() const
+    {
+        return ptr != nullptr;
+    }
+
+    bool operator==(auto* p) const{ return ptr == p; }
+
+};
+
+class referencer_base
+{
+protected:
+    friend class reference_handle;
+
+    void* ptr = nullptr;
+
+    void move_handel(reference_handle* old_handle, reference_handle* new_handle)
+    {
+        auto mem_shift = reinterpret_cast<size_t>(new_handle) - reinterpret_cast<size_t>(old_handle);
+        ptr = reinterpret_cast<void*>(reinterpret_cast<size_t>(ptr) + mem_shift);
+    }
+
+    void remove_handel(reference_handle* h)
+    {
+        ptr = nullptr;
+    }
+
+};
+
+class reference_handle
 {
     template<class T>
     friend
-    class reference_handler_base;
+    class referencer;
 
-protected:
-    virtual void move_handel(reference_handler_interface* old, reference_handler_interface* h) noexcept = 0;
-
-    virtual void remove_handel(reference_handler_interface* h) noexcept = 0;
-};
-
-template<typename Derived>
-class reference_handler_base : public reference_handler_interface
-{
-
-#ifndef NDEBUG
-    bool has_dereferenced = false;
-#endif
-public:
-    reference_handler_base() = default;
-
-    reference_handler_base(const reference_handler_base&) = delete;
-
-    reference_handler_base(reference_handler_base&& other) noexcept
-    {
-        static_cast<Derived*>(&other)->for_each_referencing([&](reference_handler_interface* h)
-                                                            {
-                                                                h->move_handel(&other, this);
-                                                            });
-    }
-
-
-    ~reference_handler_base() { assert(has_dereferenced); }
-
-protected:
-    void dereference() noexcept
-    {
-        static_cast<Derived*>(this)->for_each_referencing([&](reference_handler_interface* h)
-                                                          {
-                                                              h->remove_handel(this);
-                                                          });
-    }
-
-    void dereference_at_destory() noexcept
-    {
-#ifndef NDEBUG
-        has_dereferenced = true;
-#endif
-        static_cast<Derived*>(this)->for_each_referencing([&](reference_handler_interface* h)
-                                                          {
-                                                              h->remove_handel(this);
-                                                          });
-    }
-};
-
-class reference_handle : public reference_handler_base<reference_handle>
-{
-    friend class reference_handler_base<reference_handle>;
+    std::set<class referencer_base*> referencing{};
 
 public:
     reference_handle() = default;
 
     reference_handle(const reference_handle&) = delete;
 
-    reference_handle(reference_handle&& other) noexcept = default;
+    reference_handle(reference_handle&& other) noexcept
+    {
+        for (auto ref: other.referencing)
+            ref->move_handel(&other, this);
+    }
 
-    ~reference_handle() { dereference_at_destory(); }
+    ~reference_handle()
+    {
+        for (auto ref: referencing)
+            ref->remove_handel(this);
+    }
 
 private:
-    std::set<reference_handler_interface*> referencing{};
 
     template<typename Callable>
     void for_each_referencing(Callable&& func)
@@ -165,13 +227,13 @@ private:
             func(h);
     }
 
-    void move_handel(reference_handler_interface* old, reference_handler_interface* h) noexcept override
+    void move_handel(referencer_base* old, referencer_base* h) noexcept
     {
         referencing.erase(old);
         referencing.insert(h);
     }
 
-    void remove_handel(reference_handler_interface* h) noexcept override
+    void remove_handel(referencer_base* h) noexcept
     {
         referencing.erase(h);
     }
@@ -184,50 +246,43 @@ public:
     }
 };
 
-template<typename T> requires std::is_convertible_v<T*, reference_handle*>
-class referencer : public reference_handler_base<referencer<T>>
+template<typename T>
+class referencer : referencer_base
 {
-    using super = reference_handler_base<referencer<T>>;
-    friend super;
     T* ptr = nullptr;
 
-    template<class Callable>
-    void for_each_referencing(Callable&& func)
+    void remove_reference() noexcept
     {
-        if (ptr) func(static_cast<reference_handle*>(ptr));
+        if (ptr) static_cast<reference_handle*>(ptr)->remove_handel(this);
     }
 
-    void move_handel(reference_handler_interface* old, reference_handler_interface* h) noexcept override
+    void set_reference(T* obj) noexcept
     {
-        constexpr auto offset = reinterpret_cast<size_t>(static_cast<reference_handler_interface*>((T*) 0));
-        ptr = reinterpret_cast<T*>(reinterpret_cast<size_t>(h) - offset);
-    }
-
-    void remove_handel(reference_handler_interface* h) noexcept override
-    {
-        ptr = nullptr;
-    }
-
-    void bind(T* obj)
-    {
-        if (ptr) super::dereference();
-        ptr = obj;
         if (obj) static_cast<reference_handle*>(obj)->add_handel(this);
+        ptr = obj;
+    }
+
+    void bind(T* obj) noexcept
+    {
+        remove_reference();
+        set_reference();
     }
 
 public:
     referencer() = default;
 
-    referencer(T* obj) { bind(obj); }
+    referencer(T* obj) noexcept { set_reference(obj); }
 
-    referencer(const referencer& other)
+    referencer(const referencer& other) noexcept
     {
-        bind(other.ptr);
+        set_reference(other.ptr);
     }
 
-    referencer(referencer&& other) :
-            super(std::move(other)),
-            ptr(other.ptr) { other.ptr = nullptr; }
+    referencer(referencer&& other) noexcept: ptr(other.ptr)
+    {
+        if (ptr) static_cast<reference_handle*>(ptr)->move_handel(&other, this);
+        other.ptr = nullptr;
+    }
 
     referencer& operator=(const referencer& other) noexcept
     {
@@ -239,8 +294,10 @@ public:
     referencer& operator=(referencer&& other) noexcept
     {
         if (this == &other) return *this;
-        bind(other.ptr);
-        other.dereference();
+        remove_reference();
+        ptr = other.ptr;
+        if (ptr) static_cast<reference_handle*>(ptr)->move_handel(&other, this);
+        other.ptr = nullptr;
         return *this;
     }
 
@@ -250,7 +307,7 @@ public:
         return *this;
     }
 
-    ~referencer() { super::dereference_at_destory(); }
+    ~referencer() { remove_reference(); }
 
     T& operator*() { return *ptr; }
 
@@ -260,6 +317,5 @@ public:
 
     operator bool() const { return ptr != nullptr; }
 };
-
 
 
