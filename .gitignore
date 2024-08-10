@@ -2,8 +2,7 @@
 .xmake/
 build/
 .vscode/
-cmake-build-debug/
-cmake-build-release/
+cmake-build-*/
 .cache/
 .vs/
 debug/

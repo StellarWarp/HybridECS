@@ -13,11 +13,8 @@ set(CMAKE_CXX_COMPILER "C:/Program Files/Microsoft Visual Studio/2022/Community/
 add_executable(Delegate "")
 set_target_properties(Delegate PROPERTIES OUTPUT_NAME "Delegate")
 set_target_properties(Delegate PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/build/windows/x64/debug")
-target_compile_options(Delegate PRIVATE
-    $<$<COMPILE_LANGUAGE:CXX>:/Zc:__cplusplus>
-)
 if(MSVC)
-    target_compile_options(Delegate PRIVATE /EHsc)
+    target_compile_options(Delegate PRIVATE /EHsc /JMC)
 elseif(Clang)
     target_compile_options(Delegate PRIVATE -fexceptions)
     target_compile_options(Delegate PRIVATE -fcxx-exceptions)

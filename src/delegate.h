@@ -1,18 +1,8 @@
 #pragma once
 
-#include <vector>
-#include <concepts>
+#include "auto_reference.h"
 #include "function_traits.h"
-#include <set>
-#include <map>
-#include <assert.h>
-#include <ranges>
-
-
-template<auto...var>
-class var_list
-{
-};
+#include <concepts>
 
 
 template<typename Func>
@@ -51,7 +41,7 @@ public:
     void bind(T* obj, Ret(T::*mem_func)(Args...))
     {
         ptr = reinterpret_cast<generic_class*>(obj);
-        mem_fn = (mem_func_t) mem_fn;
+        mem_fn = (mem_func_t) mem_func;
     }
 
     template<typename T, typename Callable>
@@ -86,236 +76,100 @@ public:
     }
 };
 
-template<typename Owner,typename Target>
-class bi_ref
+
+template<typename Func>
+class auto_delegate;
+
+//reduce guide
+template<typename T_MemFunc>
+auto_delegate(typename function_traits<T_MemFunc>::class_type*,
+              T_MemFunc) -> auto_delegate<typename function_traits<T_MemFunc>::function_type>;
+
+template<typename Ret, typename... Args>
+class auto_delegate<Ret(Args...)>
 {
-    template<class U,class V>
-    friend class bi_ref;
-
-    Target* ptr = nullptr;
-    bi_ref<Target, Owner>* referencer;
-
-    void on_referencer_set(bi_ref<Target, Owner>* new_ref)
+    struct generic_class
     {
-        referencer = new_ref;
-        ptr = new_ref->owner;
-    }
-
-    void on_referencer_remove()
-    {
-        referencer = nullptr;
-        ptr = nullptr;
-    }
-
-public:
-    bi_ref() {}
-    bi_ref(bi_ref<Target, Owner>* ref) noexcept {bind(ref);}
-
-    bi_ref(const bi_ref&) = delete;
-
-    bi_ref(bi_ref&& other) noexcept
-        : ptr(other.ptr), owner(other.owner), referencer(other.referencer)
-    {
-        referencer->on_referencer_set(this);
-        other.on_referencer_remove();
-    }
-    bi_ref(Owner* new_owner, bi_ref&& other) noexcept
-    : ptr(other.ptr), owner(new_owner), referencer(other.referencer)
-    {
-        referencer->on_referencer_set(this);
-        other.on_referencer_remove();
-    }
-    bi_ref& operator=(bi_ref&& other) noexcept
-    {
-        if (this != &other)
+        template<typename T, typename Lambda>
+        Ret Invoker(Args... args)
         {
-            if(referencer) referencer->on_referencer_remove();
-            ptr = other.ptr;
-            owner = other.owner;
-            referencer = other.referencer;
-            referencer->on_referencer_set(this);
-            other.on_referencer_remove();
+            return std::decay_t<Lambda>{}(*reinterpret_cast<T*>(this), std::forward<Args>(args)...);
         }
-        return *this;
-    }
+    };
 
-    ~bi_ref()
+
+    using mem_func_t = Ret(generic_class::*)(Args...);
+
+    struct object_referencer : referencer_interface
     {
-        if(referencer) referencer->on_referencer_remove();
-    }
+        void notify_reference_removed(void* reference_handel_address) override {};
+        ref_handle<array_ref_protocol , true> handle;
 
-    void bind(bi_ref<Target, Owner>* ref)
-    {
-        on_referencer_set(ref);
-        ref->on_referencer_set(this);
-    }
+        template<class T>
+        void bind(T* obj)
+        {
+            if(obj == handle.cast<T>()) return;
+            auto charger = static_cast<array_ref_charger<false>*>(obj);
+            assert(charger == obj);
+            auto h = charger->new_bind_handle();
+            handle.bind(this, charger, h);
+            assert(h->get() == this);
+        }
 
-    void unbind()
-    {
-        referencer->on_referencer_remove();
-        on_referencer_remove();
-    }
+        void unbind() { handle.unbind(); }
 
-    Target* get() const { return ptr; }
+        operator bool() const { return handle; }
 
-    void notify_owner_change(Owner* new_owner)
-    {
-        owner = new_owner;
-        referencer->ptr = new_owner;
-    }
+        generic_class* get() { return handle.cast<generic_class>(); }
+    };
 
-    operator bool() const
-    {
-        return ptr != nullptr;
-    }
-
-    bool operator==(auto* p) const{ return ptr == p; }
-
-};
-
-class referencer_base
-{
-protected:
-    friend class reference_handle;
-
-    void* ptr = nullptr;
-
-    void move_handel(reference_handle* old_handle, reference_handle* new_handle)
-    {
-        auto mem_shift = reinterpret_cast<size_t>(new_handle) - reinterpret_cast<size_t>(old_handle);
-        ptr = reinterpret_cast<void*>(reinterpret_cast<size_t>(ptr) + mem_shift);
-    }
-
-    void remove_handel(reference_handle* h)
-    {
-        ptr = nullptr;
-    }
-
-};
-
-class reference_handle
-{
-    template<class T>
-    friend
-    class referencer;
-
-    std::set<class referencer_base*> referencing{};
+    object_referencer ptr;
+    mem_func_t mem_fn;
 
 public:
-    reference_handle() = default;
+    using function_type = Ret(Args...);
 
-    reference_handle(const reference_handle&) = delete;
+    auto_delegate() : ptr(), mem_fn(nullptr) {}
 
-    reference_handle(reference_handle&& other) noexcept
+    template<typename T>
+    auto_delegate(T* obj, Ret(T::*mem_fn)(Args...)) : ptr((generic_class*) obj), mem_fn((mem_func_t) mem_fn) {}
+
+    template<typename T>
+    void bind(T* obj, Ret(T::*mem_func)(Args...))
     {
-        for (auto ref: other.referencing)
-            ref->move_handel(&other, this);
+        ptr.bind(obj);
+        mem_fn = (mem_func_t) mem_func;
     }
 
-    ~reference_handle()
+    template<typename T, typename Callable>
+    requires std::is_empty_v<Callable>
+    void bind(T* obj, Callable&& func)
     {
-        for (auto ref: referencing)
-            ref->remove_handel(this);
+        ptr.bind(obj);
+        mem_fn = &generic_class::template Invoker<T, Callable>;
     }
-
-private:
 
     template<typename Callable>
-    void for_each_referencing(Callable&& func)
+    requires std::same_as<std::invoke_result_t<Callable, Args...>, Ret> &&
+             std::derived_from<std::decay_t<Callable>, array_ref_charger<false>>
+    void bind(Callable&& callable) requires std::is_lvalue_reference_v<Callable> || std::is_empty_v<Callable>
     {
-        for (auto h: referencing)
-            func(h);
+        if constexpr (std::is_empty_v<Callable>)
+            ptr.unbind();
+        else
+            ptr.bind(&callable);
+        mem_fn = (mem_func_t) &std::decay_t<Callable>::operator();
     }
 
-    void move_handel(referencer_base* old, referencer_base* h) noexcept
+    operator bool() const { return ptr; }
+
+    Ret invoke(Args... args)
     {
-        referencing.erase(old);
-        referencing.insert(h);
+        return (ptr.get()->*mem_fn)(std::forward<Args>(args)...);
     }
 
-    void remove_handel(referencer_base* h) noexcept
+    Ret operator()(Args... args)
     {
-        referencing.erase(h);
-    }
-
-public:
-    template<typename T>
-    void add_handel(T* obj)
-    {
-        referencing.insert(obj);
+        return invoke(std::forward<Args>(args)...);
     }
 };
-
-template<typename T>
-class referencer : referencer_base
-{
-    T* ptr = nullptr;
-
-    void remove_reference() noexcept
-    {
-        if (ptr) static_cast<reference_handle*>(ptr)->remove_handel(this);
-    }
-
-    void set_reference(T* obj) noexcept
-    {
-        if (obj) static_cast<reference_handle*>(obj)->add_handel(this);
-        ptr = obj;
-    }
-
-    void bind(T* obj) noexcept
-    {
-        remove_reference();
-        set_reference();
-    }
-
-public:
-    referencer() = default;
-
-    referencer(T* obj) noexcept { set_reference(obj); }
-
-    referencer(const referencer& other) noexcept
-    {
-        set_reference(other.ptr);
-    }
-
-    referencer(referencer&& other) noexcept: ptr(other.ptr)
-    {
-        if (ptr) static_cast<reference_handle*>(ptr)->move_handel(&other, this);
-        other.ptr = nullptr;
-    }
-
-    referencer& operator=(const referencer& other) noexcept
-    {
-        if (this == &other) return *this;
-        bind(other.ptr);
-        return *this;
-    }
-
-    referencer& operator=(referencer&& other) noexcept
-    {
-        if (this == &other) return *this;
-        remove_reference();
-        ptr = other.ptr;
-        if (ptr) static_cast<reference_handle*>(ptr)->move_handel(&other, this);
-        other.ptr = nullptr;
-        return *this;
-    }
-
-    referencer& operator=(T* obj) noexcept
-    {
-        bind(obj);
-        return *this;
-    }
-
-    ~referencer() { remove_reference(); }
-
-    T& operator*() { return *ptr; }
-
-    T* operator->() { return ptr; }
-
-    explicit operator T*() { return ptr; }
-
-    operator bool() const { return ptr != nullptr; }
-};
-
-

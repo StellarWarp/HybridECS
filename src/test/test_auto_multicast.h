@@ -1,0 +1,134 @@
+#pragma once
+
+#include "../multicast_delegate.h"
+#include <iostream>
+namespace test_auto_multicast_delegate
+{
+    struct type1
+    {
+        int value;
+    };
+
+#define ARG_LIST type1 t1, type1& t2, const type1 t1c, const type1& t2c
+#define ARG_LIST_FORWARD t1, std::ref(t2), std::forward<const type1>(t1c), std::cref(t2c)
+
+    struct A
+    {
+        multicast_auto_delegate<void(ARG_LIST)> event;
+        multicast_auto_delegate<int(ARG_LIST)> event_ret;
+    };
+
+    struct B : public array_ref_charger<false>
+    {
+        std::string name;
+        B(std::string name) : name(name) {}
+        void action(ARG_LIST) noexcept
+        {
+            std::cout << name << " call " << t1.value << " " << t2.value << " " << t1c.value << " " << t2c.value << std::endl;
+        }
+
+        int function(ARG_LIST) noexcept
+        {
+            std::cout << name << " call " << t1.value << " " << t2.value << " " << t1c.value << " " << t2c.value << std::endl;
+            return t1.value + t2.value + t1c.value + t2c.value;
+        }
+    };
+
+    void test()
+    {
+        A* a = new A();
+        auto b1 = new B("b1");
+        auto b2 = new B("b2");
+
+        a->event.bind(b1, &B::action);
+        a->event.bind(b2, [](auto&& b, ARG_LIST) { b.action(ARG_LIST_FORWARD); });
+
+        struct
+        {
+            type1 v1{1};
+            type1 v2{2};
+            type1 v3{3};
+        } params;
+
+        a->event.invoke(params.v1, params.v2, params.v1, params.v2);
+
+        auto temp = new B(std::move(*b1));
+        delete b1;
+        b1 = temp;
+
+        a->event.invoke(params.v1, params.v2, params.v1, params.v2);
+
+        delete b2;
+
+        a->event.invoke(params.v1, params.v2, params.v1, params.v2);
+
+        b2 = new B("new b2");
+
+        auto temp2 = new A(std::move(*a));
+        delete a;
+        a = temp2;
+
+        a->event_ret.bind(b1, &B::function);
+
+        a->event_ret.bind(b2, &B::function);
+
+        a->event_ret.invoke(params.v1, params.v2, params.v1, params.v2,
+                           [](auto&& results)
+                            {
+                                for (auto&& ret: results)
+                                {
+                                    std::cout << "result " << ret << std::endl;
+                                }
+                            });
+
+        std::cout << "delete b2" << std::endl;
+        delete b2;
+        a->event.invoke(params.v1, params.v2, params.v1, params.v2);
+        a->event_ret.invoke(params.v1, params.v2, params.v1, params.v2,
+                            [](auto&& results)
+                            {
+                                for (auto&& ret: results)
+                                {
+                                    printf("%d\n", ret);
+                                }
+                            });
+
+        std::cout << "delete b1" << std::endl;
+        delete b1;
+        a->event.invoke(params.v1, params.v2, params.v1, params.v2);
+        a->event_ret.invoke(params.v1, params.v2, params.v1, params.v2,
+                            [](auto&& results)
+                            {
+                                for (auto&& ret: results)
+                                {
+                                    printf("%d\n", ret);
+                                }
+                            });
+        b1 = new B("new b1");
+        b2 = new B("new b2");
+        a->event_ret.bind(b1, &B::function);
+        a->event_ret.bind(b1, &B::function);
+        a->event_ret.bind(b1, &B::function);
+        a->event_ret.bind(b1, &B::function);
+        a->event_ret.bind(b1, &B::function);
+        a->event_ret.bind(b1, &B::function);
+        a->event_ret.bind(b1, &B::function);
+        a->event_ret.bind(b1, &B::function);
+        a->event_ret.bind(b2, &B::function);
+        a->event_ret.invoke(params.v1, params.v2, params.v1, params.v2,
+                            [](auto&& results)
+                            {
+                                for (auto&& ret: results)
+                                {
+                                    printf("%d\n", ret);
+                                }
+                            });
+        delete b1;
+        delete a;
+        delete b2;
+
+    }
+
+#undef ARG_LIST
+#undef ARG_LIST_FORWARD
+}

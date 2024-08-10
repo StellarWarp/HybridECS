@@ -1,7 +1,7 @@
 local function apply_msvc_flags(target)
     for _, toolchain in ipairs(target:toolchains()) do
         if toolchain:name() == "msvc" then
-            toolchain:add("cxxflags", "/Zc:__cplusplus")
+            toolchain:add("cxxflags", "/Zc:__cplusplus", "/JMC")
         end
     end
 end
@@ -15,7 +15,7 @@ target("Delegate")
     set_kind("binary")
     add_files("src/*.cpp")
 
-    on_load(apply_msvc_flags)
+    --on_load(apply_msvc_flags)
 
 --
 -- If you want to known more usage about xmake, please see https://xmake.io
