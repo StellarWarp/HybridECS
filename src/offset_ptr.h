@@ -26,7 +26,7 @@ protected:
     int64_t offset;
     offset_ptr_generic(void* ptr, int64_t offset): ptr(ptr),offset(offset){}
 public:
-    offset_ptr_generic() : ptr(nullptr) {}
+    offset_ptr_generic() : ptr(nullptr), offset(0) {}
 
     void* get() { return ptr; }
 

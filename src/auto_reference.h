@@ -488,7 +488,7 @@ class array_ref_charger : public referencer_interface
         AppendingData data;
 
         template<typename... Args>
-        explicit element_non_void(Args&& ... args) : handle(std::forward<Args>(args)...) {}
+        explicit element_non_void(Args&& ... args) : handle(std::forward<Args>(args)...), data() {}
     };
 
     using element_t = std::conditional_t<std::is_same_v<AppendingData, void>, element_void, element_non_void>;

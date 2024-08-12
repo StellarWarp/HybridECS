@@ -59,7 +59,7 @@ public:
 
 	public:
 		iterator(std::vector<delegate_object>& vec)
-			: it(vec.begin()), end_it(vec.end()){}
+			: it(vec.begin()), end_it(vec.end()) {}
 
 		void operator++() { ++it; }
 
@@ -86,76 +86,60 @@ template<typename Func, template<typename> typename DelegateContainer = default_
 class multicast_delegate;
 
 template<template<typename> typename DelegateContainer, typename Ret, typename... Args>
-requires (!std::is_rvalue_reference_v<Args> && ...)
+	requires (!std::is_rvalue_reference_v<Args> && ...)
 
 class multicast_delegate<Ret(Args...), DelegateContainer>
 {
-    struct generic_class
-    {
-        template<typename T, typename Lambda>
-        Ret Invoker(Args... args)
-        {
-            return std::decay_t<Lambda>{}(*reinterpret_cast<T*>(this), std::forward<Args>(args)...);
-        }
-    };
+	struct generic_class
+	{
+		template<typename T, typename Lambda>
+		Ret Invoker(Args... args)
+		{
+			return std::decay_t<Lambda>{}(*reinterpret_cast<T*>(this), std::forward<Args>(args)...);
+		}
+	};
 
-    using mem_func_t = Ret(generic_class::*)(Args...);
+	using mem_func_t = Ret(generic_class::*)(Args...);
 
-    using object_container_t = DelegateContainer<mem_func_t>;
+	using object_container_t = DelegateContainer<mem_func_t>;
 
-    object_container_t referencing;
-
-    static Ret invoke_single(const auto& ptr, mem_func_t mem_fn, Args... args)
-    {
-        generic_class* c;
-        if constexpr (requires { static_cast<generic_class*>(ptr); })
-            c = static_cast<generic_class*>(ptr);
-        else if constexpr (requires { ptr.get(); })
-            c = reinterpret_cast<generic_class*>(ptr.get());
-        else if constexpr (requires { ptr.lock().get(); })
-        {
-            return (reinterpret_cast<generic_class*>(ptr.lock().get())
-                    ->*mem_fn)(std::forward<Args>(args)...);
-        } else
-            static_assert(!std::same_as<int, int>);
-        return (c->*mem_fn)(std::forward<Args>(args)...);
-    }
+	object_container_t referencing;
 
 public:
-    multicast_delegate() = default;
+	multicast_delegate() = default;
 
-    multicast_delegate(const multicast_delegate&) = delete;
+	multicast_delegate(const multicast_delegate&) = delete;
 
-    multicast_delegate(multicast_delegate&& other) noexcept = default;
+	multicast_delegate(multicast_delegate&& other) noexcept = default;
 
 public:
 
-    template<typename T, typename T_ptr>
-    requires std::same_as<typename std::pointer_traits<T_ptr>::element_type, T>
-    void bind(const T_ptr& obj, Ret(T::*mem_func)(Args...))
-    {
-        auto& fn = referencing.bind(obj);
-        fn = (mem_func_t) mem_func;
-    }
+	template<typename T, typename T_ptr>
+		requires std::same_as<typename std::pointer_traits<T_ptr>::element_type, T>
+	void bind(const T_ptr& obj, Ret(T::* mem_func)(Args...))
+	{
+		auto& fn = referencing.bind(obj);
+		fn = (mem_func_t)mem_func;
+	}
 
-    template<typename T_ptr, typename Callable>
-    requires std::is_empty_v<Callable>
-    void bind(const T_ptr& obj, Callable&& func)
-    {
-        using T = typename std::pointer_traits<T_ptr>::element_type;
-        auto& fn = referencing.bind(obj);
-        fn = &generic_class::template Invoker<T, Callable>;
-    }
+	template<typename T_ptr, typename Callable>
+		requires std::is_empty_v<Callable>
+	void bind(const T_ptr& obj, Callable&& func)
+	{
+		using T = typename std::pointer_traits<T_ptr>::element_type;
+		auto& fn = referencing.bind(obj);
+		fn = &generic_class::template Invoker<T, Callable>;
+	}
 
-    template<typename T_ptr>
-    void
-    bind(const T_ptr& callable)requires std::same_as<std::invoke_result_t<std::decay_t<decltype(*callable)>, Args...>, Ret>
-    {
-        auto& fn = referencing.bind(callable);
-        fn = (mem_func_t) &std::decay_t<decltype(*callable)>::operator();
-    }
+	template<typename T_ptr>
+	void
+		bind(const T_ptr& callable)requires std::same_as<std::invoke_result_t<std::decay_t<decltype(*callable)>, Args...>, Ret>
+	{
+		auto& fn = referencing.bind(callable);
+		fn = (mem_func_t)&std::decay_t<decltype(*callable)>::operator();
+	}
 
-    //unable to unbind from nullptr so not support for static function bind
+	//unable to unbind from nullptr so not support for static function bind
 //    template<typename Callable>
 //    void bind(Callable&& callable)
 //    requires std::same_as<std::invoke_result_t<std::decay_t<Callable>, Args...>, Ret>
@@ -165,91 +149,112 @@ public:
 //        fn = (mem_func_t) &std::decay_t<Callable>::operator();
 //    }
 
-    template<typename T_ptr>
-    void unbind(const T_ptr& obj) requires requires{ typename std::pointer_traits<T_ptr>; }
-    {
-        referencing.unbind(obj);
-    }
-
-
-    //no need to forward as the parameters types are already defined
-    void invoke(Args... args) requires std::same_as<Ret, void>
-    {
-        for (auto [obj, mem_fn]: referencing)
-        {
-            invoke_single(obj, mem_fn, std::forward<Args>(args)...);
-        }
-    }
-
-    void operator()(Args... args) requires std::same_as<Ret, void>
-    {
-        invoke(std::forward<Args>(args)...);
-    }
+	template<typename T_ptr>
+	void unbind(const T_ptr& obj) requires requires{ typename std::pointer_traits<T_ptr>; }
+	{
+		referencing.unbind(obj);
+	}
 
 private:
-    class iterable
-    {
-        using object_iterator_t = object_container_t::iterator;
-        using sentinel_t = decltype(std::declval<object_container_t&>().end());
-        const object_iterator_t begin_it;
-        const sentinel_t end_it;
-        const std::tuple<Args&& ...> args_tuple;
-    public:
-        explicit iterable(object_container_t& objects, Args... args) :
-                begin_it(objects.begin()), end_it(objects.end()),
-                args_tuple(std::forward_as_tuple(std::forward<Args>(args)...)) {}
+	static Ret invoke_single(const auto& ptr, mem_func_t mem_fn, Args... args)
+	{
+		generic_class* c;
+		if constexpr (requires { static_cast<generic_class*>(ptr); })
+			c = static_cast<generic_class*>(ptr);
+		else if constexpr (requires { ptr.get(); })
+			c = reinterpret_cast<generic_class*>(ptr.get());
+		else if constexpr (requires { ptr.lock().get(); })
+		{
+			return (reinterpret_cast<generic_class*>(ptr.lock().get())
+				->*mem_fn)(std::forward<Args>(args)...);
+		}
+		else
+			static_assert(!std::same_as<int, int>);
+		//union 
+		//{
+		//	mem_func_t fn;
+		//	void* mem_fn_address;
+		//}u;
+		//u.fn = mem_fn;
+		//std::cout << "ptr " << c << " mem_fn " << u.mem_fn_address << std::endl;
+		return (c->*mem_fn)(std::forward<Args>(args)...);
+	}
 
-        class iterator
-        {
-        public:
-            using iterator_category = std::input_iterator_tag;
-            using difference_type = std::ptrdiff_t;
-            using value_type = Ret;
-            using pointer = Ret*;
-            using reference = Ret&;
-        private:
-            const iterable* info;
-            object_iterator_t it;
-        public:
-            iterator(const iterable& info) : info(&info), it(info.begin_it) {}
+public:
+	//no need to forward as the parameters types are already defined
+	void invoke(Args... args) requires std::same_as<Ret, void>
+	{
+		for (auto [obj, mem_fn] : referencing)
+		{
+			invoke_single(obj, mem_fn, std::forward<Args>(args)...);
+		}
+	}
 
-            Ret operator*()
-            {
-                return []<size_t... I>(auto && invoke_info,
-										const std::tuple<Args && ...>& args,
-                                        std::integer_sequence<std::size_t, I...>)
-                {
-                    return [](auto && invoke_info, Args&& ... args)
-                    {
-						auto [obj, mem_fn] = invoke_info;
-                        return invoke_single(obj, mem_fn, std::forward<Args>(args)...);
-                    }(std::move(invoke_info), std::forward<Args>(std::get<I>(args))...);
-				}(std::move(*it), info->args_tuple, std::make_index_sequence<sizeof...(Args)>{});
-            }
+	void operator()(Args... args) requires std::same_as<Ret, void>
+	{
+		invoke(std::forward<Args>(args)...);
+	}
 
-            void operator++() { ++it; }
+private:
+	template<typename Invoker>
+	class iterable
+	{
+		using object_iterator_t = object_container_t::iterator;
+		using sentinel_t = decltype(std::declval<object_container_t&>().end());
+		const object_iterator_t begin_it;
+		const sentinel_t end_it;
+		Invoker invoker;
+	public:
+		explicit iterable(object_container_t& objects, Invoker invoker) :
+			begin_it(objects.begin()), end_it(objects.end()),
+			Invoker(std::forward<Invoker>(invoker)) {}
 
-            void operator++(int) { operator++(); }
+		class iterator
+		{
+		public:
+			using iterator_category = std::input_iterator_tag;
+			using difference_type = std::ptrdiff_t;
+			using value_type = Ret;
+			using pointer = Ret*;
+			using reference = Ret&;
+		private:
+			iterable* info;
+			object_iterator_t it;
+		public:
+			iterator(const iterable& info) : info(&info), it(info.begin_it) {}
 
-            bool operator==(std::default_sentinel_t)
-            {
-                return it == info->end_it;
-            }
-        };
+			Ret operator*()
+			{
+				return invoker(*it);
+			}
 
-        iterator begin() { return iterator(*this); }
+			void operator++() { ++it; }
+
+			void operator++(int) { operator++(); }
+
+			bool operator==(std::default_sentinel_t)
+			{
+				return it == info->end_it;
+			}
+		};
+
+		iterator begin() { return iterator(*this); }
 
 		std::default_sentinel_t end() { return {}; }
-    };
+	};
 
 public:
 
-    template<typename Callable>
-    requires (!std::same_as<Ret, void>)
-    void invoke(Args... args, Callable&& result_proc)
-    {
-        result_proc(iterable(referencing, std::forward<Args>(args)...));
-    }
+	template<typename Callable>
+		requires (!std::same_as<Ret, void>)
+	void invoke(Args... args, Callable&& result_proc)
+	{
+		result_proc(iterable(referencing, [args..., result_proc](auto&& invoke_info) {
+			auto [obj, mem_fn] = invoke_info;
+			return invoke_single(obj, mem_fn, std::forward<Args>(args)...);
+		}
+		));
+	}
 };
 
 template<typename Func>
@@ -265,97 +270,97 @@ template<typename MemFunc>
 class weak_delegate_container
 {
 
-    struct delegate_object
-    {
-        std::weak_ptr<void> ptr;
-        MemFunc mem_fn;
-    };
+	struct delegate_object
+	{
+		std::weak_ptr<void> ptr;
+		MemFunc mem_fn;
+	};
 
-    std::vector<delegate_object> objects;
+	std::vector<delegate_object> objects;
 
-    template<typename T, typename U>
-    inline bool equals(const std::weak_ptr<T>& t, const std::weak_ptr<U>& u)
-    {
-        return !t.owner_before(u) && !u.owner_before(t);
-    }
+	template<typename T, typename U>
+	inline bool equals(const std::weak_ptr<T>& t, const std::weak_ptr<U>& u)
+	{
+		return !t.owner_before(u) && !u.owner_before(t);
+	}
 
 public:
 
-    //    template<class T>
-    MemFunc& bind(const std::weak_ptr<void>& obj)
-    {
-        auto& res = objects.emplace_back(obj, nullptr);
-        return res.mem_fn;
-    }
-//    MemFunc& bind(nullptr_t)
-//    {
-//        auto&res = objects.emplace_back({}, nullptr);
-//        return res.mem_fn;
-//    }
+	//    template<class T>
+	MemFunc& bind(const std::weak_ptr<void>& obj)
+	{
+		auto& res = objects.emplace_back(obj, nullptr);
+		return res.mem_fn;
+	}
+	//    MemFunc& bind(nullptr_t)
+	//    {
+	//        auto&res = objects.emplace_back({}, nullptr);
+	//        return res.mem_fn;
+	//    }
 
-    void unbind(const std::weak_ptr<void>& obj)
-    {
-        for (int i = 0; i < objects.size(); ++i)
-        {
-            if (equals(objects[i].ptr, obj))
-            {
-                objects[i] = std::move(objects.back());
-                objects.pop_back();
-                return;
-            }
-        }
-        assert(false);
-    }
+	void unbind(const std::weak_ptr<void>& obj)
+	{
+		for (int i = 0; i < objects.size(); ++i)
+		{
+			if (equals(objects[i].ptr, obj))
+			{
+				objects[i] = std::move(objects.back());
+				objects.pop_back();
+				return;
+			}
+		}
+		assert(false);
+	}
 
-    class iterator
-    {
-    public:
-        using iterator_category = std::input_iterator_tag;
-        using value_type = std::tuple<const std::weak_ptr<void>&, MemFunc>;
-        using difference_type = std::ptrdiff_t;
-        using pointer = value_type*;
-        using reference = value_type&;
-    private:
-        std::vector<delegate_object>::iterator it;
-        std::vector<delegate_object>::iterator end_it;
-        std::vector<delegate_object>& vec;
+	class iterator
+	{
+	public:
+		using iterator_category = std::input_iterator_tag;
+		using value_type = std::tuple<const std::weak_ptr<void>&, MemFunc>;
+		using difference_type = std::ptrdiff_t;
+		using pointer = value_type*;
+		using reference = value_type&;
+	private:
+		std::vector<delegate_object>::iterator it;
+		std::vector<delegate_object>::iterator end_it;
+		std::vector<delegate_object>& vec;
 
-    public:
-        iterator(std::vector<delegate_object>& vec)
-                : it(vec.begin()), end_it(vec.end()), vec(vec) {}
+	public:
+		iterator(std::vector<delegate_object>& vec)
+			: it(vec.begin()), end_it(vec.end()), vec(vec) {}
 
-        void operator++() { ++it; }
+		void operator++() { ++it; }
 
-        void operator++(int) { operator++(); }
+		void operator++(int) { operator++(); }
 
-        value_type operator*() { return value_type(it->ptr, it->mem_fn); }
+		value_type operator*() { return value_type(it->ptr, it->mem_fn); }
 
-        bool operator==(const iterator& other) { return it == other.it; }
+		bool operator==(const iterator& other) { return it == other.it; }
 
-        bool operator==(nullptr_t)
-        {
-            if (it == end_it)
-            {
-                vec.resize(end_it - vec.begin());
-                return true;
-            }
-            while (it->ptr.expired())
-            {
-                end_it--;
-                if (it == end_it)
-                {
-                    vec.resize(end_it - vec.begin());
-                    return true;
-                }
-                *it = *end_it;
-            }
-            return false;
-        }
-    };
+		bool operator==(nullptr_t)
+		{
+			if (it == end_it)
+			{
+				vec.resize(end_it - vec.begin());
+				return true;
+			}
+			while (it->ptr.expired())
+			{
+				end_it--;
+				if (it == end_it)
+				{
+					vec.resize(end_it - vec.begin());
+					return true;
+				}
+				*it = *end_it;
+			}
+			return false;
+		}
+	};
 
-    iterator begin() { return iterator(objects); }
+	iterator begin() { return iterator(objects); }
 
-    nullptr_t end() { return {}; }
+	nullptr_t end() { return {}; }
 };
 
 template<typename Func>

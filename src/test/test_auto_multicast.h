@@ -74,25 +74,23 @@ namespace test_auto_multicast_delegate
 
         a->event.invoke(params.v1, params.v2, params.v1, params.v2);
 
-        auto temp = new B(std::move(*b1));
-        delete b1;
-        b1 = temp;
+        //auto temp = new B(std::move(*b1));
+        //delete b1;
+        //b1 = temp;
 
         a->event.invoke(params.v1, params.v2, params.v1, params.v2);
 
-        delete b2;
+        //delete b2;
 
         a->event.invoke(params.v1, params.v2, params.v1, params.v2);
 
-        b2 = new B("new b2");
+        //b2 = new B("new b2");
 
-        auto temp2 = new A(std::move(*a));
-        delete a;
-        a = temp2;
+        //auto temp2 = new A(std::move(*a));
+        //delete a;
+        //a = temp2;
 
 		a->event.invoke(params.v1, params.v2, params.v1, params.v2);
-
-		std::cout << a;
 		
         a->event_ret.bind(b1, &B::function);
 
@@ -157,10 +155,10 @@ namespace test_auto_multicast_delegate
 
         a = new A();
         unique_reference c = new reference_reflector<C>("c");
-		reference_reflector<C>;
+		/*reference_reflector<C>;
 		std::cout << intptr_t((C*)(reference_reflector<C>*)0xFFFFFFFF) - intptr_t((reference_reflector<C>*)0xFFFFFFFF) << std::endl;
 		std::cout << intptr_t((C*)(reference_reflector<C>*)c.get()) - intptr_t((reference_reflector<C>*)c.get()) << std::endl;
-		std::cout << intptr_t((extern_reflector_generic_object_t*)(reference_reflector<extern_reflector_generic_object_t>*)0xFFFFFFFF) - intptr_t((reference_reflector<extern_reflector_generic_object_t>*)0xFFFFFFFF) << std::endl;
+		std::cout << intptr_t((extern_reflector_generic_object_t*)(reference_reflector<extern_reflector_generic_object_t>*)0xFFFFFFFF) - intptr_t((reference_reflector<extern_reflector_generic_object_t>*)0xFFFFFFFF) << std::endl;*/
 
 
         a->event_ref.bind(c, &C::action);
