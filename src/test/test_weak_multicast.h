@@ -22,25 +22,38 @@ namespace test_weak_multicast_delegate
     {
         void action(ARG_LIST) noexcept
         {
-            printf("call %d %d %d %d\n", t1.value, t2.value, t1c.value, t2c.value);
+            std::cout << "call action" << t1.value << " " << t2.value << " " << t1c.value << " " << t2c.value << std::endl;
         }
 
         int function(ARG_LIST) noexcept
         {
-            printf("call %d %d %d %d\n", t1.value, t2.value, t1c.value, t2c.value);
+            std::cout << "call function" << t1.value << " " << t2.value << " " << t1c.value << " " << t2c.value << std::endl;
             return t1.value + t2.value + t1c.value + t2c.value;
             return 0;
         }
     };
 
-    void test_func2()
+    void test()
     {
+		std::cout << "test_weak_multicast_delegate" << std::endl;
+
         A2 a2;
-        auto b = std::make_shared<B2>();
+        std::vector<std::shared_ptr<B2>> bs;
+        for (int i = 0; i < 10; ++i)
+        {
+            auto b = std::make_shared<B2>();
+            bs.push_back(b);
+        }
 
+        std::cout <<"normal bind" << std::endl;
 
-        a2.event.bind(b,&B2::action);
-        a2.event.bind(b, [](auto&& b, ARG_LIST) { b.action(ARG_LIST_FORWARD); });
+        for (auto b: bs)
+            a2.event.bind(b, &B2::action);
+        for (auto b: bs)
+            a2.event.bind(b, [](auto&& b, ARG_LIST) { b.action(ARG_LIST_FORWARD); });
+        for (auto b: bs)
+            a2.event_ret.bind(b, &B2::function);
+
         struct
         {
             type1 v1{1};
@@ -48,19 +61,31 @@ namespace test_weak_multicast_delegate
             type1 v3{3};
         } params;
         a2.event.invoke(params.v1, params.v2, params.v1, params.v2);
-        a2.event_ret.bind(b, &B2::function);
-        {
-            auto b2 = std::make_shared<B2>();
-            a2.event_ret.bind(b2, &B2::function);
-        }
         a2.event_ret.invoke(params.v1, params.v2, params.v1, params.v2,
                             [](auto&& results)
                             {
                                 for (auto&& ret: results)
-                                {
-                                    printf("%d\n", ret);
-                                }
+                                    std::cout << ret << std::endl;
                             });
+        //random remove
+        for(int i = 0; i < 5; ++i)
+        {
+            int idx = rand() % bs.size();
+            bs.erase(bs.begin() + idx);
+        }
+        std::cout <<"after remove" << std::endl;
+
+
+        a2.event.invoke(params.v1, params.v2, params.v1, params.v2);
+        a2.event_ret.invoke(params.v1, params.v2, params.v1, params.v2,
+                            [](auto&& results)
+                            {
+                                for (auto&& ret: results)
+                                    std::cout << ret << std::endl;
+                            });
+
+
+
     }
 
 #undef ARG_LIST

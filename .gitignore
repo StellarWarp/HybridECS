@@ -5,6 +5,7 @@ build/
 cmake-build-*/
 .cache/
 .vs/
+vs2022/
 debug/
 out/
 

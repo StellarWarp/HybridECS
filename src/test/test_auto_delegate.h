@@ -20,9 +20,11 @@ namespace test_auto_delegate
     struct A
     {
         auto_delegate<int(ARG_LIST)> event_ret;
+        weak_delegate<int(ARG_LIST)> event_weak;
+        shared_delegate<int(ARG_LIST)> event_shared;
     };
 
-    struct B : public array_ref_charger<false>
+    struct B : public generic_ref_reflector
     {
         std::string name;
 
@@ -47,8 +49,12 @@ namespace test_auto_delegate
 
     void test()
     {
+		std::cout << "test auto delegate" << std::endl;
+
         A* a = new A();
         auto b1 = new B("b1");
+
+//        weak_reference<generic_ref_reflector,generic_ref_reflector> r = b1;
 
         struct
         {
@@ -81,13 +87,37 @@ namespace test_auto_delegate
 
         a->event_ret.invoke(PARAM_LIST);
 
-        a->event_ret.bind(*b2);
+        a->event_ret.bind(b2);
         a->event_ret.invoke(PARAM_LIST);
 
         delete a;
         delete b2;
 
+        a = new A();
+        auto bw1 = std::make_shared<B>("bw1");
+        a->event_weak.bind(bw1, &B::function);
+        a->event_weak.invoke(PARAM_LIST);
+        a->event_weak.bind(bw1, [](auto&& b, ARG_LIST) { return b.function(ARG_LIST_FORWARD); });
+        a->event_weak.invoke(PARAM_LIST);
+        a->event_weak.bind(bw1);
+        a->event_weak.invoke(PARAM_LIST);
+        a->event_weak.bind([](ARG_LIST) {
+            std::cout << "call pure function lambda" << std::endl;
+            return 0; });
+        a->event_weak.invoke(PARAM_LIST);
 
+        a->event_shared.bind(bw1, &B::function);
+        a->event_shared.invoke(PARAM_LIST);
+        a->event_shared.bind(bw1, [](auto&& b, ARG_LIST) { return b.function(ARG_LIST_FORWARD); });
+        a->event_shared.invoke(PARAM_LIST);
+        a->event_shared.bind(bw1);
+        a->event_shared.invoke(PARAM_LIST);
+        a->event_shared.bind([](ARG_LIST) {
+            std::cout << "call pure function lambda" << std::endl;
+            return 0; });
+        a->event_shared.invoke(PARAM_LIST);
+
+        delete a;
     }
 
 #undef ARG_LIST

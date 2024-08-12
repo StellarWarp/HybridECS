@@ -15,10 +15,11 @@ namespace test_auto_multicast_delegate
     struct A
     {
         multicast_auto_delegate<void(ARG_LIST)> event;
-        multicast_auto_delegate<int(ARG_LIST)> event_ret;
+        multicast_delegate<int(ARG_LIST)> event_ret;
+        multicast_auto_delegate_extern_ref<void(ARG_LIST)> event_ref;
     };
 
-    struct B : public array_ref_charger<false>
+    struct B : public generic_ref_reflector
     {
         std::string name;
         B(std::string name) : name(name) {}
@@ -34,11 +35,32 @@ namespace test_auto_multicast_delegate
         }
     };
 
+    struct C
+    {
+        std::string name;
+        C(std::string name) : name(name) {}
+        void action(ARG_LIST) noexcept
+        {
+            std::cout << name << " call " << t1.value << " " << t2.value << " " << t1c.value << " " << t2c.value << std::endl;
+        }
+
+        int function(ARG_LIST) noexcept
+        {
+            std::cout << name << " call " << t1.value << " " << t2.value << " " << t1c.value << " " << t2c.value << std::endl;
+            return t1.value + t2.value + t1c.value + t2c.value;
+        }
+    };
+
+
     void test()
     {
+		std::cout << "test_auto_multicast_delegate" << std::endl;
+
         A* a = new A();
         auto b1 = new B("b1");
         auto b2 = new B("b2");
+
+
 
         a->event.bind(b1, &B::action);
         a->event.bind(b2, [](auto&& b, ARG_LIST) { b.action(ARG_LIST_FORWARD); });
@@ -68,6 +90,10 @@ namespace test_auto_multicast_delegate
         delete a;
         a = temp2;
 
+		a->event.invoke(params.v1, params.v2, params.v1, params.v2);
+
+		std::cout << a;
+		
         a->event_ret.bind(b1, &B::function);
 
         a->event_ret.bind(b2, &B::function);
@@ -80,6 +106,8 @@ namespace test_auto_multicast_delegate
                                     std::cout << "result " << ret << std::endl;
                                 }
                             });
+
+		return;
 
         std::cout << "delete b2" << std::endl;
         delete b2;
@@ -126,6 +154,20 @@ namespace test_auto_multicast_delegate
         delete b1;
         delete a;
         delete b2;
+
+        a = new A();
+        unique_reference c = new reference_reflector<C>("c");
+		reference_reflector<C>;
+		std::cout << intptr_t((C*)(reference_reflector<C>*)0xFFFFFFFF) - intptr_t((reference_reflector<C>*)0xFFFFFFFF) << std::endl;
+		std::cout << intptr_t((C*)(reference_reflector<C>*)c.get()) - intptr_t((reference_reflector<C>*)c.get()) << std::endl;
+		std::cout << intptr_t((extern_reflector_generic_object_t*)(reference_reflector<extern_reflector_generic_object_t>*)0xFFFFFFFF) - intptr_t((reference_reflector<extern_reflector_generic_object_t>*)0xFFFFFFFF) << std::endl;
+
+
+        a->event_ref.bind(c, &C::action);
+        a->event_ref.bind(c, [](auto&& o, ARG_LIST) { o.action(ARG_LIST_FORWARD); });
+
+        a->event_ref.invoke(params.v1, params.v2, params.v1, params.v2);
+        delete a;
 
     }
 
