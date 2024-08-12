@@ -5,6 +5,7 @@ build/
 cmake-build-*/
 .cache/
 .vs/
+.idea/
 vs2022/
 debug/
 out/
@@ -14,3 +15,9 @@ out/
 .DS_Store
 
 
+/.idea/.gitignore
+/.idea/codeStyles/codeStyleConfig.xml
+/.idea/Delegate.iml
+/.idea/misc.xml
+/.idea/modules.xml
+/.idea/vcs.xml
