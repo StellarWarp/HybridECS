@@ -12,8 +12,8 @@ int main(int argc, char* argv[])
 {
     test_auto_delegate::test();
     test_auto_multicast_delegate::test();
-    //test_auto_reference::test();
-    //test_weak_multicast_delegate::test();
+    test_auto_reference::test();
+    test_weak_multicast_delegate::test();
 
     return 0;
 }

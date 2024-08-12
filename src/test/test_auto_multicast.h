@@ -1,7 +1,6 @@
 #pragma once
 
 #include "../multicast_delegate.h"
-#include <iostream>
 namespace test_auto_multicast_delegate
 {
     struct type1
@@ -74,21 +73,21 @@ namespace test_auto_multicast_delegate
 
         a->event.invoke(params.v1, params.v2, params.v1, params.v2);
 
-        //auto temp = new B(std::move(*b1));
-        //delete b1;
-        //b1 = temp;
+        auto temp = new B(std::move(*b1));
+        delete b1;
+        b1 = temp;
 
         a->event.invoke(params.v1, params.v2, params.v1, params.v2);
 
-        //delete b2;
+        delete b2;
 
         a->event.invoke(params.v1, params.v2, params.v1, params.v2);
 
-        //b2 = new B("new b2");
+        b2 = new B("new b2");
 
-        //auto temp2 = new A(std::move(*a));
-        //delete a;
-        //a = temp2;
+        auto temp2 = new A(std::move(*a));
+        delete a;
+        a = temp2;
 
 		a->event.invoke(params.v1, params.v2, params.v1, params.v2);
 		
@@ -105,7 +104,6 @@ namespace test_auto_multicast_delegate
                                 }
                             });
 
-		return;
 
         std::cout << "delete b2" << std::endl;
         delete b2;
