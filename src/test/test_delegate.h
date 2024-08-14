@@ -54,7 +54,7 @@ namespace test_delegate
         {
             return b.function(PARAM_LIST);
         };
-        d.bind(lambda);
+        d.bind(&lambda);
         d.invoke(PARAM_LIST);
     }
 

@@ -9,7 +9,7 @@ namespace test_auto_reference
 
     struct A
     {
-        array_ref_charger<generic_ref_protocol, void*> refs;
+        array_ref_charger<generic_ref_protocol> refs;
 
         A() = default;
 
@@ -18,13 +18,12 @@ namespace test_auto_reference
         template<class T>
         void bind(T* obj)
         {
-            auto& data = refs.bind(obj);
-            data = nullptr;
+            refs.bind(obj);
         }
 
         void print_ref()
         {
-            for (auto [ref, _]: refs)
+            for (auto [ref]: refs)
             {
                 std::cout << this << " A ref *: " << ref << std::endl;
             }

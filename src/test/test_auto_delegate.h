@@ -38,6 +38,14 @@ namespace test_auto_delegate
             return t1.value + t2.value + t3.value + t1c.value + t2c.value + t3c.value;
         }
 
+        virtual int virtual_function(ARG_LIST) noexcept
+        {
+            std::cout << name << " call virtual_function "
+                      << t1.value << " " << t2.value << " " << t3.value << " "
+                      << t1c.value << " " << t2c.value << " " << t3c.value << std::endl;
+            return t1.value + t2.value + t3.value + t1c.value + t2c.value + t3c.value;
+        }
+
         int operator()(ARG_LIST) noexcept
         {
             std::cout << name << " call operator() "
@@ -64,7 +72,7 @@ namespace test_auto_delegate
         } params;
 #define PARAM_LIST params.v1, params.v2, std::move(params.v3),params.v1, params.v2, std::move(params.v3)
 
-        a->event_ret.bind(b1, &B::function);
+        a->event_ret.bind<&B::function>(b1);
         a->event_ret.invoke(PARAM_LIST);
 
         auto temp = new B(std::move(*b1));
@@ -78,7 +86,7 @@ namespace test_auto_delegate
         std::cout << a->event_ret.operator bool() << std::endl;
 
         auto b2 = new B("new b2");
-        a->event_ret.bind(b2, [](auto&& b, ARG_LIST) { return b.function(ARG_LIST_FORWARD); });
+        a->event_ret.bind(b2, [](auto&& b, ARG_LIST) { return b.virtual_function(ARG_LIST_FORWARD); });
         a->event_ret.invoke(PARAM_LIST);
 
         auto temp2 = new A(std::move(*a));
@@ -95,25 +103,25 @@ namespace test_auto_delegate
 
         a = new A();
         auto bw1 = std::make_shared<B>("bw1");
-        a->event_weak.bind(bw1, &B::function);
+        a->event_weak.bind<&B::function>(bw1);
         a->event_weak.invoke(PARAM_LIST);
-        a->event_weak.bind(bw1, [](auto&& b, ARG_LIST) { return b.function(ARG_LIST_FORWARD); });
+        a->event_weak.bind(bw1, [](auto&& b, ARG_LIST) { return b.virtual_function(ARG_LIST_FORWARD); });
         a->event_weak.invoke(PARAM_LIST);
         a->event_weak.bind(bw1);
         a->event_weak.invoke(PARAM_LIST);
         a->event_weak.bind([](ARG_LIST) {
-            std::cout << "call pure function lambda" << std::endl;
+            std::cout << "call pure virtual_function lambda" << std::endl;
             return 0; });
         a->event_weak.invoke(PARAM_LIST);
 
-        a->event_shared.bind(bw1, &B::function);
+        a->event_shared.bind<&B::function>(bw1);
         a->event_shared.invoke(PARAM_LIST);
-        a->event_shared.bind(bw1, [](auto&& b, ARG_LIST) { return b.function(ARG_LIST_FORWARD); });
+        a->event_shared.bind(bw1, [](auto&& b, ARG_LIST) { return b.virtual_function(ARG_LIST_FORWARD); });
         a->event_shared.invoke(PARAM_LIST);
         a->event_shared.bind(bw1);
         a->event_shared.invoke(PARAM_LIST);
         a->event_shared.bind([](ARG_LIST) {
-            std::cout << "call pure function lambda" << std::endl;
+            std::cout << "call pure virtual_function lambda" << std::endl;
             return 0; });
         a->event_shared.invoke(PARAM_LIST);
 

@@ -39,5 +39,11 @@ if(MSVC)
 endif()
 target_sources(Delegate PRIVATE
     src/main.cpp
+    src/auto_reference.h
+    src/delegate.h
+    src/function_traits.h
+    src/multicast_delegate.h
+    src/offset_ptr.h
+    src/type_list.h
 )
 

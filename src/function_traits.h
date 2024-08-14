@@ -19,11 +19,11 @@ struct function_traits<ReturnType(Args...)>
     using bare_tuple_type = std::tuple<std::remove_const_t<std::remove_reference_t<Args>>...>;
 };
 
-// function pointer
+// virtual_function pointer
 template<typename ReturnType, typename... Args>
 struct function_traits<ReturnType(*)(Args...)> : function_traits<ReturnType(Args...)> {};
 
-// member function pointer
+// member virtual_function pointer
 template <typename ReturnType, typename ClassType, typename... Args>
 struct function_traits<ReturnType(ClassType::*)(Args...)> : function_traits<ReturnType(Args...)> {
     using class_type = ClassType;
@@ -49,8 +49,8 @@ struct function_traits : function_traits<decltype(&Callable::operator())> {};
 
 
 
-// A const-qualified function type means the user is trying to disambiguate
-// a member function pointer.
+// A const-qualified virtual_function type means the user is trying to disambiguate
+// a member virtual_function pointer.
 template <class Fun> // Fun = R(As...) const
 struct Sig {
     template <class T>
@@ -63,8 +63,8 @@ struct Sig {
     }
 };
 
-// A function type with no arguments means the user is trying to disambiguate
-// a member function pointer.
+// A virtual_function type with no arguments means the user is trying to disambiguate
+// a member virtual_function pointer.
 template <class R>
 struct Sig<R()> : Sig<R() const> {
     using Fun = R();
@@ -92,12 +92,12 @@ struct SigImpl : Sig<R(As...) const> {
     }
 };
 
-// The user could be trying to disambiguate either a member or a free function.
+// The user could be trying to disambiguate either a member or a free virtual_function.
 template <class R, class... As>
 struct Sig<R(As...)> : SigImpl<R, As...> {};
 
 // This case is like the one above, except we want to add an overload that
-// handles the case of a free function where the first argument is more
+// handles the case of a free virtual_function where the first argument is more
 // const-qualified than the user explicitly specified.
 template <class R, class A, class... As>
 struct Sig<R(A&, As...)> : SigImpl<R, A&, As...> {

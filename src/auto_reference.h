@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <vector>
 #include "offset_ptr.h"
+#include "type_list.h"
 
 struct referencer_interface
 {
@@ -11,11 +12,11 @@ struct referencer_interface
 };
 
 
-template<typename To,typename From>
+template<typename To, typename From>
 To interconvertible_pointer_cast(From obj)
 {
     auto ptr = static_cast<To>(obj);
-    if constexpr (requires {reinterpret_cast<uintptr_t>(ptr) == reinterpret_cast<uintptr_t>(obj); })
+    if constexpr (requires { reinterpret_cast<uintptr_t>(ptr) == reinterpret_cast<uintptr_t>(obj); })
         assert(reinterpret_cast<uintptr_t>(ptr) == reinterpret_cast<uintptr_t>(obj));
     return ptr;
 }
@@ -321,7 +322,8 @@ public:
     }
 
     auto operator<=>(other_object_ptr_t p) const { return info.pointer() <=> p; }
-    bool operator ==(nullptr_t) const { return info.obj == nullptr; }
+
+    bool operator==(nullptr_t) const { return info.obj == nullptr; }
 
     operator bool() const { return info.obj != nullptr; }
 
@@ -359,17 +361,18 @@ using generic_ref_protocol = auto_ref_protocol<
         class generic_ref_reflector,
         true, true>;
 
-class generic_ref_reflector
+class generic_ref_reflector : referencer_interface
 {
+protected:
     template<typename, bool>
     friend
     class ref_handle;
 
-    using RefHandle = ref_handle<generic_ref_protocol, false>;
+    using ref_handle_t = ref_handle<generic_ref_protocol, false>;
 
     struct element_void
     {
-        RefHandle handle;
+        ref_handle_t handle;
 
         template<typename... Args>
         explicit element_void(Args&& ... args) : handle(std::forward<Args>(args)...) {}
@@ -379,7 +382,7 @@ class generic_ref_reflector
 
     std::vector<element_t> refs;
 
-    void notify_reference_removed(void* reference_handel_address)
+    void notify_reference_removed(void* reference_handel_address) override
     {
         auto addr = (element_t*) reference_handel_address;
         size_t index = addr - refs.data();
@@ -468,15 +471,16 @@ class optional_referencer_interface<Derived, true> : public referencer_interface
 template<typename AutoRefProtocol, typename AppendingData = void>
 class array_ref_charger : public referencer_interface
 {
+protected:
     template<typename, bool>
     friend
     class ref_handle;
 
-    using RefHandle = ref_handle<AutoRefProtocol, true>;
+    using ref_handle_t = ref_handle<AutoRefProtocol, true>;
 
     struct element_void
     {
-        RefHandle handle;
+        ref_handle_t handle;
 
         template<typename... Args>
         explicit element_void(Args&& ... args) : handle(std::forward<Args>(args)...) {}
@@ -484,7 +488,7 @@ class array_ref_charger : public referencer_interface
 
     struct element_non_void
     {
-        RefHandle handle;
+        ref_handle_t handle;
         AppendingData data;
 
         template<typename... Args>
@@ -492,12 +496,13 @@ class array_ref_charger : public referencer_interface
     };
 
     using element_t = std::conditional_t<std::is_same_v<AppendingData, void>, element_void, element_non_void>;
-
+    using append_data_t = AppendingData;
     std::vector<element_t> refs;
 
     void notify_reference_removed(void* reference_handel_address) override
     {
         auto addr = (element_t*) reference_handel_address;
+        assert(((char*)addr - (char*)refs.data())%sizeof(element_t) == 0);
         size_t index = addr - refs.data();
         //swap back
         refs[index] = std::move(refs.back());
@@ -516,10 +521,14 @@ public:
         }
     }
 
-//    template<class T>
-    decltype(auto) bind(AutoRefProtocol::second_object_ptr_t obj)
+    auto size() { return refs.size(); }
+    bool empty() { return refs.empty(); }
+    void clear() { refs.clear(); }
+
+    using pointer_t = AutoRefProtocol::second_object_ptr_t;
+
+    decltype(auto) bind(const pointer_t& obj)
     {
-//        auto generic_object = reinterpret_cast<typename AutoRefProtocol::second_object_ptr_t>(obj);
         auto charger = ref_charger_convert_trait<AutoRefProtocol, false>::cast_ref_charger(obj);
         auto handle = charger->new_bind_handle<AutoRefProtocol>();
         if constexpr (std::is_same_v<AppendingData, void>)
@@ -533,19 +542,19 @@ public:
             return (AppendingData&) storage.data;
         }
     }
-//    decltype(auto) bind(nullptr_t)
-//    {
-//        if constexpr (std::is_same_v<AppendingData, void>)
-//        {
-//            objects.emplace_back();
-//        } else
-//        {
-//            auto& storage = objects.emplace_back();
-//            return (AppendingData&) storage.data;
-//        }
-//    }
+    decltype(auto) bind(nullptr_t)
+    {
+        if constexpr (std::is_same_v<AppendingData, void>)
+        {
+            refs.emplace_back();
+        } else
+        {
+            auto& storage = refs.emplace_back();
+            return (AppendingData&) storage.data;
+        }
+    }
 
-    void unbind(AutoRefProtocol::second_object_ptr_t obj)
+    void unbind(const pointer_t& obj)
     {
         for (int i = 0; i < refs.size(); ++i)
         {
@@ -561,9 +570,29 @@ public:
 
     class iterator
     {
+        template<typename T>
+        struct value_type_helper;
+        template<>
+        struct value_type_helper<void>
+        {
+            using type = std::tuple<typename AutoRefProtocol::second_object_ptr_t>;
+        };
+        template<typename... Ts>
+        struct value_type_helper<std::tuple<Ts...>>
+        {
+            using type = std::tuple<typename AutoRefProtocol::second_object_ptr_t,Ts&...>;
+            static type wrap(element_non_void& element)
+            {
+                using first_type = typename AutoRefProtocol::second_object_ptr_t;
+                return []<size_t...I>(first_type ptr, std::tuple<Ts...>& data, std::integer_sequence<size_t,I...> )
+                {
+                    return type{ptr, std::get<I>(data)...};
+                }(element.handle.get(), element.data, std::index_sequence_for<Ts...>{});
+            }
+        };
     public:
         using iterator_category = std::input_iterator_tag;
-        using value_type = std::tuple<typename AutoRefProtocol::second_object_ptr_t, AppendingData>;
+        using value_type = value_type_helper<AppendingData>::type;
         using difference_type = std::ptrdiff_t;
         using pointer = value_type*;
         using reference = value_type&;
@@ -578,7 +607,13 @@ public:
 
         void operator++(int) { ++it; }
 
-        value_type operator*() { return std::make_tuple(it->handle.get(), it->data); }
+        value_type operator*()
+        {
+            if constexpr (std::is_same_v<AppendingData, void>)
+                return std::make_tuple(it->handle.get());
+            else
+                return value_type_helper<AppendingData>::wrap(*it);
+        }
     };
 
     iterator begin() { return iterator(refs.begin()); }
@@ -586,14 +621,8 @@ public:
     iterator end() { return iterator(refs.end()); }
 };
 
-#ifdef _MSC_VER
-#define MSC_EBO __declspec(empty_bases)
-#else
-#define MSC_EBO
-#endif
-
 template<typename T>
-struct MSC_EBO reference_reflector : generic_ref_reflector, T
+struct reference_reflector : generic_ref_reflector, T
 {
     using reflector_reference_type = T;
 
@@ -604,7 +633,7 @@ struct MSC_EBO reference_reflector : generic_ref_reflector, T
 
 struct extern_reflector_generic_object_t
 {
-	int pad;
+    int pad;
 };
 using extern_reflector_generic_object_ptr_t = offset_ptr<
         extern_reflector_generic_object_t,
@@ -629,7 +658,7 @@ private:
 };
 
 template<typename T, bool IsFirstReferencer = true>
-using typed_ref_handle = ref_handle<generic_ref_protocol::modify_second_object_ptr<T*>, IsFirstReferencer>;
+using typed_ref_handle = ref_handle<generic_ref_protocol::modify_second_object_ptr < T * >, IsFirstReferencer>;
 
 template<typename T>
 struct auto_reference_traits;
@@ -706,7 +735,6 @@ public:
 };
 
 
-
 template<typename T>
 class weak_reference<T, reference_reflector<T>> : public weak_reference_base<T, reference_reflector<T>>
 {
@@ -781,9 +809,10 @@ class unique_reference : public offset_ptr<T, Reflector>
     using super = offset_ptr<T, Reflector>;
 public:
     using super::super;
+
     unique_reference(const unique_reference&) = delete;
 
-    super offset_ptr(){ return super(*this); }
+    super offset_ptr() { return super(*this); }
 
     operator extern_reflector_generic_object_ptr_t() const requires std::same_as<Reflector, reference_reflector<T>>
     {

@@ -1,7 +1,8 @@
 #pragma once
 
 #include "../multicast_delegate.h"
-namespace test_auto_multicast_delegate
+
+namespace t
 {
     struct type1
     {
@@ -14,7 +15,7 @@ namespace test_auto_multicast_delegate
     struct A
     {
         multicast_auto_delegate<void(ARG_LIST)> event;
-        multicast_delegate<int(ARG_LIST)> event_ret;
+        multicast_auto_delegate<int(ARG_LIST)> event_ret;
         multicast_auto_delegate_extern_ref<void(ARG_LIST)> event_ref;
     };
 
@@ -24,12 +25,24 @@ namespace test_auto_multicast_delegate
         B(std::string name) : name(name) {}
         void action(ARG_LIST) noexcept
         {
-            std::cout << name << " call " << t1.value << " " << t2.value << " " << t1c.value << " " << t2c.value << std::endl;
+            std::cout << name << "action" << t1.value << " " << t2.value << " " << t1c.value << " " << t2c.value << std::endl;
         }
 
-        int function(ARG_LIST) noexcept
+        virtual int virtual_function(ARG_LIST) noexcept
         {
-            std::cout << name << " call " << t1.value << " " << t2.value << " " << t1c.value << " " << t2c.value << std::endl;
+            std::cout << name << " virtual_function" << t1.value << " " << t2.value << " " << t1c.value << " " << t2c.value << std::endl;
+            return t1.value + t2.value + t1c.value + t2c.value;
+        }
+
+        static int static_function(ARG_LIST) noexcept
+        {
+            std::cout << "B static_function " << t1.value << " " << t2.value << " " << t1c.value << " " << t2c.value << std::endl;
+            return t1.value + t2.value + t1c.value + t2c.value;
+        }
+
+        int operator()(ARG_LIST) noexcept
+        {
+            std::cout << name << " operator() " << t1.value << " " << t2.value << " " << t1c.value << " " << t2c.value << std::endl;
             return t1.value + t2.value + t1c.value + t2c.value;
         }
     };
@@ -60,8 +73,8 @@ namespace test_auto_multicast_delegate
         auto b2 = new B("b2");
 
 
+        a->event.bind<B, &B::action>(b1);
 
-        a->event.bind(b1, &B::action);
         a->event.bind(b2, [](auto&& b, ARG_LIST) { b.action(ARG_LIST_FORWARD); });
 
         struct
@@ -90,10 +103,16 @@ namespace test_auto_multicast_delegate
         a = temp2;
 
 		a->event.invoke(params.v1, params.v2, params.v1, params.v2);
-		
-        a->event_ret.bind(b1, &B::function);
 
-        a->event_ret.bind(b2, &B::function);
+        a->event_ret.bind<&B::virtual_function>(b1);
+
+        a->event_ret.bind<&B::virtual_function>(b2);
+
+        auto static_function_h = a->event_ret.bind<&B::static_function>();
+
+        a->event_ret.bind(b1);
+
+        auto static_lambda_h = a->event_ret.bind([](ARG_LIST) { std::cout << "stateless callable" << std::endl; return 0;});
 
         a->event_ret.invoke(params.v1, params.v2, params.v1, params.v2,
                            [](auto&& results)
@@ -108,14 +127,6 @@ namespace test_auto_multicast_delegate
         std::cout << "delete b2" << std::endl;
         delete b2;
         a->event.invoke(params.v1, params.v2, params.v1, params.v2);
-        a->event_ret.invoke(params.v1, params.v2, params.v1, params.v2,
-                            [](auto&& results)
-                            {
-                                for (auto&& ret: results)
-                                {
-                                    printf("%d\n", ret);
-                                }
-                            });
 
         std::cout << "delete b1" << std::endl;
         delete b1;
@@ -128,17 +139,27 @@ namespace test_auto_multicast_delegate
                                     printf("%d\n", ret);
                                 }
                             });
+
+        a->event_ret.unbind(static_lambda_h);
+        a->event_ret.unbind(static_function_h);
+        a->event_ret.invoke(params.v1, params.v2, params.v1, params.v2,
+                            [](auto&& results)
+                            {
+                                for (auto&& ret: results)
+                                {
+                                    printf("%d\n", ret);
+                                }
+                            });
         b1 = new B("new b1");
         b2 = new B("new b2");
-        a->event_ret.bind(b1, &B::function);
-        a->event_ret.bind(b1, &B::function);
-        a->event_ret.bind(b1, &B::function);
-        a->event_ret.bind(b1, &B::function);
-        a->event_ret.bind(b1, &B::function);
-        a->event_ret.bind(b1, &B::function);
-        a->event_ret.bind(b1, &B::function);
-        a->event_ret.bind(b1, &B::function);
-        a->event_ret.bind(b2, &B::function);
+        a->event_ret.bind<&B::virtual_function>(b1);
+        a->event_ret.bind<&B::virtual_function>(b1);
+        a->event_ret.bind<&B::virtual_function>(b1);
+        a->event_ret.bind<&B::virtual_function>(b1);
+        a->event_ret.bind<&B::virtual_function>(b1);
+        a->event_ret.bind<&B::virtual_function>(b1);
+        a->event_ret.bind<&B::virtual_function>(b1);
+
         a->event_ret.invoke(params.v1, params.v2, params.v1, params.v2,
                             [](auto&& results)
                             {
@@ -153,13 +174,8 @@ namespace test_auto_multicast_delegate
 
         a = new A();
         unique_reference c = new reference_reflector<C>("c");
-		/*reference_reflector<C>;
-		std::cout << intptr_t((C*)(reference_reflector<C>*)0xFFFFFFFF) - intptr_t((reference_reflector<C>*)0xFFFFFFFF) << std::endl;
-		std::cout << intptr_t((C*)(reference_reflector<C>*)c.get()) - intptr_t((reference_reflector<C>*)c.get()) << std::endl;
-		std::cout << intptr_t((extern_reflector_generic_object_t*)(reference_reflector<extern_reflector_generic_object_t>*)0xFFFFFFFF) - intptr_t((reference_reflector<extern_reflector_generic_object_t>*)0xFFFFFFFF) << std::endl;*/
 
-
-        a->event_ref.bind(c, &C::action);
+        a->event_ref.bind<&C::action>(c);
         a->event_ref.bind(c, [](auto&& o, ARG_LIST) { o.action(ARG_LIST_FORWARD); });
 
         a->event_ref.invoke(params.v1, params.v2, params.v1, params.v2);

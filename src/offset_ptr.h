@@ -71,7 +71,7 @@ public:
 
     auto operator<=>(T* p) const { return get() <=> p; }
 
-    operator Final*() const { return get_final_ptr(); }
+    operator Final*() const requires (!std::same_as<Final,T>) { return get_final_ptr(); }
     operator T*() const { return get(); }
 
     explicit operator offset_ptr_generic() const

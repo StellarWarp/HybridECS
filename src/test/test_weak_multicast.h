@@ -27,7 +27,7 @@ namespace test_weak_multicast_delegate
 
         int function(ARG_LIST) noexcept
         {
-            std::cout << "call function" << t1.value << " " << t2.value << " " << t1c.value << " " << t2c.value << std::endl;
+            std::cout << "call virtual_function" << t1.value << " " << t2.value << " " << t1c.value << " " << t2c.value << std::endl;
             return t1.value + t2.value + t1c.value + t2c.value;
             return 0;
         }
@@ -48,11 +48,11 @@ namespace test_weak_multicast_delegate
         std::cout <<"normal bind" << std::endl;
 
         for (auto b: bs)
-            a2.event.bind(b, &B2::action);
+            a2.event.bind<&B2::action>(b);
         for (auto b: bs)
             a2.event.bind(b, [](auto&& b, ARG_LIST) { b.action(ARG_LIST_FORWARD); });
         for (auto b: bs)
-            a2.event_ret.bind(b, &B2::function);
+            a2.event_ret.bind<&B2::function>(b);
 
         struct
         {
@@ -77,6 +77,22 @@ namespace test_weak_multicast_delegate
 
 
         a2.event.invoke(params.v1, params.v2, params.v1, params.v2);
+        a2.event_ret.invoke(params.v1, params.v2, params.v1, params.v2,
+                            [](auto&& results)
+                            {
+                                for (auto&& ret: results)
+                                    std::cout << ret << std::endl;
+                            });
+
+        auto b = std::make_shared<B2>();
+        auto handle = a2.event_ret.bind<&B2::function>(b);
+        a2.event_ret.invoke(params.v1, params.v2, params.v1, params.v2,
+                            [](auto&& results)
+                            {
+                                for (auto&& ret: results)
+                                    std::cout << ret << std::endl;
+                            });
+        a2.event_ret.unbind(handle);
         a2.event_ret.invoke(params.v1, params.v2, params.v1, params.v2,
                             [](auto&& results)
                             {

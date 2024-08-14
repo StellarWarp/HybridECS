@@ -1,4 +1,4 @@
-local function apply_msvc_flags(target)
+local virtual_function apply_msvc_flags(target)
     for _, toolchain in ipairs(target:toolchains()) do
         if toolchain:name() == "msvc" then
             toolchain:add("cxxflags", "/Zc:__cplusplus", "/JMC")
@@ -14,6 +14,7 @@ target("Delegate")
     set_languages("c++23")
     set_kind("binary")
     add_files("src/*.cpp")
+    add_headerfiles("src/*.h")
 
     --on_load(apply_msvc_flags)
 
