@@ -1,20 +1,28 @@
-local virtual_function apply_msvc_flags(target)
+local function apply_msvc_flags(target)
     for _, toolchain in ipairs(target:toolchains()) do
         if toolchain:name() == "msvc" then
-            toolchain:add("cxxflags", "/Zc:__cplusplus", "/JMC")
+            toolchain:add("/Zc:__cplusplus", "/JMC", "/PROFILE")
+            --toolchain:add("ldflags", "/PROFILE")
         end
     end
 end
 
+
 add_rules("mode.debug", "mode.release")
 
 set_toolchains("msvc")
+
+add_requires("benchmark", {configs = {header_only  = true}})
 
 target("Delegate")
     set_languages("c++23")
     set_kind("binary")
     add_files("src/*.cpp")
     add_headerfiles("src/*.h")
+    add_packages("benchmark")
+    on_load(apply_msvc_flags)
+    --add_ldflags("/PROFILE", {force = true})
+
 
     --on_load(apply_msvc_flags)
 

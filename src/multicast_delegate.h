@@ -89,15 +89,8 @@ public:
     delegate_handle_ref& operator=(delegate_handle_ref&& other) noexcept
     {
         if (this == &other) return *this;
-        if (handle) handle->delegate_object = nullptr;
-        handle = other.handle;
-        if (handle)
-        {
-            handle->delegate_object = this;
-            other.handle = nullptr;
-        }
-//        this->~delegate_handle_ref();
-//        std::construct_at(this, std::move(other));
+        this->~delegate_handle_ref();
+        std::construct_at(this, std::move(other));
         return *this;
     }
 
@@ -149,14 +142,16 @@ public:
 
     unique_delegate_handle(Container* container, inverse_handle_type* ref) : container(container),
                                                                              delegate_handle(ref) {}
-
+    unique_delegate_handle( const unique_delegate_handle& other) = delete;
     unique_delegate_handle(unique_delegate_handle&& other) noexcept:
+            delegate_handle(std::move(other)),
             container(other.container)
     {
         other.container = nullptr;
     }
 
     ~unique_delegate_handle() { if (container) container->unbind(*this); }
+
 };
 
 template<typename Container>
@@ -165,50 +160,83 @@ class unique_delegate_handle_ref : public delegate_handle_ref
     unique_delegate_handle<Container>* get_handle() { return static_cast<unique_delegate_handle<Container>*>(handle); }
 
 public:
+    unique_delegate_handle_ref() = default;
+    unique_delegate_handle_ref(const unique_delegate_handle_ref&) = delete;
+    unique_delegate_handle_ref(unique_delegate_handle_ref&& other) noexcept = default;
     void notify_container_moved(Container* new_container)
     {
         if (auto h = get_handle())
             h->container = new_container->container;
     }
 
+    unique_delegate_handle_ref& operator=(unique_delegate_handle_ref&& other) noexcept
+    {
+        delegate_handle_ref::operator=(std::move(other));
+        return *this;
+    }
+
     ~unique_delegate_handle_ref() { if (auto h = get_handle()) h->container = nullptr; }
+
+    static unique_delegate_handle_ref* get(unique_delegate_handle<Container>* h)
+    {
+        return static_cast<unique_delegate_handle_ref*>(h->delegate_object);
+    }
+
 };
 
 #pragma endregion
 
-template<typename DelegateHandle = void>
+template<typename = void>
 class default_delegate_container
 {
 public:
-    using delegate_handle_t = delegate_handle_traits<DelegateHandle>::delegate_handle_type;
-    using delegate_handle_t_ref = delegate_handle_traits<DelegateHandle>::delegate_handle_reference;
-    using inverse_handle_t = delegate_handle_traits<DelegateHandle>::inverse_handle_type;
-    using inverse_handle_t_ref = delegate_handle_traits<DelegateHandle>::inverse_handle_reference;
+//    using delegate_handle_t = delegate_handle_traits<DelegateHandle>::delegate_handle_type;
+    using delegate_handle_t = unique_delegate_handle<default_delegate_container>;
+    using delegate_handle_t_ref = delegate_handle_traits<delegate_handle_t>::delegate_handle_reference;
+    using inverse_handle_t = delegate_handle_traits<delegate_handle_t>::inverse_handle_type;
+    using inverse_handle_t_ref = delegate_handle_traits<delegate_handle_t>::inverse_handle_reference;
+    static constexpr bool enable_delegate_handle = delegate_handle_traits<delegate_handle_t>::enable_delegate_handle;
+
 private:
     struct delegate_object
     {
         void* ptr;
         void* mem_fn;
-        [[no_unique_address]] inverse_handle_t _;
+        [[no_unique_address]] inverse_handle_t inv_handle;
     };
 
     std::vector<delegate_object> objects;
 public:
-
-
-    delegate_handle_t bind(void* obj, void* invoker)
-    {
-        objects.emplace_back(obj, invoker);
-    }
-
     auto size() { return objects.size(); }
 
     bool empty() { return objects.empty(); }
 
     void clear() { objects.clear(); }
 
+    delegate_handle_t bind(void* obj, void* invoker)
+    {
+        auto& [ptr, fn, handle_ref] = objects.emplace_back(obj, invoker, inverse_handle_t{} );
+        if constexpr (requires { delegate_handle_t(this, &handle_ref); })
+            return delegate_handle_t(this, &handle_ref);
+        else if constexpr (requires { delegate_handle_t(& handle_ref); })
+            return delegate_handle_t(&handle_ref);
+        else
+            return;
+    }
 
-    void unbind(void* obj)
+    void unbind(delegate_handle_t_ref handle) requires enable_delegate_handle
+    {
+        if constexpr (!enable_delegate_handle) return;
+        inverse_handle_t* inv_handle = inverse_handle_t::get(&handle);
+        assert(inv_handle);
+        intptr_t handle_ref_element_offset = offsetof(delegate_object, inv_handle);
+        auto* o = (delegate_object*) (intptr_t(inv_handle) - handle_ref_element_offset);
+        int64_t index = o - objects.data();
+        objects[index] = std::move(objects.back());
+        objects.pop_back();
+    }
+
+    void unbind(void* obj)requires (not enable_delegate_handle)
     {
         for (int i = 0; i < objects.size(); ++i)
         {
@@ -230,7 +258,7 @@ public:
 };
 
 
-template<typename Func, typename DelegateContainer = default_delegate_container>
+template<typename Func, typename DelegateContainer = default_delegate_container<>>
 class multicast_delegate;
 
 template<typename DelegateContainer, typename Ret, typename... Args> requires (!std::is_rvalue_reference_v<Args> && ...)
@@ -487,14 +515,16 @@ private:
             return;
     }
 
-    template<size_t Idx,class Tuple>
-    constexpr size_t tuple_element_offset() {
+    template<size_t Idx, class Tuple>
+    constexpr size_t tuple_element_offset()
+    {
         using ElementType = typename std::tuple_element<Idx, Tuple>::type;
         alignas(Tuple) char storage[sizeof(Tuple)];//for eliminate warning
         Tuple* t_ptr = reinterpret_cast<Tuple*>(&storage);
         ElementType* elem_ptr = &std::get<Idx>(*t_ptr);
         return reinterpret_cast<char*>(elem_ptr) - reinterpret_cast<char*>(t_ptr);
     }
+
 public:
     delegate_handle_t bind(const super::pointer_t& obj, void* invoker)
     {
@@ -503,6 +533,7 @@ public:
         fn = invoker;
         return bind_handle(handle_ref);
     }
+
     delegate_handle_t bind(nullptr_t, void* invoker) requires enable_delegate_handle
     {
         auto& [fn, handle_ref] = super::bind(nullptr_t{});
@@ -614,7 +645,7 @@ public:
         assert(!obj.expired());
         for (int i = 0; i < objects.size(); ++i)
         {
-            if (equals(objects[i].handle.get() , obj))
+            if (equals(objects[i].handle.get(), obj))
             {
                 objects[i] = std::move(objects.back());
                 objects.pop_back();
