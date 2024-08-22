@@ -1,13 +1,9 @@
 
 #include <benchmark/benchmark.h>
 #include <windows.h>
-
-#include "test/test_auto_multicast.h"
-//#include "test/test_auto_delegate.h"
-//#include "test/test_auto_reference.h"
-//#include "test/test_weak_multicast.h"
-#include "delegate/multicast_delegate.h"
 #include <iostream>
+
+#include "benchmark/auto_delegate_bench_mark.h"
 
 using namespace std;
 

@@ -1,7 +1,10 @@
 #pragma once
-
-#include "../delegate/multicast_delegate.h"
 #include <random>
+
+#include "../reference_safe_delegate/reference_safe_delegate.h"
+#include "type_list.h"
+
+
 using namespace auto_delegate;
 
 struct type1
@@ -468,23 +471,23 @@ const auto min_warm_up = 0;
 const uint64_t invoke_count = 1 << 20;
 
 BENCHMARK(BM_Direct_Function)
-        ->MinWarmUpTime(min_warm_up)
-        ->Iterations(invoke_count);
+->MinWarmUpTime(min_warm_up)
+->Iterations(invoke_count);
 BENCHMARK(BM_Direct_VirtualFunction)
-        ->MinWarmUpTime(min_warm_up)
-        ->Iterations(invoke_count);
+->MinWarmUpTime(min_warm_up)
+->Iterations(invoke_count);
 BENCHMARK(BM_DefaultMulticast_InvokeAction)
-        ->MinWarmUpTime(min_warm_up)
-        ->Iterations(invoke_count);
+->MinWarmUpTime(min_warm_up)
+->Iterations(invoke_count);
 BENCHMARK(BM_DefaultMulticast_InvokeFunction)
-        ->MinWarmUpTime(min_warm_up)
-        ->Iterations(invoke_count);
+->MinWarmUpTime(min_warm_up)
+->Iterations(invoke_count);
 BENCHMARK(BM_DefaultMulticast_InvokeVirtualAction)
-        ->MinWarmUpTime(min_warm_up)
-        ->Iterations(invoke_count);
+->MinWarmUpTime(min_warm_up)
+->Iterations(invoke_count);
 BENCHMARK(BM_DefaultMulticast_InvokeVirtualFunction)
-        ->MinWarmUpTime(min_warm_up)
-        ->Iterations(invoke_count);
+->MinWarmUpTime(min_warm_up)
+->Iterations(invoke_count);
 
 template<typename DelegateType>
 void BM_WeakMulticast(benchmark::State& state, auto&& bind, auto&& invoke)
@@ -616,17 +619,17 @@ static void BM_WeakMulticast_VirtualFunction(benchmark::State& state)
 }
 
 BENCHMARK(BM_WeakMulticast_InvokeAction)
-        ->MinWarmUpTime(min_warm_up)
-        ->Iterations(invoke_count);
+->MinWarmUpTime(min_warm_up)
+->Iterations(invoke_count);
 BENCHMARK(BM_WeakMulticast_InvokeFunction)
-        ->MinWarmUpTime(min_warm_up)
-        ->Iterations(invoke_count);
+->MinWarmUpTime(min_warm_up)
+->Iterations(invoke_count);
 BENCHMARK(BM_WeakMulticast_InvokeVirtualAction)
-        ->MinWarmUpTime(min_warm_up)
-        ->Iterations(invoke_count);
+->MinWarmUpTime(min_warm_up)
+->Iterations(invoke_count);
 BENCHMARK(BM_WeakMulticast_VirtualFunction)
-        ->MinWarmUpTime(min_warm_up)
-        ->Iterations(invoke_count);
+->MinWarmUpTime(min_warm_up)
+->Iterations(invoke_count);
 
 
 #undef ARG_LIST

@@ -1,20 +1,16 @@
 #pragma once
 
-#include "auto_reference.h"
-#include "delegate_depend.h"
 #include <concepts>
+#include "function_traits.h"
 
 namespace auto_delegate
 {
-
-
     template<auto>
     struct tag {};
 
     template<typename Func, typename GenericPtr = void*>
     class delegate;
 
-//reduce guide
     template<typename T_ptr, typename T_MemFunc>
     delegate(T_ptr, T_MemFunc) ->
     delegate<typename function_traits<T_MemFunc>::function_type, void*>;
@@ -151,15 +147,9 @@ namespace auto_delegate
         }
     };
 
+}
 
-    template<typename Func>
-    using auto_delegate = delegate<Func, weak_reference<generic_ref_reflector, generic_ref_reflector>>;
-    template<typename Func>
-    using weak_delegate = delegate<Func, std::weak_ptr<void>>;
-    template<typename Func>
-    using shared_delegate = delegate<Func, std::shared_ptr<void>>;
-//template<typename Func>
-//using unique_delegate = delegate<Func, std::unique_ptr<void>>;
-
-
+namespace auto_delegate_export
+{
+    using auto_delegate::delegate;
 }

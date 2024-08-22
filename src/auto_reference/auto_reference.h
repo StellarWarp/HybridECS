@@ -1,10 +1,10 @@
 #pragma once
 
 #include <type_traits>
-#include <assert.h>
+#include <cassert>
 #include <vector>
+#include <concepts>
 #include "offset_ptr.h"
-#include "delegate_depend.h"
 
 namespace auto_reference
 {
