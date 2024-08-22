@@ -6,6 +6,7 @@
 //#include "test/test_auto_delegate.h"
 //#include "test/test_auto_reference.h"
 //#include "test/test_weak_multicast.h"
+#include "delegate/multicast_delegate.h"
 #include <iostream>
 
 using namespace std;
@@ -38,7 +39,4 @@ int main(int argc, char** argv)
     cout << "All Done" << endl;
     return 0;
 }
-
-int main(int, char**);
-
 

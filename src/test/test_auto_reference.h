@@ -1,7 +1,7 @@
 #pragma once
 
 #include <iostream>
-#include "../delegate.h"
+#include "../delegate/delegate.h"
 
 namespace test_auto_reference
 {

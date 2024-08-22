@@ -1,7 +1,7 @@
 
 #pragma once
 
-#include "../delegate.h"
+#include "../delegate/delegate.h"
 #include <iostream>
 #include <functional>
 

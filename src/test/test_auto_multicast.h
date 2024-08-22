@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../multicast_delegate.h"
+#include "../delegate/multicast_delegate.h"
 #include <random>
 
 struct type1

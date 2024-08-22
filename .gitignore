@@ -22,3 +22,5 @@ out/
 /.idea/modules.xml
 /.idea/vcs.xml
 /vsxmake2022/
+/results.json
+/compile_commands.json

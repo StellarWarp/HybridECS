@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../delegate.h"
+#include "../delegate/delegate.h"
 
 namespace test_delegate
 {
