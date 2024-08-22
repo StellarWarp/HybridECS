@@ -1,4 +1,5 @@
 #pragma once
+
 namespace hyecs
 {
 	struct entity
@@ -43,9 +44,6 @@ namespace hyecs
 
 	template<typename T>
 	struct is_entity : std::is_same<T, entity> {};
-
-
-
 }
 
 template <> //function-template-specialization

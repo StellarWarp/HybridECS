@@ -1,7 +1,6 @@
 #pragma once
 #include "../lib/std_lib.h"
-#include "../meta/meta_utils.h"
-#include "../container/static_string.h"
+#include "core/hyecs_core.h"
 
 namespace hyecs
 {

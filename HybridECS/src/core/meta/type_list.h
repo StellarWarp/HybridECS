@@ -1,5 +1,5 @@
 #pragma once
-#include "../lib/std_lib.h"
+#include "lib/std_lib.h"
 namespace hyecs {
 
 	template <typename... T> struct type_list {

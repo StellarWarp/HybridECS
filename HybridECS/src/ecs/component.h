@@ -1,7 +1,8 @@
 #pragma once
 #include "../container/container.h"
-#include "../container/generic_type.h"
+#include "core/runtime_type/generic_type.h"
 #include "component_group.h"
+
 namespace hyecs
 {
 	class component_type_info : public generic::type_index_interface
@@ -315,7 +316,7 @@ namespace hyecs
 			};
 
 			static constexpr std::array<type_sort_info,sizeof...(T)> order_mapping =
-				internal::sort(std::array<type_sort_info,sizeof...(T)>{
+				std::ranges::sort(std::array<type_sort_info,sizeof...(T)>{
 				type_sort_info{
 					I,
 					component_traits<T>::static_group_id,

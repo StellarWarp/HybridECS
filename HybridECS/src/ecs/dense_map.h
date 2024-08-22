@@ -2,10 +2,13 @@
 
 #include "../container/container.h"
 #include "entity.h"
+#include "../core/marco.h"
 
 namespace hyecs
 {
-
+#if defined(_MSC_VER)
+#define no_unique_address msvc::no_unique_address
+#endif
 
     template<typename T>
     class entity_sparse_table

@@ -1,5 +1,5 @@
 #pragma once
-#include "../meta/meta_utils.h"
+#include "core/meta/meta_utils.h"
 #include "stl_container.h"
 
 namespace hyecs

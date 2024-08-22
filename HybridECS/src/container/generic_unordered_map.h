@@ -1,5 +1,5 @@
 #pragma once
-#include "generic_type.h"
+#include "core/runtime_type/generic_type.h"
 #include <memory>
 
 

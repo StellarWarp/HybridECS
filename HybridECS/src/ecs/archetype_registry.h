@@ -1,6 +1,5 @@
 #pragma once
 #include "archetype_registry_node.h"
-#include "../meta/assertion.h"
 
 namespace hyecs
 {

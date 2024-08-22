@@ -3,7 +3,7 @@
 
 #include "core/data_registry.h"
 #include "lib/std_lib.h"
-#include "container/type_hash.h"
+#include "core/type_info/type_hash.h"
 
 using namespace hyecs;
 

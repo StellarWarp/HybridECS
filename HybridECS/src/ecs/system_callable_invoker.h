@@ -1,6 +1,4 @@
 #pragma once
-#include "../meta/function_traits.h"
-#include "../meta/type_list.h"
 #include "entity.h"
 #include "component.h"
 #include "storage_key_registry.h"

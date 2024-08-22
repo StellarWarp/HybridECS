@@ -38,10 +38,11 @@
 
 #include <any>
 
-
-#if defined(_MSC_VER)
-#define no_unique_address msvc::no_unique_address
-#endif
-
 #include <format>
 #include <bit>
+
+
+#include <ranges>
+#include <concepts>
+
+

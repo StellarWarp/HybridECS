@@ -5,6 +5,10 @@
 #include "storage_key_registry.h"
 #include "system_callable_invoker.h"
 
+#if defined(_MSC_VER)
+#define no_unique_address msvc::no_unique_address
+#endif
+
 namespace hyecs
 {
 	struct component_table_chunk_traits

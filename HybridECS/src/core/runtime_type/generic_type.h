@@ -1,8 +1,7 @@
 #pragma once
 
-#include "vaildref_map.h"
-#include "../meta/meta_utils.h"
-#include "type_hash.h"
+#include "core/meta/type_hash.h"
+#include "../marco.h"
 
 namespace hyecs
 {
