@@ -79,11 +79,6 @@ namespace hyecs
 				return m_iter == other.m_iter;
 			}
 
-			bool operator!=(const iterator& other) const
-			{
-				return m_iter != other.m_iter;
-			}
-
 			std::pair<const key_type&, mapped_type&> operator*() const
 			{
 				return { m_iter->first, *m_iter->second };
@@ -95,9 +90,6 @@ namespace hyecs
 				std::pair<const key_type&, mapped_type&> temp = { m_iter->first, *m_iter->second };
 				return &temp;
 			}
-
-
-
 
 		};
 
@@ -126,7 +118,7 @@ namespace hyecs
 		mapped_type& emplace(const key_type& key, mapped_type&& value)
 		{
 			assert(!m_key_to_index.contains(key));
-			return emplace_value(key, std::move(value));
+			return emplace_value(key, std::forward<mapped_type>(value));
 		}
 
 

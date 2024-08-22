@@ -31,10 +31,11 @@ namespace hyecs
 		}
 
 		generic_vector(const generic_vector& other) noexcept
-			: m_type(other.m_type),
+			: 
 			m_begin(new uint8_t[other.byte_capacity()]),
 			m_end(m_begin + other.byte_size()),
-			m_capacity_end(m_begin + other.byte_capacity())
+			m_capacity_end(m_begin + other.byte_capacity()),
+			m_type(other.m_type)
 		{
 			std::memcpy(m_begin, other.m_begin, other.byte_size());
 		}
@@ -187,7 +188,7 @@ namespace hyecs
 		template<typename T>
 		void* push_back(const T& value)
 		{
-			assert(type_hash::of<T> == m_type.hash());
+			assert(type_hash::of<T>() == m_type.hash());
 			T* addr = (T*)allocate_value();
 			new(addr) T(std::forward<T>(value));
 			return addr;
@@ -198,7 +199,7 @@ namespace hyecs
 		{
 			using type = std::remove_reference_t<T>;
 			using pointer = type*;
-			assert(type_hash::of<type> == m_type.hash());
+			assert(type_hash::of<type>() == m_type.hash());
 			pointer addr = (pointer)allocate_value();
 			new(addr) type(std::forward<T>(value));
 			return addr;
@@ -207,7 +208,7 @@ namespace hyecs
 		template<typename T, typename... Args>
 		void* emplace_back(Args&&... args)
 		{
-			assert(type_hash::of<T> == m_type.hash());
+			assert(type_hash::of<T>() == m_type.hash());
 			T* addr = (T*)allocate_value();
 			new(addr) T(std::forward<Args>(args)...);
 			return addr;
@@ -327,11 +328,6 @@ namespace hyecs
 			bool operator==(const iterator& other) const
 			{
 				return m_ptr == other.m_ptr;
-			}
-
-			bool operator!=(const iterator& other) const
-			{
-				return m_ptr != other.m_ptr;
 			}
 
 			bool operator<(const iterator& other) const

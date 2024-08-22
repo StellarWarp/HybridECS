@@ -118,7 +118,7 @@ auto func(std::integral auto a, int b)
 void test(query_builder<type_list<>, type_list<>, type_list<>> builder)
 {
 
-	type_hash runtime_type_hash = type_hash::of<A>;
+	type_hash runtime_type_hash = type_hash::of<A>();
 
 	vector<int> a = { 1,2,3 };
 	auto b = std::views::take(2);

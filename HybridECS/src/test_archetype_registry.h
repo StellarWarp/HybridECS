@@ -38,7 +38,7 @@ struct B
 	int x;
 };
 
-static_assert(type_hash::of<A> != type_hash::of<B>);
+static_assert(type_hash::of<A>() != type_hash::of<B>());
 
 struct C
 {
@@ -148,6 +148,8 @@ class main_registry : public immediate_data_registry<register_idents::main>
 
 int main()
 {
+
+
 	main_registry registry(ecs_static_register_context::register_context);
 
 

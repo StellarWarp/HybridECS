@@ -38,14 +38,10 @@
 
 #include <any>
 
-#if defined _MSC_VER
+
+#if defined(_MSC_VER)
 #define no_unique_address msvc::no_unique_address
 #endif
 
-
-#if _HAS_CXX20
 #include <format>
 #include <bit>
-#else
-#include "cxx20_extend_for_cxx17.h"
-#endif

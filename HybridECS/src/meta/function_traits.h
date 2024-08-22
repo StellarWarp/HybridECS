@@ -30,11 +30,6 @@ namespace hyecs
 	template<typename ReturnType, typename... Args>
 	struct function_traits<std::function<ReturnType(Args...)>> : function_traits<ReturnType(Args...)> {};
 
-	// member function
-//#define FUNCTION_TRAITS(...)\
-//template <typename ReturnType, typename ClassType, typename... Args>\
-//struct function_traits<ReturnType(ClassType::*)(Args...) __VA_ARGS__> : function_traits<ReturnType(Args...)>{};\
-
 	template <typename ReturnType, typename ClassType, typename... Args>
 	struct function_traits<ReturnType(ClassType::*)(Args...) > : function_traits<ReturnType(Args...)> {};
 	template <typename ReturnType, typename ClassType, typename... Args>

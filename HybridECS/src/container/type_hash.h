@@ -63,13 +63,13 @@ namespace hyecs
 		constexpr type_hash(uint64_t hash) : hash(hash) {}
 	public:
 		template<typename T>
-		static constexpr type_hash of = type_name<T>.hash();
+		static constexpr type_hash of(){ return type_name<T>.hash();}
 
+        constexpr type_hash() : hash(0) {}
 		constexpr type_hash(const type_hash& other) noexcept : hash(other.hash) {}
 		constexpr type_hash(type_hash&& other) noexcept : hash(other.hash) { other.hash = 0; };
-		constexpr type_hash& operator=(const type_hash& other) noexcept { hash = other.hash; return *this; }
+		constexpr type_hash& operator=(const type_hash& other) noexcept = default;
 		constexpr bool operator==(const type_hash& other) const { return hash == other.hash; }
-		constexpr bool operator!=(const type_hash& other) const { return hash != other.hash; }
 		constexpr bool operator<(const type_hash& other) const { return hash < other.hash; }
 		constexpr bool operator>(const type_hash& other) const { return hash > other.hash; }
 		constexpr operator uint64_t() const { return hash; }
@@ -77,8 +77,6 @@ namespace hyecs
 
 	namespace internal
 	{
-
-
 		template <typename... T, size_t... I>
 		constexpr auto static_sort_mapping(std::index_sequence < I...>)
 		{

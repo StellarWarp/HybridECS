@@ -20,7 +20,7 @@ int main()
 	const char* str = str3;
 
 
-	constexpr auto hash = type_hash::of<A>;
+	constexpr auto hash = type_hash::of<A>();
 
 	std::cout << (uint64_t)hash << std::endl;
 

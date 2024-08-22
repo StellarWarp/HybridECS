@@ -23,7 +23,7 @@ namespace hyecs
 	sequence_ref_class(Iter, Iter)->sequence_ref_class<typename std::iterator_traits<Iter>::value_type, Iter>;\
 	template <typename... T> \
 		requires (type_list<T...>::is_same && sizeof...(T) > 0)\
-	sequence_ref_class(T...)->sequence_ref_class<typename type_list<T...>::get<0>>;
+	sequence_ref_class(T...)->sequence_ref_class<typename type_list<T...>::template get<0>>;
 
 
 	HYECS_sequence_ref_template_guides(sequence_ref);
@@ -238,8 +238,7 @@ namespace hyecs
 	};
 
 
-	template <typename T, typename Container> 
-		requires (has_member_type_iterator_v<Container>)
+	template <typename T, typename Container> requires (!std::input_or_output_iterator<Container>)
 	class sequence_ref<T, Container>
 	{
 	public:

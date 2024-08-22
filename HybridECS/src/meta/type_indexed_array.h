@@ -51,6 +51,11 @@ namespace hyecs
 			return get<U, 0>();
 		}
 
+		constexpr size_t index_of(const T& val) const
+		{
+			return std::find(arr.begin(), arr.end(), val) - arr.begin();
+		}
+
 		constexpr auto data() { return arr.data(); }
 
 		constexpr auto operator[](size_t i) const { return arr[i]; }

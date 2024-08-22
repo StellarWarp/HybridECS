@@ -10,7 +10,7 @@ namespace hyecs {
 
 	private:
 		template <size_t I, typename... Ts> struct get_helper;
-		template <> struct get_helper<0> {
+		template <size_t I> struct get_helper<I> {
 			using type = void;
 		};
 		template <typename U, typename... Us> struct get_helper<0, U, Us...> {
@@ -25,7 +25,7 @@ namespace hyecs {
 		template <size_t I> using get = typename get_helper<I, T...>::type;
 
 		using remove_ref = type_list<std::remove_reference_t<T>...>;
-		using decay_type = typename type_list<std::decay_t<T>...>;
+		using decay_type = type_list<std::decay_t<T>...>;
 
 	private:
 		template <typename U>
@@ -61,10 +61,10 @@ namespace hyecs {
 		template <typename U> struct is_same_helper<U> {
 			static constexpr bool value = true;
 		};
-		template <typename U0, typename U1, typename... Us> 
+		template <typename U0, typename U1, typename... Us>
 		struct is_same_helper<U0, U1, Us...> {
-			static constexpr bool value = std::is_same_v<U0, U1> &&
-				is_same_helper<U1,Us...>::value;
+			static constexpr bool value = std::is_same_v<U0, U1>&&
+				is_same_helper<U1, Us...>::value;
 		};
 
 	public:
@@ -125,6 +125,22 @@ namespace hyecs {
 			using type = typename remove_helper<type_list<T1s..., T2>, type_list<T2s...>, Remove - 1>::type;
 		};
 
+
+
+		template <typename Unsolve, typename Solved, typename BlackList> struct t_remove_helper;
+		template <typename BlackList, typename... Solved>
+		struct t_remove_helper<type_list<>, type_list<Solved...>, BlackList>
+		{
+			using type = type_list<Solved...>;
+		};
+		template <typename... Remove, typename U, typename... Unsolve, typename... Solved>
+		struct t_remove_helper<type_list<U, Unsolve...>, type_list<Solved...>, type_list<Remove...>> {
+			static constexpr bool filtered = type_list<Remove...>::template contains<U>;
+			using new_solve_list = std::conditional_t<filtered, type_list<Solved...>, type_list<Solved..., U>>;
+			using type = t_remove_helper<type_list<Unsolve...>, new_solve_list, type_list<Remove...>>::type;
+		};
+
+
 	public:
 		template <typename... List>
 		using cat = typename cat_helper<type_list<T...>, List...>::type;
@@ -139,23 +155,9 @@ namespace hyecs {
 
 		template <size_t I>
 		using remove = typename remove_helper<type_list<>, type_list<T...>, I>::type;
+		template <typename... U>
+		using erase = typename t_remove_helper<type_list<T...>, type_list<>, type_list<U...>>::type;
 
-		// template <size_t I, typename... Result, typename... U>
-		// static constexpr auto remove_index(type_list<Result...> result,
-		// type_list<U...>) { 	if constexpr (sizeof...(U) == 0) 		return
-		// result; else {
-		//		using first = type_list<U...>::template get<0>;
-		//		using poped = type_list<Result...>::pop_front;
-		//		if constexpr (sizeof...(Result) == I)
-		//			return cat_helper<type_list<Result...>, poped>{};
-		//		else
-		//			return remove_index<I>(type_list<Result..., first>{},
-		// poped{});
-		//	}
-		// }
-		// template<size_t I>
-		// using remove = std::decay_t<decltype(remove_index<I>(type_list<>{},
-		// type_list<T...>{})) > ;
 
 	private:
 		template <typename U> struct from_tuple_helper;
@@ -201,27 +203,7 @@ namespace hyecs {
 			using type = typename filter_helper<Condition, TargetCondition, f>::type;
 		};
 
-		// template <template <typename> typename Condition, typename... Result,
-		// typename... U> static constexpr auto filter_types(type_list<Result...>
-		// result, type_list<U...>) { 	if constexpr (sizeof...(U) == 0)
-		// return result;
-		//	else
-		//	{
-		//		using first = type_list<U...>::template get<0>;
-		//		using poped = type_list<U...>::pop_front;
-		//		if constexpr (Condition<first>{})
-		//			return filter_types<Condition>(type_list<Result...,
-		// first>{},
-		// poped{}); 		else 			return
-		// filter_types<Condition>(result, poped{});
-		//	}
-		// }
-
 	public:
-		// template <template <typename> typename Condition>
-		// using filter_with =
-		// std::decay_t<decltype(filter_types<Condition>(type_list<>{},
-		// type_list<T...>{})) > ;
 
 		template <template <typename> typename Condition>
 		using filter_with = typename
@@ -252,26 +234,65 @@ namespace hyecs {
 		using unique = typename unique_helper<T...>::type;
 
 	private:
-		template <typename Target, size_t I, typename...> struct index_of_helper;
-		template <typename Target, size_t I> struct index_of_helper<Target, I> {
-			using type = std::integral_constant<size_t, -1>;
+		template <typename Target, int I, typename...> struct index_of_helper;
+		template <typename Target, int I> struct index_of_helper<Target, I> {
+			using type = std::integral_constant<int, -1>;
 		};
-		template <typename Target, size_t I, typename U, typename... Us>
+		template <typename Target, int I, typename U, typename... Us>
 		struct index_of_helper<Target, I, U, Us...> {
 			using type = std::conditional_t<
-				std::is_same_v<Target, U>, std::integral_constant<size_t, I>,
+				std::is_same_v<Target, U>,
+				std::integral_constant<int, I>,
 				typename index_of_helper<Target, I + 1, Us...>::type>;
 		};
 
 	public:
 		template <typename U>
-		static constexpr size_t index_of = index_of_helper<U, 0, T...>::type::value;
+		static constexpr int index_of = index_of_helper<U, 0, T...>::type::value;
 
 	public:
 
 		template<template <typename> typename Caster>
 		using cast = type_list<Caster<T>...>;
 
+
+	private:
+		template <template <typename> typename Condition, int I, typename...> struct find_helper;
+		template <template <typename> typename Condition, int I> struct find_helper<Condition, I> {
+			using type = std::integral_constant<int, -1>;
+		};
+		template <template <typename> typename Condition, int I, typename U, typename... Us>
+		struct find_helper<Condition, I, U, Us...> {
+			using type = std::conditional_t<
+				Condition<U>::value,
+				std::integral_constant<int, I>,
+				typename find_helper<Condition, I + 1, Us...>::type>;
+		};
+
+	public:
+		template<template <typename> typename Condition>
+		static constexpr int find_first = find_helper<Condition, 0, T...>::type::value;
+
+
+	private:
+		template <int I, typename V, typename Left, typename Right>
+		struct replace_helper;
+		template <typename V>
+		struct replace_helper<0, V, type_list<>, type_list<>> {
+			using type = type_list<>;
+		};
+		template <typename V, typename... Left, typename U, typename... Right>
+		struct replace_helper<0, V, type_list<Left...>, type_list<U, Right...>> {
+			using type = type_list< Left..., V, Right...>;
+		};
+		template <int I, typename V, typename... Left, typename U, typename... Right>
+		struct replace_helper<I, V, type_list<Left...>, type_list<U, Right...>> {
+			using type = replace_helper<I - 1, V, type_list<Left..., U>, type_list< Right...>>::type;
+		};
+
+	public:
+		template <int I, typename V>
+		using replace_at = replace_helper<I, V, type_list<>, type_list<T...>>::type;
 
 	};
 

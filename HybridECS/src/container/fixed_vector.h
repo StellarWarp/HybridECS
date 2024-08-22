@@ -3,9 +3,6 @@
 
 namespace hyecs
 {
-#if defined _MSC_VER
-#define no_unique_address msvc::no_unique_address
-#endif
 	/// <summary>
 	/// light wieght vector with fixed capacity
 	/// </summary>

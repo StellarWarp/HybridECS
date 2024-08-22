@@ -1,20 +1,20 @@
 #pragma once
 #include "pch.h"
-//#include "core/archetype_registry.h"
+//#include "ecs/archetype_registry.h"
 #include "container/container.h"
 
-//#include "core/entity.h"
+//#include "ecs/entity.h"
 ////#include "meta/meta_utils.h"
-// #include "core/sparse_table.h"
-// #include "core/table.h"
+// #include "ecs/sparse_table.h"
+// #include "ecs/table.h"
 
-// #include "core/archetype_storage.h"
-//#include "core/component_storage.h"
-// #include "core/tag_archetype_storage.h"
- //#include "core/data_registry.h"
+// #include "ecs/archetype_storage.h"
+//#include "ecs/component_storage.h"
+// #include "ecs/tag_archetype_storage.h"
+ //#include "ecs/data_registry.h"
 
-//#include "core/archetype_storage.h"
-//#include "core/archetype_storage.h"
+//#include "ecs/archetype_storage.h"
+//#include "ecs/archetype_storage.h"
 //#include "test_archetype_registry.h"
 
 using namespace hyecs;
