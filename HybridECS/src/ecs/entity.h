@@ -22,11 +22,6 @@ namespace hyecs
 			return m_id == other.m_id && m_version == other.m_version;
 		}
 
-		bool operator!=(const entity& other) const
-		{
-			return !operator==(other);
-		}
-
 		bool operator<(const entity& other) const
 		{
 			return m_id < other.m_id || (m_id == other.m_id && m_version < other.m_version);

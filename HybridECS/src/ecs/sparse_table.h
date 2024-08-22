@@ -5,7 +5,7 @@
 
 namespace hyecs
 {
-	class sparse_table
+	class sparse_table : non_copyable
 	{
 		dense_set<entity> m_entities;
 		vector<component_type_index> m_notnull_components;
@@ -25,6 +25,10 @@ namespace hyecs
 				m_notnull_components.push_back(m_component_storages[i]->component_type());
 			}
 		}
+		//sparse_table(const sparse_table&) = delete;
+		//sparse_table& operator=(const sparse_table&) = delete;
+		//sparse_table(sparse_table&&) = default;
+		//sparse_table& operator=(sparse_table&&) = default;
 
 	private:
 		void allocate_entity(entity e, sequence_ref<void*> components)
@@ -101,7 +105,7 @@ namespace hyecs
 				void operator++()
 				{
 					m_component_index++;
-					if (operator!=(end_iterator{}))
+					if (!operator==(end_iterator{}))
 						m_type = m_accessor->m_table.m_notnull_components[m_component_index];
 					else
 						m_type = component_type_index{};
@@ -116,12 +120,9 @@ namespace hyecs
 
 				component_array_accessor& operator*() { return *this; }
 
-				auto comparable() const { return m_type; }
+				auto& comparable() const { return m_type; }
 				bool operator==(const component_array_accessor& other) const { return m_type == other.m_type; }
-				bool operator!=(const component_array_accessor& other) const { return !(*this == other); }
 				bool operator==(const end_iterator& other) const { return m_component_index == m_accessor->m_table.m_notnull_components.size(); }
-				bool operator!=(const end_iterator& other) const { return !(*this == other); }
-
 
 				class iterator
 				{
@@ -154,9 +155,7 @@ namespace hyecs
 					}
 
 					bool operator==(const iterator& other) const { return m_entity_iter == other.m_entity_iter; }
-					bool operator!=(const iterator& other) const { return !(*this == other); }
 					bool operator==(const end_iterator& other) const { return m_entity_iter == m_accessor->m_entities.end(); }
-					bool operator!=(const end_iterator& other) const { return !(*this == other); }
 					void* operator*() { return m_storage->at(*m_entity_iter); }
 				};
 
@@ -169,7 +168,7 @@ namespace hyecs
 		};
 
 		template <typename SeqParam = const entity*>
-		class allocate_accessor
+		class allocate_accessor : non_copyable
 		{
 			using entity_seq = sequence_cref<entity, SeqParam>;
 			sparse_table& m_table;
@@ -188,15 +187,13 @@ namespace hyecs
 					//m_storage_key_builder(e, {});
 				}
 			}
-
-			allocate_accessor(const allocate_accessor&) = delete;
-
-			allocate_accessor(allocate_accessor&& other)
+			allocate_accessor(allocate_accessor&& other) noexcept
 				: m_table(other.m_table),
 				  m_entities(std::move(other.m_entities))
 			{
 				ASSERTION_CODE(other.m_is_construct_finished = true);
 			}
+			allocate_accessor& operator=(allocate_accessor&&) = delete;
 
 			void notify_construct_finish()
 			{
@@ -252,27 +249,24 @@ namespace hyecs
 				void operator++()
 				{
 					m_component_index++;
-					if (operator!=(end_iterator{}))
+					if (!operator==(end_iterator{}))
 					{
 						m_type = m_accessor->m_table.m_notnull_components[m_component_index];
 						allocate_for_index(m_component_index);
 					}
 				}
+                void operator++(int)
+                {
+                    ++(*this);
+                }
 
 				component_array_accessor& operator*() { return *this; }
 
-				component_array_accessor& operator++(int)
-				{
-					component_array_accessor copy = *this;
-					++(*this);
-					return copy;
-				}
 
-				auto comparable() const { return m_type; }
+
+				auto& comparable() const { return m_type; }
 				bool operator==(const component_array_accessor& other) const { return m_type == other.m_type; }
-				bool operator!=(const component_array_accessor& other) const { return !(*this == other); }
 				bool operator==(const end_iterator& other) const { return m_component_index == m_accessor->m_table.m_notnull_components.size(); }
-				bool operator!=(const end_iterator& other) const { return !(*this == other); }
 
 				class iterator
 				{
@@ -300,9 +294,7 @@ namespace hyecs
 
 					void* operator*() const { return *m_current; }
 					bool operator==(const iterator& other) const { return m_current == other.m_current; }
-					bool operator!=(const iterator& other) const { return !(*this == other); }
 					bool operator==(const end_iterator& other) const { return m_current == m_end; }
-					bool operator!=(const end_iterator& other) const { return !operator==(other); }
 				};
 
 				iterator begin() { return iterator(m_components); }
@@ -338,19 +330,18 @@ namespace hyecs
 			return allocate_accessor<SeqParam>(*this, entities, std::forward<StorageKeyBuilder>(builder));
 		}
 
-		class deallocate_accessor : public raw_accessor
+		class deallocate_accessor : public raw_accessor, non_copyable
 		{
 			ASSERTION_CODE(bool m_is_destruct_finished = false);
 
 		public:
 			using raw_accessor::raw_accessor;
-			deallocate_accessor(const deallocate_accessor&) = delete;
-			deallocate_accessor& operator=(const deallocate_accessor&) = delete;
 
 			deallocate_accessor(deallocate_accessor&& other) : raw_accessor(std::move(other))
 			{
 				ASSERTION_CODE(other.m_is_destruct_finished = true);
 			}
+			deallocate_accessor& operator=(deallocate_accessor&&) = delete;
 
 			void destruct()
 			{

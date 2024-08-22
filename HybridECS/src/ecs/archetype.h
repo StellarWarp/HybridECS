@@ -227,7 +227,6 @@ namespace hyecs
 			return m_archetype->hash() == other.m_archetype->hash();
 		}
 
-		bool operator!=(const archetype_index& other) const { return m_archetype != other.m_archetype; }
 		auto begin() const { return m_archetype->begin(); }
 		auto end() const { return m_archetype->end(); }
 		uint32_t component_count() const { return m_archetype->component_count(); }

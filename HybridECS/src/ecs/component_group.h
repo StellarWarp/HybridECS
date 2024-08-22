@@ -18,8 +18,10 @@ namespace hyecs
 
 	struct tag_component { static constexpr bool is_tag = true; };
 
-	DECLATE_MEMBER_STATIC_VARIABLE_TEST(is_tag);
-	DECLATE_MEMBER_STATIC_VARIABLE_TEST(static_group_id);
+    template<typename T>
+    concept has_member_static_variable_is_tag = requires { T::is_tag; };
+    template<typename T>
+    concept has_member_static_variable_static_group_id = requires { T::static_group_id; };
 
 	struct component_group_id
 	{
@@ -35,11 +37,7 @@ namespace hyecs
 			id = string_hash32(name.c_str(), name.size());
 		}
 		component_group_id(const volatile component_group_id& other) : id(other.id) {}
-		bool operator == (const component_group_id& other) const { return id == other.id; }
-		bool operator != (const component_group_id& other) const { return id != other.id; }
-		bool operator < (const component_group_id& other) const { return id < other.id; }
-		bool operator > (const component_group_id& other) const { return id > other.id; }
-		int compare(const component_group_id& other) const { return id - other.id; }
+        constexpr auto operator <=> (const component_group_id& other) const = default;
 	};
 
 
@@ -59,31 +57,31 @@ namespace hyecs
 		{
 			if constexpr (component_register_static<T>::value)
 				return true;
-			else if constexpr (has_member_static_variable_static_group_id_v<component_static_group_override<T>>)
+			else if constexpr (has_member_static_variable_static_group_id<component_static_group_override<T>>)
 				return true;
-			else if constexpr (has_member_static_variable_static_group_id_v<component_traits_override<T>>)
+			else if constexpr (has_member_static_variable_static_group_id<component_traits_override<T>>)
 				return true;
-			else if constexpr (has_member_static_variable_static_group_id_v<T>)
+			else if constexpr (has_member_static_variable_static_group_id<T>)
 				return true;
 			else
 			return false;
 		}
 		static constexpr bool is_tag_helper()
 		{
-			if constexpr (has_member_static_variable_is_tag_v<component_traits_override<T>>)
+			if constexpr (has_member_static_variable_is_tag<component_traits_override<T>>)
 				return component_traits_override<T>::is_tag;
-			else if constexpr (has_member_static_variable_is_tag_v<T>)
+			else if constexpr (has_member_static_variable_is_tag<T>)
 				return T::is_tag;
 			else
 				return std::is_empty_v<T>;
 		}
 		static constexpr component_group_id static_group_id_helper()
 		{
-			if constexpr (has_member_static_variable_static_group_id_v<component_static_group_override<T>>)
+			if constexpr (has_member_static_variable_static_group_id<component_static_group_override<T>>)
 				return component_static_group_override<T>::static_group_id;
-			else if constexpr (has_member_static_variable_static_group_id_v<component_traits_override<T>>)
+			else if constexpr (has_member_static_variable_static_group_id<component_traits_override<T>>)
 				return component_traits_override<T>::static_group_id;
-			else if constexpr (has_member_static_variable_static_group_id_v<T>)
+			else if constexpr (has_member_static_variable_static_group_id<T>)
 				return T::static_group_id;
 			else return component_group_id();
 		}
@@ -183,7 +181,7 @@ namespace hyecs
 
 #define REGISTER_HYECS_COMPONENT(T, group_id) \
 namespace internal_component_register { \
-	inline static volatile ecs_component_static_register<T> __ecs_component_register_##T(group_id); \
+	inline volatile ecs_component_static_register<T> __ecs_component_register_##T(group_id); \
 }\
 \
 template<>\
@@ -220,7 +218,7 @@ struct component_register_static<T> : std::true_type{};
 
 
 
-	class component_type_index;
+    struct component_type_index;
 	struct component_group_info
 	{
 		component_group_id id;
@@ -230,12 +228,11 @@ struct component_register_static<T> : std::true_type{};
 
 	class component_group_index
 	{
-		inline static component_group_info no_group{};
 		const component_group_info* info;
 
 	public:
 		component_group_index()
-			: info(&no_group)
+			: info(nullptr)
 		{}
 
 		component_group_index(const component_group_info& info)
@@ -253,13 +250,10 @@ struct component_register_static<T> : std::true_type{};
 
 		component_group_id id() const { return info->id; }
 		const std::string& name() const { return info->name; }
-		bool valid() const { return info != &no_group; }
+		bool valid() const { return info != nullptr; }
 		const vector<component_type_index>& component_types() const { return info->component_types; }
-		bool operator == (const component_group_index& other) const { return info->id == other.info->id; }
-		bool operator != (const component_group_index& other) const { return !operator==(other); }
-		bool operator < (const component_group_index& other) const { return info->id < other.info->id; }
-		bool operator > (const component_group_index& other) const { return info->id > other.info->id; }
-		int compare(const component_group_index& other) const { return info->id.compare(other.info->id); }
+        auto operator <=> (const component_group_index& other) const { return info->id <=> other.info->id; }
+        bool operator == (const component_group_index& other) const { return info->id == other.info->id; }
 	};
 };
 

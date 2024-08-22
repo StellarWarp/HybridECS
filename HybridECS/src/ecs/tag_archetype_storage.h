@@ -4,7 +4,7 @@
 
 namespace hyecs
 {
-	class tag_archetype_storage
+	class tag_archetype_storage : non_movable
 	{
 		archetype_index m_index;
 		dense_map<entity, storage_key> m_entities;
@@ -30,9 +30,6 @@ namespace hyecs
 				notify_storage_chunk_convert();
 			});
 		}
-
-		tag_archetype_storage(const tag_archetype_storage&) = delete;
-		tag_archetype_storage(tag_archetype_storage&&) = delete;
 
 		dense_map<entity, storage_key>& entities() { return m_entities; }
 
@@ -247,9 +244,7 @@ namespace hyecs
 					}
 
 					bool operator==(const iterator& other) const { return m_iterator == other.m_iterator; }
-					bool operator!=(const iterator& other) const { return m_iterator != other.m_iterator; }
 					bool operator==(const end_iterator&) const { return std::visit([](auto& iter) { return iter == end_iterator{}; }, m_iterator); }
-					bool operator!=(const end_iterator&) const { return !operator==(end_iterator{}); }
 					void* operator*() { return std::visit([](auto& iter) { return *iter; }, m_iterator); }
 				};
 
@@ -257,7 +252,6 @@ namespace hyecs
 				end_iterator end() { return {}; }
 
 				bool operator==(const component_array_accessor& other) const { return m_accessor == other.m_accessor; }
-				bool operator!=(const component_array_accessor& other) const { return m_accessor != other.m_accessor; }
 
 				bool operator==(const end_iterator&) const
 				{
@@ -272,7 +266,6 @@ namespace hyecs
 					}, m_accessor);
 				}
 
-				bool operator!=(const end_iterator&) const { return !operator==(end_iterator{}); }
 			};
 
 			component_array_accessor begin()

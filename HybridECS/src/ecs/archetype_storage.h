@@ -5,7 +5,7 @@
 
 namespace hyecs
 {
-	class archetype_storage
+	class archetype_storage : non_movable
 	{
 		friend class tag_archetype_storage;
 
@@ -63,9 +63,6 @@ namespace hyecs
 				chunk_to_sparse_convert_limit = 0;
 			}
 		}
-
-		archetype_storage(const archetype_storage&) = delete;
-		archetype_storage(archetype_storage&&) = delete;
 
 	public:
 		archetype_index archetype() const
@@ -198,7 +195,7 @@ namespace hyecs
 					}
 					else if (src_component_accessors.comparable() > dest_component_accessors.comparable())
 					{
-						assert(constructors_iter->type() == dest_component_accessors.component_type().type_index());
+						assert(constructors_iter->type() == dest_component_accessors.component_type());
 						auto& constructor = *constructors_iter;
 						for (void* addr : dest_component_accessors)
 							constructor(addr);
@@ -225,7 +222,7 @@ namespace hyecs
 		void sparse_convert_to_chunk()
 		{
 			auto sparse_table_ptr = std::make_unique<sparse_table>(std::move(std::get<sparse_table>(m_table)));
-			initializer_list<component_type_index> components(m_index.begin(), m_index.end());
+            sorted_sequence_cref<component_type_index> components(m_index.begin(), m_index.end());
 			m_table.emplace<table>(components);
 			auto& entities = sparse_table_ptr->get_entities();
 
@@ -265,11 +262,11 @@ namespace hyecs
 
 		void chunk_convert_to_sparse()
 		{
-			auto table_ptr = std::make_unique<table>(std::move(std::get<table>(m_table)));
-			m_table.emplace<sparse_table>(sorted_sequence_cref(m_component_storages));
+			table* table_ptr = &std::get<table>(m_table);
+			auto sparse_ptr = std::make_unique<sparse_table>(sorted_sequence_cref(m_component_storages));
 			auto entities = table_ptr->get_entities();
 			auto src_accessor = table_ptr->get_raw_accessor();
-			auto dest_accessor = std::get<sparse_table>(m_table).get_allocate_accessor(
+			auto dest_accessor = sparse_ptr->get_allocate_accessor(
 				sequence_cref(entities),
 				[this](entity e, storage_key s)
 				{
@@ -293,6 +290,8 @@ namespace hyecs
 				src_component_accessors++;
 				dest_component_accessors++;
 			}
+
+			m_table = std::move(*sparse_ptr);
 
 			for (auto& on_chunk_to_sparse : m_on_chunk_to_sparse)
 			{
@@ -439,21 +438,19 @@ namespace hyecs
 					{
 						return std::visit([](auto& iter) -> void* {
 							using iter_type = std::decay_t<decltype(iter)>;
-							if constexpr (has_operator_dereference_v<iter_type>)return *iter;
+							if constexpr (dereferenceable<iter_type>)return *iter;
 							else return nullptr;
 						}, m_iterator);
 					}
 
-					iterator& operator++()
+					void operator++()
 					{
 						std::visit([](auto& iterator) { iterator++; }, m_iterator);
-						return *this;
 					}
 
-					iterator& operator++(int)
+					void operator++(int)
 					{
-						std::visit([](auto& iterator) { iterator++; }, m_iterator);
-						return *this;
+						operator++();
 					}
 
 					//can't use variant operator== and operator!=
@@ -472,18 +469,14 @@ namespace hyecs
 							}, m_iterator);
 					}
 
-					bool operator!=(const iterator& other) const { return !operator==(other); }
 					bool operator==(const end_iterator&) const { return std::visit([](auto& accessor) { return accessor == nullptr; }, m_iterator); }
-					bool operator!=(const end_iterator&) const { return std::visit([](auto& accessor) { return accessor != nullptr; }, m_iterator); }
 				};
 
 				iterator begin() { return std::visit([](auto& accessor) { return iterator(accessor.begin()); }, m_accessor); }
 				end_iterator end() { return nullptr; }
 
 				bool operator==(const component_array_accessor& other) const { return m_accessor == other.m_accessor; }
-				bool operator!=(const component_array_accessor& other) const { return m_accessor != other.m_accessor; }
 				bool operator==(const end_iterator& other) const { return std::visit([](auto& accessor) { return accessor == nullptr; }, m_accessor); }
-				bool operator!=(const end_iterator& other) const { return std::visit([](auto& accessor) { return accessor != nullptr; }, m_accessor); }
 			};
 
 			component_array_accessor begin() { return std::visit([](auto& accessor) { return component_array_accessor(accessor.begin()); }, m_accessor); }

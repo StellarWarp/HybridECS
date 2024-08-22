@@ -18,7 +18,7 @@ namespace hyecs
 				std::array<indexed_type, sizeof...(T)>{
 				indexed_type{
 					type_list<T...>::template index_of<T>,
-					m_component_type_infos.at(type_hash::of<T>)
+					m_component_type_infos.at(type_hash::of<T>())
 				}...
 			}, [](const indexed_type& lhs, const indexed_type& rhs) {
 					return lhs.second < rhs.second;
@@ -44,7 +44,7 @@ namespace hyecs
 		auto unsorted_component_types(type_list<T...> = {}) -> const std::array<component_type_index, sizeof...(T)>&
 		{
 			static const std::array<component_type_index, sizeof...(T)> component_types =  {
-				m_component_type_infos.at(type_hash::of<T>) ...
+				m_component_type_infos.at(type_hash::of<T>()) ...
 			};
 			return component_types;
 		}

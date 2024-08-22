@@ -1,6 +1,6 @@
 #pragma once
-#include "core/static_data_registry.h"
-#include "core/component_group.h"
+#include "ecs/static_data_registry.h"
+#include "ecs/component_group.h"
 
 using namespace hyecs;
 

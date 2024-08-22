@@ -227,10 +227,12 @@ namespace hyecs
 			{
 				auto& any = anys[i];
 				if (!query_condition::match_any(comp_mask, any))//if any is empty it will be remove
-					if (!tag_condition.anys()[i].empty())
-						maintain_any_index.push_back(i);
-					else
-						return;
+                {
+                    if (!tag_condition.anys()[i].empty())
+                        maintain_any_index.push_back(i);
+                    else
+                        return;
+                }
 			}
 
 			if (maintain_any_index.empty())

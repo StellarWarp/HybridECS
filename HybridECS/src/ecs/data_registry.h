@@ -32,7 +32,7 @@ namespace hyecs
 
 	inline std::ostream& operator<<(std::ostream& os, const component_type_index& index)
 	{
-		std::string_view name = index.get_info().name();
+		std::string_view name = index.name();
 		os << name.substr(7);
 		return os;
 	}
@@ -284,7 +284,7 @@ namespace hyecs
 			group.component_types.push_back(component_index);
 			m_archetype_registry.register_component(component_index);
 			if (!type.is_empty())
-				m_component_storages.emplace(type.hash(), component_storage(component_index));
+				m_component_storages.emplace_value(type.hash(), component_index);
 			return component_index;
 		}
 
@@ -395,7 +395,7 @@ namespace hyecs
 					auto component_accessor = allocate_accessor.begin();
 					while (component_accessor != allocate_accessor.end())
 					{
-						assert((generic::type_index)component_accessor.component_type() == constructor_iter->type());
+						assert(component_accessor.component_type() == constructor_iter->type());
 						for (void* addr : component_accessor)
 						{
 							(*constructor_iter)(addr);
@@ -604,19 +604,19 @@ namespace hyecs
 			if constexpr (is_wo)
 			{
 				static_assert(!std::is_empty_v<typename T::type>, "empty component is not allowed to access");
-				return access_info{ type_hash::of<typename T::type>, access_info::wo };
+				return access_info{ type_hash::of<typename T::type>(), access_info::wo };
 			}
 			else
 			{
 				static_assert(!std::is_empty_v<decayed>, "empty component is not allowed to access");
 
 				if constexpr (is_const)
-					return access_info{ type_hash::of<decayed>, access_info::ro };
+					return access_info{ type_hash::of<decayed>(), access_info::ro };
 				else
 					if constexpr (is_ref)
-						return access_info{ type_hash::of<decayed>, access_info::rw };
+						return access_info{ type_hash::of<decayed>(), access_info::rw };
 					else
-						return access_info{ type_hash::of<decayed>, access_info::wo };
+						return access_info{ type_hash::of<decayed>(), access_info::wo };
 			}
 		};
 
@@ -629,20 +629,20 @@ namespace hyecs
 					if constexpr (std::is_base_of_v<query_parameter::all_param, T>)
 					{
 						for_each_type([&]<typename U>(type_wrapper<U>) {
-							cond_all.push_back(type_hash::of<U>);
+							cond_all.push_back(type_hash::of<U>());
 						}, typename T::types{});
 					}
 					else if constexpr (std::is_base_of_v<query_parameter::any_param, T>)
 					{
 						auto& cond_any = cond_anys.emplace_back();
 						for_each_type([&]<typename U>(type_wrapper<U>) {
-							cond_any.push_back({ type_hash::of<U> });
+							cond_any.push_back({ type_hash::of<U>() });
 						}, typename T::types{});
 					}
 					else if constexpr (std::is_base_of_v<query_parameter::none_param, T>)
 					{
 						for_each_type([&]<typename U>(type_wrapper<U>) {
-							cond_none.push_back(type_hash::of<U>);
+							cond_none.push_back(type_hash::of<U>());
 						}, typename T::types{});
 					}
 					else if constexpr (std::is_base_of_v<query_parameter::variant_param, T>)
@@ -669,7 +669,7 @@ namespace hyecs
 						using relation_tag = typename T::relation_tag;
 						using query_param = typename T::query_param;
 						relation.emplace_back(
-							type_hash::of<relation_tag>,
+							type_hash::of<relation_tag>(),
 							relation_category::single,
 							query_descriptor(query_param{}));
 					}
@@ -678,7 +678,7 @@ namespace hyecs
 						using relation_tag = typename T::relation_tag;
 						using query_param = typename T::query_param;
 						relation.emplace_back(
-							type_hash::of<relation_tag>,
+							type_hash::of<relation_tag>(),
 							relation_category::multi,
 							query_descriptor(query_param{}));
 					}
@@ -765,12 +765,13 @@ namespace hyecs
 				for (int i = 1; i < sorted_range.size(); ++i)
 					if (sorted_range[i] == sorted_range[i - 1])
 						return false;
-			};
+				return true;
+				};
 
-			assert(is_unique(descriptor.cond_all));
-			assert(is_unique(descriptor.cond_none));
-			for (auto& vec : descriptor.cond_anys)
-				assert(is_unique(vec));
+				assert(is_unique(descriptor.cond_all));
+				assert(is_unique(descriptor.cond_none));
+				for (auto& vec : descriptor.cond_anys)
+					assert(is_unique(vec));
 
 				);
 

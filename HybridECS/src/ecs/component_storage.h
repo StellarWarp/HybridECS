@@ -5,7 +5,7 @@
 
 namespace hyecs
 {
-	class component_storage
+	class component_storage : non_movable
 	{
 		component_type_index m_component_type;
 		raw_entity_dense_map m_storage;
@@ -15,7 +15,7 @@ namespace hyecs
 	public:
 		component_storage(component_type_index index) :
 			m_component_type(index),
-			m_storage(index.type_index().size())
+			m_storage(index.size(),index.alignment())
 		{
 			assert(!index.is_empty());
 		}
@@ -104,10 +104,10 @@ namespace hyecs
 		template <typename T>
 		class accessor
 		{
-			const raw_entity_dense_map* m_storage;
+			raw_entity_dense_map* m_storage;
 
 		public:
-			accessor(const raw_entity_dense_map& storage) : m_storage(&storage)
+			accessor(raw_entity_dense_map& storage) : m_storage(&storage)
 			{
 			}
 
@@ -143,10 +143,6 @@ namespace hyecs
 					return m_iter == other.m_iter;
 				}
 
-				bool operator!=(const iterator& other) const
-				{
-					return m_iter != other.m_iter;
-				}
 			};
 
 			iterator begin()
@@ -217,9 +213,7 @@ namespace hyecs
 
 				void* operator*() const { return *m_current; }
 				bool operator==(const iterator& other) const { return m_current == other.m_current; }
-				bool operator!=(const iterator& other) const { return !(*this == other); }
 				bool operator==(const end_iterator& other) const { return m_current == m_end; }
-				bool operator!=(const end_iterator& other) const { return !operator==(other); }
 			};
 
 			iterator begin() { return iterator(m_components); }

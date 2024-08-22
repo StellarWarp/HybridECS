@@ -21,21 +21,9 @@ namespace hyecs
 
 
 	public:
-		query_condition() = default;
+		query_condition():hash_(invalid_hash) {};
 
-		query_condition(query_condition&& other)
-			:storage_(std::move(other.storage_)),
-			all_(other.all_),
-			none_(other.none_),
-			anys_(other.anys_),
-			all_bitset_(other.all_bitset_),
-			none_bitset_(other.none_bitset_),
-			hash_(other.hash_)
-		{
-			
-		}
-
-		query_condition(const query_condition& other)
+		query_condition(const query_condition& other) noexcept
 			: all_bitset_(other.all_bitset_),
 			none_bitset_(other.none_bitset_),
 			hash_(other.hash_)
@@ -59,18 +47,9 @@ namespace hyecs
 				append_cond(any, any_);
 			}
 		}
-
-		query_condition& operator=(query_condition&& other)
-		{
-			storage_ = std::move(other.storage_);
-			all_ = other.all_;
-			none_ = other.none_;
-			anys_ = other.anys_;
-			all_bitset_ = other.all_bitset_;
-			none_bitset_ = other.none_bitset_;
-			hash_ = other.hash_;
-			return *this;
-		}
+		query_condition& operator=(const query_condition&) = delete;
+		query_condition(query_condition&&) = default;
+		query_condition& operator=(query_condition&&) = default;
 
 		template<typename Filter = nullptr_t, typename Complete = std::true_type>
 		query_condition(
