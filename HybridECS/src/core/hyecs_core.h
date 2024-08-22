@@ -5,5 +5,5 @@
 
 namespace hyecs
 {
-
+    using namespace auto_delegate;
 }
