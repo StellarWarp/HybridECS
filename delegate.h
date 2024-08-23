@@ -114,6 +114,7 @@ namespace auto_delegate
             invoker = StaticLambdaInvoker<Callable{}>;
         }
 
+        bool is_bound() const { return ptr != nullptr; }
         operator bool() const { return ptr != nullptr; }
 
         Ret invoke(Args... args)
