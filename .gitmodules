@@ -1,3 +1,6 @@
 [submodule "src/delegate"]
 	path = src/delegate
 	url = D:/local_git/AutoDelegateShare
+[submodule "src/auto_reference"]
+	path = src/auto_reference
+	url = D:/local_git/AutoReference
