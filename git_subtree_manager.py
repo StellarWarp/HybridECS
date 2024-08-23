@@ -13,6 +13,8 @@ def run_command(command):
     if result.returncode != 0:
         print(Fore.RED + result.stderr + Style.RESET_ALL)
         error_code = result.returncode;
+        if result.stderr.find("Timed out") != -1:
+            raise TimeoutError()
         raise Exception(f"{command} failed with exit code {result.returncode}.")
     return result.stdout
 
@@ -44,6 +46,8 @@ try:
             for repo_url in subtree['repo_urls']:
                 try:
                     run_command(f'git subtree pull --prefix {subtree["prefix"]} {repo_url} {subtree["branch"]}')
+                except TimeoutError:
+                    print("Timed out. Skipping.")
                 except Exception as e:
                     print(f"Error: {e}")
                     if error_code != 0:
