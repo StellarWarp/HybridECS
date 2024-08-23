@@ -3,7 +3,6 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
-.idea/
 cmake-build*/
 
 .vscode
@@ -371,3 +370,7 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+
+/gitsubtree_util.py
+/gitsubtrees.json

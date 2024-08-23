@@ -4,3 +4,4 @@ project("HybridECS")
 
 # two subdirectories HybridECS and TEST
 add_subdirectory(HybridECS)
+add_subdirectory(UnitTest1)
