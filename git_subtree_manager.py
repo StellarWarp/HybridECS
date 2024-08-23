@@ -3,15 +3,39 @@ import argparse
 import json
 from colorama import Fore, Style
 
+error_code =0
 
 def run_git_command(args):
     """Runs a git command and returns the output."""
+    global error_code
     result = subprocess.run(['git'] + args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     if result.returncode != 0:
         print(Fore.RED + result.stderr + Style.RESET_ALL)
+        error_code = result.returncode;
         raise Exception(f"Command '{' '.join(args)}' failed with exit code {result.returncode}.")
     return result.stdout
 
+
+
+def add_subtree(prefix, repo_url, branch):
+    """Adds a Git subtree."""
+    print(f"Adding subtree from {repo_url} to {prefix}...")
+    output = run_git_command(['subtree', 'add', '--prefix', prefix, repo_url, branch])
+    print(output)
+
+
+def pull_subtree(prefix, repo_url, branch):
+    """Pulls updates for a Git subtree."""
+    print(f"Pulling updates from {repo_url} into {prefix}...")
+    output = run_git_command(['subtree', 'pull', '--prefix', prefix, repo_url, branch])
+    print(output)
+
+
+def push_subtree(prefix, repo_url, branch):
+    """Pushes local changes to the Git subtree back to the remote repo."""
+    print(f"Pushing local changes in {prefix} to {repo_url}...")
+    output = run_git_command(['subtree', 'push', '--prefix', prefix, repo_url, branch])
+    print(output)
 
 def try_urls_for_command(command_func, prefix, repo_urls, branch):
     """Tries each URL until a successful git command execution."""
@@ -22,28 +46,9 @@ def try_urls_for_command(command_func, prefix, repo_urls, branch):
             return
         except Exception as e:
             print(f"Failed with URL: {repo_url}. Error: {e}")
+            if error_code == 1:
+                exit(1)
     print("All repo URLs failed.")
-
-
-def add_subtree(prefix, repo_url, branch='main'):
-    """Adds a Git subtree."""
-    print(f"Adding subtree from {repo_url} to {prefix}...")
-    output = run_git_command(['subtree', 'add', '--prefix', prefix, repo_url, branch, '--squash'])
-    print(output)
-
-
-def pull_subtree(prefix, repo_url, branch='main'):
-    """Pulls updates for a Git subtree."""
-    print(f"Pulling updates from {repo_url} into {prefix}...")
-    output = run_git_command(['subtree', 'pull', '--prefix', prefix, repo_url, branch, '--squash'])
-    print(output)
-
-
-def push_subtree(prefix, repo_url, branch='main'):
-    """Pushes local changes to the Git subtree back to the remote repo."""
-    print(f"Pushing local changes in {prefix} to {repo_url}...")
-    output = run_git_command(['subtree', 'push', '--prefix', prefix, repo_url, branch])
-    print(output)
 
 
 def load_config(config_file):
