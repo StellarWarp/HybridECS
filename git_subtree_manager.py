@@ -45,9 +45,9 @@ def try_urls_for_command(command_func, prefix, repo_urls, branch):
             command_func(prefix, repo_url, branch)
             return
         except Exception as e:
-            print(f"Failed with URL: {repo_url}. Error: {e}")
-            if error_code == 1:
-                exit(1)
+            print(f"Error: {e}")
+            if error_code != 0:
+                exit(error_code)
     print("All repo URLs failed.")
 
 
