@@ -3,7 +3,8 @@ import argparse
 import json
 from colorama import Fore, Style
 
-error_code =0
+error_code = 0
+
 
 def run_command(command):
     """Runs a git command and returns the output."""
@@ -16,17 +17,6 @@ def run_command(command):
     return result.stdout
 
 
-def load_config(config_file):
-    """Loads the JSON configuration file."""
-    with open(config_file, 'r') as file:
-        return json.load(file)
-
-
-def pull_all_subtrees(subtrees):
-    """Pulls updates for all Git subtrees."""
-
-
-
 parser = argparse.ArgumentParser(description="Manage Git subtrees.")
 parser.add_argument('command', choices=['add', 'pull', 'push', 'pull-all'],
                     help="Command to run: add, pull, push, or pull-all")
@@ -35,6 +25,14 @@ parser.add_argument('--config', default='subtrees.json',
                     help="The path to the configuration file (default: subtrees.json)")
 
 args = parser.parse_args()
+
+
+def load_config(config_file):
+    """Loads the JSON configuration file."""
+    with open(config_file, 'r') as file:
+        return json.load(file)
+
+
 config = load_config(args.config)
 
 try:
