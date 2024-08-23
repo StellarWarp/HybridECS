@@ -9,5 +9,5 @@
 
 namespace hyecs
 {
-
+    using namespace auto_delegate_export;
 }
