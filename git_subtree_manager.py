@@ -16,7 +16,7 @@ def run_command(command):
         if result.stderr.find("Timed out") != -1:
             raise TimeoutError()
         raise Exception(f"{command} failed with exit code {result.returncode}.")
-    return result.stdout
+    print(result.stdout)
 
 
 parser = argparse.ArgumentParser(description="Manage Git subtrees.")
