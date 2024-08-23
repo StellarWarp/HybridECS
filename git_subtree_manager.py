@@ -13,7 +13,7 @@ def run_command(command):
     if result.returncode != 0:
         print(Fore.RED + result.stderr + Style.RESET_ALL)
         error_code = result.returncode;
-        raise Exception(f"Command '{' '.join(args)}' failed with exit code {result.returncode}.")
+        raise Exception(f"{command} failed with exit code {result.returncode}.")
     return result.stdout
 
 
