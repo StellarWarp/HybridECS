@@ -1,0 +1,14 @@
+{
+  "subtrees": {
+    "delegate": {
+      "prefix": "HybridECS/src/core/delegate",
+      "repo_url": "https://github.com/StellarWarp/AutoDelegate.git",
+      "branch": "delegate"
+    },
+    "auto_reference": {
+      "prefix": "HybridECS/src/core/auto_reference",
+      "repo_url": "https://github.com/StellarWarp/AutoDelegate.git",
+      "branch": "auto_reference"
+    }
+  }
+}
