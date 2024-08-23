@@ -40,24 +40,7 @@ namespace test_auto_reference
             }
         }
     };
-
-
-//    struct XY_ref_protocol : auto_ref_protocol<
-//            class X*, class Y*,
-//            array_ref_charger<XY_ref_protocol>, array_ref_charger<XY_ref_protocol>,
-//            true, true
-//    >{};
-//
-//    struct X
-//    {
-//
-//    };
-//
-//    struct Y
-//    {
-//
-//    };
-
+}
 
     void test()
     {
@@ -85,4 +68,3 @@ namespace test_auto_reference
         delete b;
 
     }
-}

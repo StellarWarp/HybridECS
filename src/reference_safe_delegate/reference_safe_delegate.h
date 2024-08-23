@@ -67,21 +67,21 @@ namespace auto_delegate
         }
 
         delegate_handle_t bind(nullptr_t, void* invoker) requires enable_delegate_handle
-                {
-                        auto& [fn, handle_ref] = super::bind(nullptr_t{});
-                fn = invoker;
-                return bind_handle(handle_ref);
-                }
+        {
+            auto& [fn, handle_ref] = super::bind(nullptr_t{});
+            fn = invoker;
+            return bind_handle(handle_ref);
+        }
 
         void unbind(delegate_handle_t_ref handle) requires enable_delegate_handle
-                {
-                        if constexpr (!enable_delegate_handle) return;
-                        inverse_handle_t* inv_handle = inverse_handle_t::get(&handle);
-                        assert(inv_handle);
-                        intptr_t offset = offsetof(typename super::element_t, data) + tuple_element_offset<1, tuple_t>();
-                        auto* h = (typename super::ref_handle_t*) (intptr_t(inv_handle) - offset);
-                        super::notify_reference_removed(h);
-                }
+        {
+            if constexpr (!enable_delegate_handle) return;
+            inverse_handle_t* inv_handle = inverse_handle_t::get(&handle);
+            assert(inv_handle);
+            intptr_t offset = offsetof(typename super::element_t, data) + tuple_element_offset<1, tuple_t>();
+            auto* h = (typename super::ref_handle_t*) (intptr_t(inv_handle) - offset);
+            super::notify_reference_removed(h);
+        }
 
         void unbind(const super::pointer_t& obj) requires (not enable_delegate_handle)
         {
@@ -92,6 +92,7 @@ namespace auto_delegate
         auto_delegate_container() = default;
 
         auto_delegate_container(auto_delegate_container&& other) noexcept
+                : super(std::move(other))
         {
             if constexpr (enable_delegate_handle)
                 if constexpr (delegate_handle_t::container_reference)
@@ -162,15 +163,15 @@ namespace auto_delegate
         }
 
         void unbind(delegate_handle_t_ref handle) requires enable_delegate_handle
-                {
-                        if constexpr (!enable_delegate_handle) return;
-                        inverse_handle_t* inv_handle = inverse_handle_t::get(&handle);
-                        intptr_t handle_ref_element_offset = offsetof(delegate_object, inv_handle);
-                        auto* o = (delegate_object*) (intptr_t(inv_handle) - handle_ref_element_offset);
-                        int64_t index = o - objects.data();
-                        objects[index] = std::move(objects.back());
-                        objects.pop_back();
-                }
+        {
+            if constexpr (!enable_delegate_handle) return;
+            inverse_handle_t* inv_handle = inverse_handle_t::get(&handle);
+            intptr_t handle_ref_element_offset = offsetof(delegate_object, inv_handle);
+            auto* o = (delegate_object*) (intptr_t(inv_handle) - handle_ref_element_offset);
+            int64_t index = o - objects.data();
+            objects[index] = std::move(objects.back());
+            objects.pop_back();
+        }
 
         void unbind(const std::weak_ptr<void>& obj) requires (not enable_delegate_handle)
         {
@@ -191,6 +192,7 @@ namespace auto_delegate
         weak_delegate_container() = default;
 
         weak_delegate_container(weak_delegate_container&& other) noexcept
+                : objects(std::move(other.objects))
         {
             if constexpr (enable_delegate_handle)
                 if constexpr (delegate_handle_t::reqiure_container)

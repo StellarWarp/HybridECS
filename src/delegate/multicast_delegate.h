@@ -177,7 +177,7 @@ namespace auto_delegate
         void notify_container_moved(Container* new_container)
         {
             if (auto h = get_handle())
-                h->container = new_container->container;
+                h->container = new_container;
         }
 
         unique_delegate_handle_ref& operator=(unique_delegate_handle_ref&& other) noexcept
@@ -218,6 +218,20 @@ namespace auto_delegate
 
         std::vector<delegate_object> objects;
     public:
+        default_delegate_container() = default;
+        default_delegate_container(const default_delegate_container&) = delete;
+        default_delegate_container(default_delegate_container&& other) noexcept
+        :objects( std::move(other.objects) ) {
+            if constexpr (enable_delegate_handle)
+                if constexpr (delegate_handle_t::container_reference)
+                {
+                    for (auto& ref: objects)
+                    {
+                        ref.inv_handle.notify_container_moved(this);
+                    }
+                }
+        }
+
         auto size() { return objects.size(); }
 
         bool empty() { return objects.empty(); }

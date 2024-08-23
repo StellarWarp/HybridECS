@@ -13,18 +13,24 @@ add_rules("mode.debug", "mode.release")
 set_toolchains("msvc")
 
 add_requires("benchmark", {configs = {header_only  = true}})
+add_requires("gtest")
 
-target("Delegate")
+target("DelegateBenchmark")
     set_languages("c++23")
     set_kind("binary")
-    add_files("src/*.cpp")
-    add_headerfiles("src/*/*.h")
-    add_packages("benchmark")
     on_load(apply_msvc_flags)
+
+    add_files("src/benchmark.cpp")
+    add_packages("benchmark")
     --add_ldflags("/PROFILE", {force = true})
 
+target("DelegateTest")
+    set_languages("c++23")
+    set_kind("binary")
+    on_load(apply_msvc_flags)
 
-    --on_load(apply_msvc_flags)
+    add_files("src/test.cpp")
+    add_packages("gtest")
 
 --
 -- If you want to known more usage about xmake, please see https://xmake.io
