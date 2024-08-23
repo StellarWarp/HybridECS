@@ -46,6 +46,7 @@ try:
             for repo_url in subtree['repo_urls']:
                 try:
                     run_command(f'git subtree pull --prefix {subtree["prefix"]} {repo_url} {subtree["branch"]}')
+                    break
                 except TimeoutError:
                     print("Timed out. Skipping.")
                 except Exception as e:
