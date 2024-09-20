@@ -1,7 +1,7 @@
 #pragma once
 #include "entity.h"
 #include "component.h"
-#include "dense_map.h"
+#include "entity_map.h"
 
 namespace hyecs
 {

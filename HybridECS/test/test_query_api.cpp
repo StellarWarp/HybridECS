@@ -158,8 +158,6 @@ static ut::suite test_suite = []
 {
     using namespace ut;
 
-    using x = function_traits<decltype(&tset_func)>::function_type;
-
     "query api"_test = []
     {
         data_registry registry(ecs_static_register_context::register_context);

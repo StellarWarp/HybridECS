@@ -10,6 +10,8 @@ namespace hyecs
 #define no_unique_address msvc::no_unique_address
 #endif
 
+    // sparse container dont support for iteration
+    // if iteration is needed, use dense container
     template<typename T>
     class entity_sparse_table
     {
@@ -57,23 +59,15 @@ namespace hyecs
         struct page
         {
         private:
-            uint8_t data[page_byte_size];
+            entity_value_pair data[page_capacity];
+            uint8_t padding[page_byte_size - sizeof(data)];
         public:
-            page()
-            {
-                for (size_t i = 0; i < page_capacity; i++)
-                {
-                    auto& pair = at(i);
-                    pair.e = null_entity;
-                }
-            }
+            page() { for(auto& p : data) p.e = null_entity; }
 
             entity_value_pair& at(uint32_t offset)
             {
                 assert(offset < page_capacity);
-                auto byte_offset = offset * sizeof(entity_value_pair);
-                assert(byte_offset < page_byte_size);
-                return *reinterpret_cast<entity_value_pair*>(&data[byte_offset]);
+                return data[offset];
             }
 
             template<class... Args>
@@ -87,12 +81,12 @@ namespace hyecs
             void erase(uint32_t offset)
             {
                 auto& pair = at(offset);
-                pair.e = entity();
+                pair.e = null_entity;
                 pair.value.~value_type();
             }
-
-
         };
+
+        static_assert(sizeof(page) == page_byte_size);
 
         vector<page*> pages;
 
@@ -168,8 +162,7 @@ namespace hyecs
         {
             auto [page_index, page_offset] = table_location(e.id());
             assert(pages.size() > page_index && pages[page_index]);
-            auto& pair = pages[page_index]->at(page_offset);
-            pair.e = null_entity;
+            pages[page_index]->erase(page_offset);
         }
 
         bool contains(entity e)
@@ -219,9 +212,6 @@ namespace hyecs
     {
         entity_sparse_map<std::pair<void*, raw_segmented_vector::index_t>> m_sparse;
         raw_segmented_vector m_dense;// element type <entity, value>
-
-
-
     public:
 
         struct entity_value
@@ -297,34 +287,6 @@ namespace hyecs
         {
             return m_dense.end();
         }
-    };
-
-
-    class entity_dense_set : protected raw_entity_dense_map
-    {
-        using super = raw_entity_dense_map;
-    public:
-        entity_dense_set() : super(0, alignof(entity)) {}
-
-        void insert(entity e) { allocate_value(e); }
-
-        void erase(entity e) { deallocate_value(e); }
-
-        class iterator : public raw_entity_dense_map::iterator
-        {
-            using super = raw_entity_dense_map::iterator;
-        public:
-            iterator(super&& it) : super(std::move(it)) {}
-
-            entity operator*()
-            {
-                return raw_entity_dense_map::iterator::operator*().e;
-            }
-        };
-
-        iterator begin() { return iterator{super::begin()}; }
-
-        end_iterator end() { return super::end(); }
     };
 
 }

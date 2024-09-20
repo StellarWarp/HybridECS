@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ecs/dense_map.h"
+#include "ecs/entity_map.h"
 
 #include "ut.hpp"
 
@@ -34,7 +34,7 @@ static ut::suite _ = [] {
         	}
         }
 
-        for (uint32_t i = 1024; i < 1024 + test_scale; i++)
+        for (uint32_t i = test_scale; i < test_scale + test_scale; i++)
         {
         	new(table.allocate_value(entity{ i,0 })) int(i);
         	map[entity{ i,0 }] = i;
@@ -69,6 +69,18 @@ static ut::suite _ = [] {
         for (auto& [e, v] : map)
         {
         	expect(*(int*)table.at(e) == v);
+        }
+        for (auto [e, ptr] : table)
+        {
+            expect(map.at(e) == *(int*)ptr);
+        }
+
+        for (uint32_t i = 0; i < test_scale*3; i++)
+        {
+            auto e = entity{i,0};
+            bool b1 = map.contains(e);
+            auto b2 = table.contains(e);
+            expect(b1 == b2);
         }
 
         entity_sparse_set set;
