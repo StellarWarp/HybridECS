@@ -26,6 +26,7 @@ namespace hyecs
 			component_group_index group,
 			bool is_tag)
 			: m_type_index(type_index),
+              m_size(type_index.size()),
               m_alignment(type_index.alignment()),
               m_copy_constructor(type_index.copy_constructor_ptr()),
               m_move_constructor(type_index.move_constructor_ptr()),

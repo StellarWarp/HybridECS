@@ -34,8 +34,8 @@ namespace hyecs
         uint32_t element_count;
 
         uint32_t m_chunk_offset_bits;
-        uint32_t m_chunk_index_mask;
-        uint32_t m_chunk_offset_mask;
+        index_t m_chunk_index_mask;
+        index_t m_chunk_offset_mask;
 
 
     public:
@@ -118,6 +118,7 @@ namespace hyecs
 
     public:
 
+        //the index is a internal allocate non-consistent index
         std::pair<void*, index_t> allocate_value()
         {
             chunk* chunk;

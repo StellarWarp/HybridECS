@@ -105,27 +105,27 @@ namespace hyecs
 			m_capacity_end = m_begin + new_capacity_byte_size;
 		}
 
-		constexpr size_t capacity() const noexcept
+		size_t capacity() const noexcept
 		{
 			return (m_capacity_end - m_begin) / m_type.size();
 		}
 
-		constexpr size_t size() const noexcept
+		size_t size() const noexcept
 		{
 			return (m_end - m_begin) / m_type.size();
 		}
 
-		constexpr size_t type_size() const noexcept
+		size_t type_size() const noexcept
 		{
 			return m_type.size();
 		}
 
-		constexpr size_t byte_size() const noexcept
+		size_t byte_size() const noexcept
 		{
 			return m_capacity_end - m_begin;
 		}
 
-		constexpr size_t byte_capacity() const noexcept
+		size_t byte_capacity() const noexcept
 		{
 			return m_capacity_end - m_begin;
 		}

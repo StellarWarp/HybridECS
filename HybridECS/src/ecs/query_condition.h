@@ -21,7 +21,7 @@ namespace hyecs
 
 
 	public:
-		query_condition():hash_(invalid_hash) {};
+		query_condition():hash_(0) { assert(compute_hash() == 0); };
 
 		query_condition(const query_condition& other) noexcept
 			: all_bitset_(other.all_bitset_),
@@ -175,8 +175,10 @@ namespace hyecs
 		uint64_t compute_hash()
 		{
 			hash_ = 0;
+            // c1,c2,c3...
 			for (auto comp : all_)
 				hash_ += comp.hash();
+            // any<c1>,any<c2>,...
 			for (auto any : anys_)
 			{
 				assert(!any.empty());
@@ -184,6 +186,7 @@ namespace hyecs
 				for (auto comp : any) h += comp.hash();
 				hash_ += any_hash(h);
 			}
+            // none<c1,c2,c3...>
 			uint64_t n_h = 0;
 			if (!none_.empty())
 			{

@@ -238,9 +238,10 @@ namespace hyecs
             void destructor(this auto&& self, void* begin, void* end) requires (requires { self.destructor_ptr(); self.size(); })
             {
                 if (self.destructor_ptr() == nullptr) return;
-                for (; begin != end; (uint8_t*) begin + self.size())
+                uint8_t* begin_ = static_cast<uint8_t*>(begin);
+                for (; begin_ != end; begin_ += self.size())
                 {
-                    self.destructor_ptr()(begin);
+                    self.destructor_ptr()(begin_);
                 }
             }
 
