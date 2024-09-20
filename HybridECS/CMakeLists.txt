@@ -8,7 +8,8 @@ set(CMAKE_CXX_STANDARD 23)
 set(SRC_FOLDERS "${CMAKE_CURRENT_SOURCE_DIR}/src")
 #file(GLOB_RECURSE SRC_FILES "${SRC_FOLDERS}/*.cpp" "${SRC_FOLDERS}/*.h" "${SRC_FOLDERS}/*.hpp")
 
-add_executable(${CURRENT_PROJECT_NAME} ${SRC_FOLDERS}/HybridECS.cpp)
+file(GLOB_RECURSE SRC_FILES "${SRC_FOLDERS}/*.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/test/*.cpp")
+add_executable(${CURRENT_PROJECT_NAME} ${SRC_FILES})
 
 
 # pch file is at ./src/pch.h

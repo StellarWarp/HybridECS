@@ -103,27 +103,26 @@ namespace hyecs
 	class data_registry
 	{
 	public:
+        // type infos - longest life-time
+		vaildref_map<uint64_t, component_type_info> m_component_type_infos;
+		vaildref_map<component_group_id, component_group_info> m_component_group_infos;
+        // archetypes
 		archetype_registry m_archetype_registry;
 		storage_key_registry m_storage_key_registry;
-
+        // storages
 		vaildref_map<uint64_t, component_storage> m_component_storages;
 		vaildref_map<uint64_t, archetype_storage> m_archetypes_storage;
 		vaildref_map<uint64_t, tag_archetype_storage> m_tag_archetypes_storage;
-		//using storage_variant = std::variant<component_storage, archetype_storage, tag_archetype_storage>;
-		//vaildref_map <archetype::hash_type, storage_variant> m_storages;
-
-		vaildref_map<uint64_t, component_type_info> m_component_type_infos;
-		vaildref_map<component_group_id, component_group_info> m_component_group_infos;
-
+        // query
 		vaildref_map<uint64_t, query> m_queries;
 		vaildref_map<uint64_t, table_tag_query> m_table_queries;
-
+        // entity
 		dense_set<entity> m_entities;
 
 		class entity_allocator
 		{
 			uint32_t m_next_id;
-			dense_map<uint32_t, uint32_t> m_reuseable_entity_versions{};
+			dense_map<uint32_t, uint32_t> m_reusable_entity_versions{};
 
 		public:
 			entity_allocator()
@@ -140,7 +139,7 @@ namespace hyecs
 
 			void deallocate(entity e)
 			{
-				m_reuseable_entity_versions[e.id()] = e.version();
+                m_reusable_entity_versions[e.id()] = e.version();
 			}
 		};
 

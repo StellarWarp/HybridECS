@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.24)
 
 project("HybridECS")
 
-# two subdirectories HybridECS and TEST
+include_directories("HybridECS/src")
+
 add_subdirectory(HybridECS)
-add_subdirectory(UnitTest1)
+add_subdirectory(TEST)
