@@ -23,8 +23,9 @@ namespace hyecs
 	sequence_ref_class(Iter, Iter)->sequence_ref_class<typename std::iterator_traits<Iter>::value_type, Iter>;\
 	template <typename... T> \
 		requires (type_list<T...>::is_same && sizeof...(T) > 0)\
-	sequence_ref_class(T...)->sequence_ref_class<typename type_list<T...>::template get<0>>;
-
+	sequence_ref_class(T...)->sequence_ref_class<typename type_list<T...>::template get<0>>;           \
+    template <typename T>\
+    sequence_ref_class(std::initializer_list<T>)->sequence_ref_class<T>;
 
 	HYECS_sequence_ref_template_guides(sequence_ref);
 
@@ -45,14 +46,10 @@ namespace hyecs
 	template <typename T, typename SeqParam = const T*>
 	class sequence_cref : public sequence_ref<const T, SeqParam>
 	{
-		using base = sequence_ref<const T, SeqParam>;
+		using super = sequence_ref<const T, SeqParam>;
 
 	public:
-		using base::base;
-
-		//sequence_cref(const base& other) : base(other)
-		//{
-		//}
+		using super::super;
 	};
 
 	HYECS_sequence_ref_template_guides(sequence_cref);
@@ -290,34 +287,39 @@ namespace hyecs
 	template <typename T, typename Option = T*>
 	class sorted_sequence_ref : public sequence_ref<T, Option>
 	{
-	public:
-		explicit sorted_sequence_ref(sequence_ref<T, Option> seq) : sequence_ref<T, Option>(seq)
+        using super = sequence_ref<T, Option>;
+
+    public:
+        explicit sorted_sequence_ref(sequence_ref<T, Option> seq) : super(seq)
 		{
 		};
 
 		template <typename Iter>
-		sorted_sequence_ref(const Iter& bgein, const Iter& end) : sequence_ref<T, Option>(bgein, end)
-		{
-		};
-	};
-
-
-	template <typename T, typename Option = const T*>
-	class sorted_sequence_cref : public sequence_cref<T, Option>
-	{
-	public:
-		explicit sorted_sequence_cref(sequence_cref<T, Option> seq) : sequence_cref<T, Option>(seq)
-		{
-		};
-
-		template <typename Iter>
-		sorted_sequence_cref(const Iter& bgein, const Iter& end) : sequence_cref<T, Option>(bgein, end)
+		sorted_sequence_ref(const Iter& bgein, const Iter& end) : super(bgein, end)
 		{
 		};
 	};
 
 	HYECS_sequence_ref_template_guides(sorted_sequence_ref);
+
+	template <typename T, typename Option = const T*>
+	class sorted_sequence_cref : public sequence_cref<T, Option>
+	{
+        using super = sequence_cref<T, Option>;
+	public:
+		explicit sorted_sequence_cref(sequence_cref<T, Option> seq) : super(seq)
+		{
+		};
+
+		template <typename Iter>
+		sorted_sequence_cref(const Iter& bgein, const Iter& end) : super(bgein, end)
+		{
+		};
+	};
+
 	HYECS_sequence_ref_template_guides(sorted_sequence_cref);
+
+#undef HYECS_sequence_ref_template_guides
 
 
 	template <typename T, size_t N>
