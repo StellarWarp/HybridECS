@@ -54,7 +54,7 @@ namespace hyecs
 		template<typename Filter = nullptr_t, typename Complete = std::true_type>
 		query_condition(
 			sequence_cref<component_type_index> all,
-			auto& anys,//sequence_cref<sequence_cref<component_type_index>>
+			auto& anys,//vector<vector<component_type_index>>
 			sequence_cref<component_type_index> none,
 			Filter filter,
 			Complete = {}

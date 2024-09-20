@@ -438,7 +438,7 @@ namespace hyecs
 					{
 						return std::visit([](auto& iter) -> void* {
 							using iter_type = std::decay_t<decltype(iter)>;
-							if constexpr (dereferenceable<iter_type>)return *iter;
+							if constexpr (requires(iter_type t) { *t; })return *iter;
 							else return nullptr;
 						}, m_iterator);
 					}

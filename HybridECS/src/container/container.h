@@ -3,7 +3,6 @@
 #include "stl_container.h"
 #include "generic_container.h"
 #include "vaildref_map.h"
-#include "fixed_vector.h"
 #include "bit_set.h"
 #include "sequence_ref.h"
 #include "raw_segmented_vector.h"

@@ -149,9 +149,16 @@ class main_registry : public immediate_data_registry<register_idents::main>
 
 namespace ut = boost::ut;
 
+void tset_func() noexcept
+{
+
+}
+
 static ut::suite test_suite = []
 {
     using namespace ut;
+
+    using x = function_traits<decltype(&tset_func)>::function_type;
 
     "query api"_test = []
     {

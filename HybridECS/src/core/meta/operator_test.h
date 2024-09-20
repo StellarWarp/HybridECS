@@ -3,11 +3,6 @@
 namespace hyecs
 {
 
-    template<typename T>
-    concept dereferenceable = requires(T t) { *t; };
-
-    template<typename T>
-    concept addressable = requires(T t) { &t; };
 
 //
 //#define DELCATE_BINARY_OPERATOR_TEST(OP, NAME) \
