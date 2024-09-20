@@ -22,9 +22,17 @@ namespace auto_delegate
         using bare_tuple_type = std::tuple <std::remove_const_t<std::remove_reference_t < Args>>...>;
     };
 
+    template<typename ReturnType, typename... Args>
+    struct function_traits<ReturnType(Args...) noexcept> : function_traits<ReturnType(Args...)> {
+        using function_type = ReturnType(Args...) noexcept;
+    };
+
     // function pointer
     template<typename ReturnType, typename... Args>
     struct function_traits<ReturnType(*)(Args...)> : function_traits<ReturnType(Args...)> {};
+
+    template<typename ReturnType, typename... Args>
+    struct function_traits<ReturnType(*)(Args...) noexcept> : function_traits<ReturnType(Args...) noexcept>{};
 
     // member function pointer
     template<typename ReturnType, typename ClassType, typename... Args>
