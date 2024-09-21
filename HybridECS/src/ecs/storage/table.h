@@ -291,7 +291,7 @@ namespace hyecs
 
 	public:
 		//call after all addition and removal were done
-		//todo this will cause invild storage key reference
+		//todo this will cause invalid storage key reference need to update storage key references
 		void phase_swap_back()
 		{
 			size_t max_len = 0;
@@ -299,8 +299,10 @@ namespace hyecs
 				max_len = std::max(max_len, free_indices.size());
 			vector<uint32_t> sorted_indices;
 			sorted_indices.reserve(max_len);
-			while (!m_free_indices.empty())
+			while (!m_free_indices.empty())//for each chunk
 			{
+                //get all free indices in chunk and sort it
+                //moving tail elements to head holes
 				auto chunk_index = m_free_indices.m_free_chunks_indices.top();
 				m_free_indices.m_free_chunks_indices.pop();
 				auto& free_indices = m_free_indices.m_free_indices[chunk_index];
@@ -327,9 +329,12 @@ namespace hyecs
 						byte* last_data = component_address(chunk, last_entity_offset, type);
 						byte* data = component_address(chunk, head_offset, type);
                         //todo should the destructor be called here?
+                        //!!!note that deallocate_accessor will destroy the 'data'
                         //is the component destruction needed for moved components?
-                        type.destructor(data);
+                        //type.destructor(data);
 						type.move_constructor(data, last_data);
+                        //todo does the last_data need to be destroyed?
+                        type.destructor(last_data);
 					}
 					last_entity_offset--;
 					head_hole_iter++;
@@ -358,8 +363,10 @@ namespace hyecs
 					}
 					move_to_head(head_entity_offset);
 				}
+                //the chunk was originally full now it has space so add it to the free list
+                assert(sorted_indices.size() != 0);//this should never happen
 				if (chunk->size() == m_chunk_capacity)
-					m_free_chunks.push({chunk, chunk_index});
+					m_free_chunks.emplace(chunk, chunk_index);
 				chunk->decrease_size(sorted_indices.size());
 				m_entity_count -= sorted_indices.size();
 
@@ -663,6 +670,7 @@ namespace hyecs
 					uint32_t m_offset;
 
 				public:
+                    //fixme empty & chunk element == 0 case is not handled
 					iterator(chunk_seq::iterator chunk_iter, chunk_seq::iterator chunk_end,
 					         const table_comp_type_info& type) :
 						m_chunk_iter(chunk_iter),
@@ -840,7 +848,7 @@ namespace hyecs
 					for (auto& type : m_table.m_notnull_components)
 					{
 						byte* data = component_address(m_table.m_chunks[chunk_index], chunk_offset, type);
-						type.destructor(data, 1);
+						type.destructor(data);
 					}
 				}
 
@@ -1085,6 +1093,7 @@ namespace hyecs
 				uint32_t m_offset;
 
 			public:
+                //fixme empty case and chunk element is 0 case need to be handled
 				iterator(chunk_seq::iterator chunk_iter, chunk_seq::iterator chunk_end) :
 					m_chunk_iter(chunk_iter),
 					m_chunk_end(chunk_end),

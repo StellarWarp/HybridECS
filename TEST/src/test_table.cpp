@@ -198,7 +198,7 @@ static ut::suite _ = []
         }
 
         vector<storage_key::table_offset_t> deallocate_keys;
-        //// ramdom deallocate
+        // ramdom deallocate
         for (uint32_t _ = 0; _ < 10240; _++)
         {
             if (uint32_t i = rand() % 10240; key_map.contains(entities[i]))

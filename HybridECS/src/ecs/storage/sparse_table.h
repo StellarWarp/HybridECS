@@ -71,7 +71,6 @@ namespace hyecs
 
 		using end_iterator = nullptr_t;
 
-		//todo template SeqIter
 		class raw_accessor
 		{
 		protected:

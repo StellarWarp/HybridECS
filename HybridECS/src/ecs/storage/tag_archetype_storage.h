@@ -196,7 +196,7 @@ namespace hyecs
 					}
 				}
 
-
+                //fixme pure tag accessor
 				component_array_accessor& operator++()
 				{
 					std::visit([this](auto& accessor)

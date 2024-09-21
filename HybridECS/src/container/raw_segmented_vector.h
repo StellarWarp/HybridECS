@@ -218,6 +218,7 @@ namespace hyecs
 
         public:
 
+            //todo chunk element count should not be 0
             iterator(sequence_ref<chunk*> chunks, size_t type_size) noexcept
                     : m_chunks(chunks), m_type_size(type_size), m_chunk_index(0), m_chunk_offset(0)
             {
