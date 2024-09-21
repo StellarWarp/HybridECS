@@ -5,14 +5,14 @@
 namespace hyecs
 {
 
-    class raw_segmented_vector
+    class raw_segmented_vector : non_copyable
     {
     public:
         using index_t = uint32_t;
 
     private:
 
-        static constexpr size_t default_chunk_byte_capacity = 1024 * 2;
+        static constexpr size_t default_chunk_byte_capacity = 1024 * 2 - sizeof(size_t);
 
         struct segment_location
         {
@@ -24,7 +24,7 @@ namespace hyecs
         struct chunk
         {
             uint8_t data[default_chunk_byte_capacity];
-            uint32_t element_count;
+            size_t element_count;
         };
         vector<chunk*> m_chunks;
         stack<std::pair<chunk*, uint32_t>> m_free_chunks;
@@ -47,6 +47,20 @@ namespace hyecs
             m_chunk_offset_mask = (1 << m_chunk_offset_bits) - 1;
             m_chunk_index_mask = ~m_chunk_offset_mask;
         }
+        ~raw_segmented_vector()
+        {
+            for (auto& chunk : m_chunks)
+            {
+                m_allocator.deallocate((std::byte*) chunk, sizeof(chunk));
+            }
+        }
+
+        void clear()
+        {
+            this->~raw_segmented_vector();
+            element_count = 0;
+            while (!m_free_chunks.empty()) m_free_chunks.pop();
+        }
 
 
     private:
@@ -57,7 +71,7 @@ namespace hyecs
 
         chunk* deallocate_chunk(chunk* ptr)
         {
-            m_allocator.deallocate((std::byte*)ptr, sizeof(chunk));
+            m_allocator.deallocate((std::byte*) ptr, sizeof(chunk));
         }
 
 
@@ -152,8 +166,17 @@ namespace hyecs
             return {ptr, table_offset({chunk_index, chunk_offset})};
         }
 
-        [[nodiscard]] bool deallocate_value(void* ptr, index_t index)
+        template<std::invocable<> OnSwapBack,
+                typename Mover = std::nullptr_t,
+                typename Deleter = decltype([](void*) {})>
+        void deallocate_value(
+                void* ptr, index_t index,
+                OnSwapBack&& on_swap_back,
+                Mover&& mover = {},
+                Deleter&& deleter = {}
+        )
         {
+            deleter(ptr);
             auto [chunk_index, chunk_offset] = chunk_index_offset(index);
             assert(chunk_index < m_chunks.size());
             assert(chunk_offset < chunk_element_capacity);
@@ -165,12 +188,16 @@ namespace hyecs
             {
                 uint32_t last_element_offset = (chunk->element_count - 1) * m_type_size;
                 void* last_element_ptr = chunk->data + last_element_offset;
-                std::memcpy(ptr, last_element_ptr, m_type_size);
+                if constexpr (std::same_as<std::nullptr_t, std::decay_t<decltype(mover)>>)
+                    std::memcpy(ptr, last_element_ptr, m_type_size);
+                else
+                    mover(ptr, last_element_ptr);
+                deleter(last_element_ptr);
+                on_swap_back();
             }
 
             chunk->element_count--;
             element_count--;
-            return swap_element;
         }
 
 
@@ -194,15 +221,21 @@ namespace hyecs
             iterator(sequence_ref<chunk*> chunks, size_t type_size) noexcept
                     : m_chunks(chunks), m_type_size(type_size), m_chunk_index(0), m_chunk_offset(0)
             {
+                while (m_chunks[m_chunk_index]->element_count == 0)
+                {
+                    m_chunk_index++;
+                    if(m_chunk_index == m_chunks.size()) break;
+                }
             }
 
             iterator& operator++()
             {
                 m_chunk_offset++;
-                if (m_chunk_offset == m_chunks[m_chunk_index]->element_count)
+                while (m_chunk_offset == m_chunks[m_chunk_index]->element_count)
                 {
                     m_chunk_index++;
                     m_chunk_offset = 0;
+                    if(m_chunk_index == m_chunks.size()) break;
                 }
                 return *this;
             }

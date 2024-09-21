@@ -1,9 +1,9 @@
 #pragma once
-#include "../lib/Lib.h"
-#include "archetype.h"
-#include "entity.h"
+#include "lib/Lib.h"
+#include "ecs/type/archetype.h"
+#include "ecs/type/entity.h"
 #include "storage_key_registry.h"
-#include "system_callable_invoker.h"
+#include "ecs/query/system_callable_invoker.h"
 
 #if defined(_MSC_VER)
 #define no_unique_address msvc::no_unique_address
@@ -248,6 +248,7 @@ namespace hyecs
 
 		void deallocate_chunk(chunk* _chunk)
 		{
+            assert(m_free_indices.empty());
 			for (int component_index = 0; component_index < m_notnull_components.size(); component_index++)
 			{
 				auto& comp_type = m_notnull_components[component_index];
@@ -274,7 +275,6 @@ namespace hyecs
 			{
 				m_free_chunks.pop();
 			}
-
 
 			return {chunk_index, chunk_offset};
 		}
@@ -326,6 +326,9 @@ namespace hyecs
 					{
 						byte* last_data = component_address(chunk, last_entity_offset, type);
 						byte* data = component_address(chunk, head_offset, type);
+                        //todo should the destructor be called here?
+                        //is the component destruction needed for moved components?
+                        type.destructor(data);
 						type.move_constructor(data, last_data);
 					}
 					last_entity_offset--;
@@ -725,6 +728,7 @@ namespace hyecs
 
 		complete_raw_accessor get_raw_accessor()
 		{
+            assert(m_free_indices.empty());
 			return complete_raw_accessor(this);
 		}
 
@@ -806,6 +810,7 @@ namespace hyecs
 		template <typename SeqParam, typename StorageKeyBuilder>
 		auto get_allocate_accessor(sequence_cref<entity, SeqParam> entities, StorageKeyBuilder builder)
 		{
+            assert(m_free_indices.empty());
 			static_assert(std::is_invocable_v<StorageKeyBuilder, entity, storage_key>);
 			m_entity_count += entities.size();
 			return allocate_accessor(*this, entities, builder);

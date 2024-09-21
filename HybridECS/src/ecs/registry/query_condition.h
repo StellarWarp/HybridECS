@@ -1,6 +1,6 @@
 #pragma once
-#include "component.h"
-#include "archetype.h"
+#include "ecs/type/component.h"
+#include "ecs/type/archetype.h"
 
 namespace hyecs
 {

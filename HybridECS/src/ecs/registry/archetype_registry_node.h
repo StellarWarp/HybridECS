@@ -1,5 +1,5 @@
 #pragma once
-#include "archetype.h"
+#include "ecs/type/archetype.h"
 #include "query_condition.h"
 
 namespace hyecs
@@ -61,6 +61,9 @@ namespace hyecs
 		return arch.hash() + tag_condition.hash();
 	}
 
+    /// the base archetype is fix to base-archetype
+    /// the tagged archetype is query by tag condition
+    /// base-arch + tag... ((tag|...) & ...) none(tag...)
 	class archetype_query_node
 	{
 	public:
@@ -218,7 +221,7 @@ namespace hyecs
 		archetype_query_index hash() const { return archetype_query_hash(m_base_archetype_node->archetype(), m_tag_condition); }
 	};
 
-
+    /// the general query, mapping to a real query in data_registry
 	class query_node
 	{
 	public:

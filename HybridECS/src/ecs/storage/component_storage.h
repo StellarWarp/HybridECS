@@ -1,6 +1,6 @@
 #pragma once
-#include "entity.h"
-#include "component.h"
+#include "ecs/type/entity.h"
+#include "ecs/type/component.h"
 #include "entity_map.h"
 
 namespace hyecs
@@ -19,6 +19,16 @@ namespace hyecs
 		{
 			assert(!index.is_empty());
 		}
+        ~component_storage()
+        {
+            if(!m_component_type.is_trivially_destructible())
+            {
+                for (auto [e, ptr] : m_storage)
+                {
+                    m_component_type.destructor_ptr()(ptr);
+                }
+            }
+        }
 
 		component_type_index component_type() const
 		{
@@ -37,18 +47,21 @@ namespace hyecs
 			return *(T*)at(e);
 		}
 
-		void erase(entity e)
-		{
-			m_storage.erase(e);
-		}
-
-		void erase(sequence_cref<entity> entities)
-		{
-			for (auto e : entities)
-			{
-				m_storage.erase(e);
-			}
-		}
+//		void erase(entity e)
+//		{
+//            if(!m_component_type.is_trivially_destructible())
+//
+//            m_storage.erase(e);
+//
+//		}
+//
+//		void erase(sequence_cref<entity> entities)
+//		{
+//			for (auto e : entities)
+//			{
+//				m_storage.erase(e);
+//			}
+//		}
 
 		//template<typename T, typename... Args>
 		//void emplace(entity e, Args&&... args)
@@ -70,10 +83,22 @@ namespace hyecs
 			return m_storage.allocate_value(e);
 		}
 
+        //todo this not the mean of deallocate but erase with destructor and copy constructor call
 		void deallocate_component(entity e)
 		{
-			m_storage.deallocate_value(e);
+			m_storage.deallocate_value(
+                    e,
+                    [this](void* dest,void* src){ m_component_type.move_constructor(dest,src); },
+                    [this](void* o){ m_component_type.destructor(o); });
 		}
+
+        void deallocate_components(sequence_cref<entity> entities)
+        {
+            for (auto e : entities)
+            {
+                deallocate_component(e);
+            }
+        }
 
 		template <typename SeqParam = const entity*>
 		void allocate_components(sequence_cref<entity, SeqParam> entities, sequence_ref<void*> addrs)

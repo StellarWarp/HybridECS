@@ -1,6 +1,6 @@
 #pragma once
-#include "tag_archetype_storage.h"
-#include "query_condition.h"
+#include "ecs/storage/tag_archetype_storage.h"
+#include "ecs/registry/query_condition.h"
 
 namespace hyecs
 {

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../container/container.h"
-#include "entity.h"
-#include "../core/marco.h"
+#include "container/container.h"
+#include "ecs/type/entity.h"
+#include "core/marco.h"
 
 namespace hyecs
 {
@@ -62,7 +62,7 @@ namespace hyecs
             entity_value_pair data[page_capacity];
             uint8_t padding[page_byte_size - sizeof(data)];
         public:
-            page() { for(auto& p : data) p.e = null_entity; }
+            page() { for (auto& p: data) p.e = null_entity; }
 
             entity_value_pair& at(uint32_t offset)
             {
@@ -118,6 +118,12 @@ namespace hyecs
                 delete page;
         }
 
+        void clear()
+        {
+            this->~entity_sparse_table();
+            pages.clear();
+        }
+
     private:
 
         auto page_for_index(uint32_t page_index)
@@ -136,7 +142,6 @@ namespace hyecs
         }
 
     public:
-
 
         template<typename... Args>
         void emplace(Args... args)
@@ -212,6 +217,8 @@ namespace hyecs
     {
         entity_sparse_map<std::pair<void*, raw_segmented_vector::index_t>> m_sparse;
         raw_segmented_vector m_dense;// element type <entity, value>
+
+        using no_deleter = decltype([](void*) {});
     public:
 
         struct entity_value
@@ -226,7 +233,21 @@ namespace hyecs
 
         raw_entity_dense_map(size_t value_size, size_t alignment) :
                 m_sparse(),
-                m_dense(sizeof(entity) + value_size, std::max(alignment, alignof(entity))) {}
+                m_dense(sizeof(entity) + value_size, std::max(alignment, alignof(entity))) {
+            assert(alignment <= sizeof(entity));//todo support for lager alignment
+        }
+        ~raw_entity_dense_map() = default; //warn that the need to delete value outside
+
+        template<typename Deleter = no_deleter>
+        void clear(Deleter deleter = {})
+        {
+            for (entity_value pair : m_dense)
+            {
+                deleter(pair.value);
+            }
+            m_sparse.clear();
+            m_dense.clear();
+        }
 
         void* allocate_value(entity e)
         {
@@ -237,16 +258,40 @@ namespace hyecs
             return ref.value;
         }
 
-        void deallocate_value(entity e)
+        template<typename Mover = std::nullptr_t,
+                typename Deleter = no_deleter>
+        void deallocate_value(entity e,
+                              Mover&& mover = {},
+                              Deleter&& deleter = {})
         {
             const auto& [ptr, index] = m_sparse.at(e);
-            if (m_dense.deallocate_value(ptr, index))
-            {
-                entity& swap_remap = *(entity*) ptr;
-                m_sparse.at(swap_remap) = {ptr, index};
-            }
+            m_dense.deallocate_value(
+                    ptr, index, [&]//remapping on swap
+                    {
+                        const entity& swap_remap = entity_value(ptr).e;
+                        m_sparse.at(swap_remap) = {ptr, index};
+                    },
+                    [&]//move
+                    {
+                        if constexpr (std::is_same_v<Mover, std::nullptr_t>)
+                            return nullptr_t{};
+                        else
+                            return [&](void* dest, void* src)
+                            {
+                                auto dest_ = entity_value(dest);
+                                auto src_ = entity_value(src);
+                                dest_.e = src_.e;
+                                mover(entity_value(dest).value, entity_value(src).value);
+                            };
+                    }(),
+                    [&](void* o)//delete
+                    {
+                        deleter(entity_value(o).value);
+                    });
             m_sparse.erase(e);
         }
+
+        size_t size() const { return m_dense.size(); }
 
         bool contains(entity e)
         {
@@ -258,10 +303,6 @@ namespace hyecs
             return entity_value(m_sparse.at(e).first).value;
         }
 
-        void erase(entity e)
-        {
-            deallocate_value(e);
-        }
 
         class iterator : public raw_segmented_vector::iterator
         {

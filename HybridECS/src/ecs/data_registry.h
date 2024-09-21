@@ -1,8 +1,8 @@
 #pragma once
-#include "archetype_registry.h"
-#include "archetype_storage.h"
-#include "tag_archetype_storage.h"
-#include "query.h"
+#include "ecs/registry/archetype_registry.h"
+#include "storage/archetype_storage.h"
+#include "storage/tag_archetype_storage.h"
+#include "ecs/query/query.h"
 
 namespace hyecs
 {
@@ -288,7 +288,7 @@ namespace hyecs
 		}
 
 	public:
-		void register_type(const ecs_type_register_context& context)
+		void register_type(const ecs_rtti_context& context)
 		{
 			for (auto& [_, group] : context.groups())
 			{
@@ -331,7 +331,7 @@ namespace hyecs
 			);
 		}
 
-		data_registry(const ecs_type_register_context& context) : data_registry()
+		data_registry(const ecs_rtti_context& context) : data_registry()
 		{
 			register_type(context);
 		}
@@ -354,12 +354,13 @@ namespace hyecs
 
 			while (group_begin != components.end())
 			{
-				group_end = std::adjacent_find(
-					group_begin, components.end(),
-					[](const component_type_index& lhs, const component_type_index& rhs)
-				{
-					return lhs.group() != rhs.group();
-				});
+				group_end = [&](){
+                    auto it = group_begin;
+                    auto g = group_begin->group();
+                    while (it != components.end() && it->group() == g)
+                        ++it;
+                    return it;
+                }();
 
 				archetype_index arch = m_archetype_registry.get_archetype(append_component(group_begin, group_end));
 
@@ -417,6 +418,43 @@ namespace hyecs
 			}
 		}
 
+        template<typename... T>
+        void emplace_(
+                sequence_ref<entity> entities,
+                T&&... components
+        )
+        {
+            const auto component_types_info = get_sorted_component_types<T...>();
+            const auto component_types = [&]{
+                std::array<component_type_index, sizeof...(T)> res{
+                        component_types_info[type_list<T...>::template index_of<T>].second ...
+                };
+                return res;
+            }();
+
+            const auto order_mapping = [&]{
+                std::array<size_t, sizeof...(T)> res;
+                for (size_t sorted_loc = 0; sorted_loc < sizeof...(T); ++sorted_loc)
+                {
+                    size_t origin_loc = component_types_info[sorted_loc].first;
+                    res[origin_loc] = sorted_loc;
+                }
+                return res;
+            }();
+
+            const auto constructors = [&](){
+                std::array<generic::constructor, sizeof...(T)> res{};
+                for_each_arg_indexed([&](auto&& component, size_t index)
+                                     {
+                                         using type = std::decay_t<decltype(component)>;
+                                         res[order_mapping[index]] = generic::constructor(std::forward<type>(component));
+                                     }, std::forward<T>(components)...);
+                return res;
+            }();
+
+            emplace(sorted_sequence_cref(component_types),sorted_sequence_cref(constructors), entities);
+        }
+
 
 		auto& get_query(const query_condition& condition)
 		{
@@ -428,6 +466,45 @@ namespace hyecs
 		{
 			return m_component_type_infos.at(hash);
 		}
+
+        template <typename... T>
+        auto get_sorted_component_types() -> const std::array<std::pair<size_t, component_type_index>, sizeof...(T)>
+        {
+            using indexed_type = std::pair<size_t, component_type_index>;
+            auto arr = std::array<indexed_type, sizeof...(T)>{
+                    indexed_type{
+                            type_list<T...>::template index_of<T>,
+                            m_component_type_infos.at(type_hash::of<T>())
+                    }...
+            };
+            std::ranges::sort(arr
+                    , [](const indexed_type& lhs, const indexed_type& rhs) {
+                        return lhs.second < rhs.second;
+                    });
+            return arr;
+        }
+
+        template <typename... T>
+        auto component_types(type_list<T...> = {}) -> const std::array<component_type_index, sizeof...(T)>
+        {
+            const auto component_types_info = get_sorted_component_types<T...>();
+            const auto component_types =[&]{
+                std::array<component_type_index, sizeof...(T)> res{
+                        component_types_info[type_list<T...>::template index_of<T>].second ...
+                };
+                return res;
+            }();
+            return component_types;
+        }
+
+        template <typename... T>
+        auto unsorted_component_types(type_list<T...> = {}) -> const std::array<component_type_index, sizeof...(T)>
+        {
+            const std::array<component_type_index, sizeof...(T)> component_types =  {
+                    m_component_type_infos.at(type_hash::of<T>()) ...
+            };
+            return component_types;
+        }
 
 
 

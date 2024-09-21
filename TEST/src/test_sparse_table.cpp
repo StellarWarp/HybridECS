@@ -1,7 +1,7 @@
 #pragma once
 
-#include "ecs/table.h"
-#include "ecs/sparse_table.h"
+#include "ecs/storage/table.h"
+#include "ecs/storage/sparse_table.h"
 
 #include "ut.hpp"
 

@@ -89,7 +89,7 @@ namespace hyecs
 				if (src_tag_storages.component_type() < dest_tag_storages.component_type())
 				{
 					//remove
-					src_tag_storages.erase(entities);
+					src_tag_storages.deallocate_components(entities);
 				}
 				else if (src_tag_storages.component_type() > dest_tag_storages.component_type())
 				{

@@ -6,9 +6,29 @@
 
 namespace hyecs::generic
 {
+    enum class type_flags : uint8_t
+    {
+        none = 0,
+        movable = 1 << 0,
+        copyable = 1 << 1,
+        trivially_destructible = 1 << 2,
+        trivially_move_constructible = 1 << 3,
+        trivially_copy_constructible = 1 << 4
+    };
+    inline type_flags operator |(const type_flags& lhs, const type_flags& rhs)
+    {
+        return type_flags(static_cast<uint8_t>(lhs) | static_cast<uint8_t>(rhs));
+    }
+    inline type_flags operator &(const type_flags& lhs, const type_flags& rhs)
+    {
+        return type_flags(static_cast<uint8_t>(lhs) & static_cast<uint8_t>(rhs));
+    }
+
+    static const size_t type_flags_count = 5;
+
     using default_constructor_ptr = void* (*)(void*);
-    using copy_constructor_ptr_t = void* (*)(void*, const void*);
-    using move_constructor_ptr_t = void* (*)(void*, void*);
+    using copy_constructor_ptr_t = void*(*)(void*, const void*);
+    using move_constructor_ptr_t = void*(*)(void*, void*);
     using destructor_ptr_t = void (*)(void*);
 
     template<typename T>
@@ -35,19 +55,20 @@ namespace hyecs::generic
         ((T*) addr)->~T();
     }
 
+    //todo support for trivially copyable types
     template<typename T>
-    constexpr auto nullable_move_constructor()
+    constexpr move_constructor_ptr_t nullable_move_constructor()
     {
-        if constexpr (std::is_move_constructible_v<T> || std::is_copy_constructible_v<T>)
+        if constexpr (std::is_move_constructible_v<T> && !std::is_trivially_move_constructible_v<T>)
             return move_constructor<T>;
         else
             return nullptr;
     }
 
     template<typename T>
-    constexpr auto nullable_copy_constructor()
+    constexpr copy_constructor_ptr_t nullable_copy_constructor()
     {
-        if constexpr (std::is_copy_constructible_v<T>)
+        if constexpr (std::is_copy_constructible_v<T> && !std::is_trivially_copy_constructible_v<T>)
             return copy_constructor<T>;
         else
             return nullptr;
@@ -72,12 +93,14 @@ namespace hyecs::generic
         destructor_ptr_t destructor;
         type_hash hash;
         const char* name;
+        type_flags flags;
 
         type_info(size_t size,
                   size_t align,
                   copy_constructor_ptr_t copy_constructor,
                   move_constructor_ptr_t move_constructor,
                   destructor_ptr_t destructor,
+                  type_flags flags,
                   type_hash hash,
                   const char* name)
                 : size(size),
@@ -85,8 +108,10 @@ namespace hyecs::generic
                   copy_constructor(copy_constructor),
                   move_constructor(move_constructor),
                   destructor(destructor),
+                  flags(flags),
                   hash(hash),
                   name(name)
+
         {
         }
 
@@ -101,6 +126,20 @@ namespace hyecs::generic
         template<typename T>
         static const type_info& of()
         {
+            constexpr auto get_flags = []{
+                type_flags f{};
+                if constexpr (std::is_copy_constructible_v<T>)
+                    f = f | type_flags::copyable;
+                if constexpr (std::is_move_constructible_v<T>)
+                    f = f | type_flags::movable;
+                if constexpr (std::is_trivially_destructible_v<T>)
+                    f = f | type_flags::trivially_destructible;
+                if constexpr (std::is_trivially_move_constructible_v<T>)
+                    f = f | type_flags::trivially_move_constructible;
+                if constexpr (std::is_trivially_copy_constructible_v<T>)
+                    f = f | type_flags::trivially_copy_constructible;
+                return f;
+            };
             static_assert(std::is_same_v<T, std::decay_t<T>>, "T must be a decayed type");
             const static type_info info{
                     std::is_empty_v<T> ? 0 : sizeof(T),
@@ -108,6 +147,7 @@ namespace hyecs::generic
                     nullable_copy_constructor<T>(),
                     nullable_move_constructor<T>(),
                     nullable_destructor<T>(),
+                    get_flags(),
                     type_hash::of<T>(),
                     type_name<T>
             };
@@ -169,6 +209,14 @@ namespace hyecs::generic
             return self.m_info->name;
         }
 
+        type_flags flags(this auto&& self) requires (requires { self.m_flags; })
+        {
+            return self.m_flags;
+        }
+        type_flags flags(this auto&& self) requires (!requires { self.m_flags; }) && (requires { self.m_info; })
+        {
+            return self.m_info->flags;
+        }
 
         auto copy_constructor_ptr(this auto&& self) requires (requires { self.m_copy_constructor; })
         {
@@ -208,25 +256,58 @@ namespace hyecs::generic
 
     public:
 
+        bool is_trivially_destructible(this auto&& self) requires (requires { self.destructor_ptr(); })
+        {
+            return self.destructor_ptr() == nullptr;
+        }
+
+        bool is_trivially_move_constructible(this auto&& self) requires (requires { self.move_constructor_ptr(); })
+        {
+            assert(self.movable());
+            return self.move_constructor_ptr() == nullptr;
+        }
+
+        bool is_trivially_copy_constructible(this auto&& self) requires (requires { self.copy_constructor_ptr(); })
+        {
+            assert(self.copyable());
+            return self.copy_constructor_ptr() == nullptr;
+        }
+
+        bool movable(this auto&& self) requires (requires { self.move_constructor_ptr(); self.flags(); })
+        {
+            return (self.flags() & type_flags::movable) != type_flags::none;
+        }
+
+        bool copyable(this auto&& self) requires (requires { self.copy_constructor_ptr(); self.flags(); })
+        {
+            return (self.flags() & type_flags::copyable) != type_flags::none;
+        }
+
         void* copy_constructor(this auto&& self, void* dest, const void* src) requires (requires { self.copy_constructor_ptr(); })
         {
-            return self.copy_constructor_ptr()(dest, src);
+            if (self.is_trivially_copy_constructible())
+                return std::memcpy(dest, src, self.size());
+            else
+                return self.copy_constructor_ptr()(dest, src);
         }
 
         void* move_constructor(this auto&& self, void* dest, void* src) requires (requires { self.move_constructor_ptr(); })
         {
-            return self.move_constructor_ptr()(dest, src);
+            if (self.is_trivially_move_constructible())
+                return std::memcpy(dest, src, self.size());
+            else
+                return self.move_constructor_ptr()(dest, src);
         }
 
         void destructor(this auto&& self, void* addr) requires (requires { self.destructor_ptr(); })
         {
-            if (self.destructor_ptr() == nullptr) return;
+            if (self.is_trivially_destructible()) return;
             return self.destructor_ptr()(addr);
         }
 
         void destructor(this auto&& self, void* addr, size_t count) requires (requires { self.destructor_ptr(); self.size(); })
         {
-            if (self.destructor_ptr() == nullptr) return;
+            if (self.is_trivially_destructible()) return;
             for (size_t i = 0; i < count; i++)
             {
                 self.destructor_ptr()(addr);
@@ -236,24 +317,13 @@ namespace hyecs::generic
 
         void destructor(this auto&& self, void* begin, void* end) requires (requires { self.destructor_ptr(); self.size(); })
         {
-            if (self.destructor_ptr() == nullptr) return;
+            if (self.is_trivially_destructible()) return;
             uint8_t* begin_ = static_cast<uint8_t*>(begin);
             for (; begin_ != end; begin_ += self.size())
             {
                 self.destructor_ptr()(begin_);
             }
         }
-
-        bool is_trivially_destructible(this auto&& self) requires (requires { self.destructor_ptr(); })
-        {
-            return self.destructor_ptr() == nullptr;
-        }
-
-        bool is_reallocable(this auto&& self) requires (requires { self.move_constructor_ptr(); })
-        {
-            return self.move_constructor_ptr() == nullptr;
-        }
-
     };
 
     template<typename T1, typename T2>

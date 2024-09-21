@@ -23,10 +23,10 @@
 					m_archetype->m_component_types._Mypair._Myval2._Myfirst[$i].info->m_type_index.m_index.m_info->name
 				</ValueNode>
 			</IndexListItems>
-			<IndexListItems>
-				<Size>size()</Size>
-				<ValueNode>m_archetype->m_component_types._Mypair._Myval2._Myfirst[$i].info->m_is_tag</ValueNode>
-			</IndexListItems>
+<!--			<IndexListItems>-->
+<!--				<Size>size()</Size>-->
+<!--				<ValueNode>m_archetype->m_component_types._Mypair._Myval2._Myfirst[$i].info->m_is_tag</ValueNode>-->
+<!--			</IndexListItems>-->
 		</Expand>
 	</Type>
 

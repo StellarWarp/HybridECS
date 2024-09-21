@@ -1,6 +1,6 @@
 #pragma once
-#include "entity.h"
-#include "../container/container.h"
+#include "ecs/type/entity.h"
+#include "container/container.h"
 
 
 namespace hyecs

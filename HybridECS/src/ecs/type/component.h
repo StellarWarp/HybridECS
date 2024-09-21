@@ -1,5 +1,5 @@
 #pragma once
-#include "../container/container.h"
+#include "container/container.h"
 #include "core/runtime_type/generic_type.h"
 #include "component_group.h"
 
@@ -17,6 +17,7 @@ namespace hyecs
 		type_hash m_hash;
 		bit_key m_bit_id;
 		component_group_index m_group;//todo
+        generic::type_flags m_flags : generic::type_flags_count;
 		uint8_t m_is_tag : 1;
 
 		static inline seqence_allocator<component_type_info, uint32_t> seqence_index_allocator;
@@ -33,6 +34,7 @@ namespace hyecs
               m_destructor(type_index.destructor_ptr()),
               m_hash(type_index.hash()),
               m_bit_id(seqence_index_allocator.allocate()),
+              m_flags(type_index.flags()),
               m_is_tag(is_tag),
               m_group(group){}
 
@@ -108,46 +110,84 @@ namespace hyecs
             return self.m_info->destructor_ptr();
         }
 
-    public:
+        generic::type_flags flags(this auto&& self) requires (requires { self.m_flags; })
+        {
+            return self.m_flags;
+        }
+        generic::type_flags flags(this auto&& self) requires (!requires { self.m_flags; })
+        {
+            return self.m_info->flags();
+        }
 
-        void* copy_constructor(this auto&& self, void* dest, const void* src) requires (requires { self.copy_constructor_ptr(); })
-        {
-            return self.copy_constructor_ptr()(dest, src);
-        }
-        void* move_constructor(this auto&& self, void* dest, void* src) requires (requires { self.move_constructor_ptr(); })
-        {
-            return self.move_constructor_ptr()(dest, src);
-        }
-        void destructor(this auto&& self, void* addr) requires (requires { self.destructor_ptr(); })
-        {
-            if (self.destructor_ptr() == nullptr) return;
-            return self.destructor_ptr()(addr);
-        }
-        void destructor(this auto&& self, void* addr, size_t count) requires (requires { self.destructor_ptr(); self.size(); })
-        {
-            if (self.destructor_ptr() == nullptr) return;
-            for (size_t i = 0; i < count; i++)
-            {
-                self.destructor_ptr()(addr);
-                addr = (uint8_t*)addr + self.size();
-            }
-        }
-        void destructor(this auto&& self, void* begin, void* end) requires (requires { self.destructor_ptr(); self.size(); })
-        {
-            if (self.destructor_ptr() == nullptr) return;
-            for (; begin != end; (uint8_t*)begin + self.size())
-            {
-                self.destructor_ptr()(begin);
-            }
-        }
+    public:
 
         bool is_trivially_destructible(this auto&& self) requires (requires { self.destructor_ptr(); })
         {
             return self.destructor_ptr() == nullptr;
         }
-        bool is_reallocable(this auto&& self) requires (requires { self.move_constructor_ptr(); })
+
+        bool is_trivially_move_constructible(this auto&& self) requires (requires { self.move_constructor_ptr(); })
         {
+            assert(self.movable());
             return self.move_constructor_ptr() == nullptr;
+        }
+
+        bool is_trivially_copy_constructible(this auto&& self) requires (requires { self.copy_constructor_ptr(); })
+        {
+            assert(self.copyable());
+            return self.copy_constructor_ptr() == nullptr;
+        }
+
+        bool movable(this auto&& self) requires (requires { self.move_constructor_ptr(); self.flags(); })
+        {
+            return (self.flags() & generic::type_flags::movable) != generic::type_flags::none;
+        }
+
+        bool copyable(this auto&& self) requires (requires { self.copy_constructor_ptr(); self.flags(); })
+        {
+            return (self.flags() & generic::type_flags::copyable) != generic::type_flags::none;
+        }
+
+        void* copy_constructor(this auto&& self, void* dest, const void* src) requires (requires { self.copy_constructor_ptr(); })
+        {
+            if (self.is_trivially_copy_constructible())
+                return std::memcpy(dest, src, self.size());
+            else
+                return self.copy_constructor_ptr()(dest, src);
+        }
+
+        void* move_constructor(this auto&& self, void* dest, void* src) requires (requires { self.move_constructor_ptr(); })
+        {
+            if (self.is_trivially_move_constructible())
+                return std::memcpy(dest, src, self.size());
+            else
+                return self.move_constructor_ptr()(dest, src);
+        }
+
+        void destructor(this auto&& self, void* addr) requires (requires { self.destructor_ptr(); })
+        {
+            if (self.is_trivially_destructible()) return;
+            return self.destructor_ptr()(addr);
+        }
+
+        void destructor(this auto&& self, void* addr, size_t count) requires (requires { self.destructor_ptr(); self.size(); })
+        {
+            if (self.is_trivially_destructible()) return;
+            for (size_t i = 0; i < count; i++)
+            {
+                self.destructor_ptr()(addr);
+                addr = (uint8_t*) addr + self.size();
+            }
+        }
+
+        void destructor(this auto&& self, void* begin, void* end) requires (requires { self.destructor_ptr(); self.size(); })
+        {
+            if (self.is_trivially_destructible()) return;
+            uint8_t* begin_ = static_cast<uint8_t*>(begin);
+            for (; begin_ != end; begin_ += self.size())
+            {
+                self.destructor_ptr()(begin_);
+            }
         }
 
     public:

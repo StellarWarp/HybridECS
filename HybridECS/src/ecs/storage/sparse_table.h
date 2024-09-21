@@ -1,5 +1,5 @@
 #pragma once
-#include "entity.h"
+#include "ecs/type/entity.h"
 #include "component_storage.h"
 #include "storage_key_registry.h"
 
@@ -25,10 +25,20 @@ namespace hyecs
 				m_notnull_components.push_back(m_component_storages[i]->component_type());
 			}
 		}
-		//sparse_table(const sparse_table&) = delete;
-		//sparse_table& operator=(const sparse_table&) = delete;
-		//sparse_table(sparse_table&&) = default;
-		//sparse_table& operator=(sparse_table&&) = default;
+		sparse_table(const sparse_table&) = delete;
+		sparse_table& operator=(const sparse_table&) = delete;
+		sparse_table(sparse_table&&) = default;
+		sparse_table& operator=(sparse_table&&) = default;
+        ~sparse_table()
+        {
+            for(auto storage : m_component_storages)
+            {
+                for(auto e: m_entities)
+                {
+                    storage->deallocate_component(e);
+                }
+            }
+        }
 
 	private:
 		void allocate_entity(entity e, sequence_ref<void*> components)

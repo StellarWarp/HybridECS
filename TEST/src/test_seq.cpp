@@ -123,8 +123,6 @@ static ut::suite _ = []
 
         test_container testc;
 
-        std::ranges::begin(testc);
-
         using t = std::ranges::iterator_t<test_container>;
         using t1 = std::iter_value_t<t>;
 
