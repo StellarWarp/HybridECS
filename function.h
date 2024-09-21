@@ -1,4 +1,5 @@
 #pragma once
+
 #include <concepts>
 #include <cstring>
 #include <assert.h>
@@ -6,78 +7,80 @@
 
 namespace auto_delegate
 {
-    enum class func_storage_op
+    namespace
     {
-        st_copy,
-        st_move,
-        st_delete,
-        st_get_type_info
-    };
-
-    template<typename T, typename RTTI_T, typename Ret, typename... Args>
-    requires std::copy_constructible<T> and std::move_constructible<T>
-    struct functor_object_traits
-    {
-        static Ret invoker(void* self, Args... args)
+        enum class func_storage_op
         {
-            T& self_ = *static_cast<T*>(self);
-            return self_(std::forward<Args>(args)...);
-        }
+            st_copy,
+            st_move,
+            st_delete,
+            st_get_type_info
+        };
 
-        static const void* manager(void* self, void* other, func_storage_op op)
+        template<typename T, typename RTTI_T, typename Ret, typename... Args> requires std::copy_constructible<T> and std::move_constructible<T>
+        struct functor_object_traits
         {
-            T& self_ = *static_cast<T*>(self);
-            T& other_ = *static_cast<T*>(other);
-            switch (op)
+            static Ret invoker(void* self, Args... args)
             {
-                case func_storage_op::st_copy:
-                    new(self) T((const T&)other_);
-                    break;
-                case func_storage_op::st_move:
-                    new(self) T(std::move(other_));
-                    break;
-                case func_storage_op::st_delete:
-                    self_.~T();
-                    break;
-#if __cpp_rtti
-                case func_storage_op::st_get_type_info:
-                    return &typeid(RTTI_T);
-#endif
+                T& self_ = *static_cast<T*>(self);
+                return self_(std::forward<Args>(args)...);
             }
-            return nullptr;
-        }
 
-        static constexpr bool is_trivial =
-                std::is_trivially_copyable_v<T>
-                and std::is_trivially_move_constructible_v<T>
-                and std::is_trivially_destructible_v<T>;
-    };
+            static const void* manager(void* self, void* other, func_storage_op op)
+            {
+                T& self_ = *static_cast<T*>(self);
+                T& other_ = *static_cast<T*>(other);
+                switch (op)
+                {
+                    case func_storage_op::st_copy:
+                        new(self) T((const T&) other_);
+                        break;
+                    case func_storage_op::st_move:
+                        new(self) T(std::move(other_));
+                        break;
+                    case func_storage_op::st_delete:
+                        self_.~T();
+                        break;
+#if __cpp_rtti
+                        case func_storage_op::st_get_type_info:
+                            return &typeid(RTTI_T);
+#endif
+                }
+                return nullptr;
+            }
+
+            static constexpr bool is_trivial =
+                    std::is_trivially_copyable_v<T>
+                    and std::is_trivially_move_constructible_v<T>
+                    and std::is_trivially_destructible_v<T>;
+        };
 
 
-    template<typename Callable, typename Ret, typename... Args>
-    struct functor_box_wrapper
-    {
-        Callable* callee;
-
-        template<typename Other>
-        explicit functor_box_wrapper(Other&& callee)
-                : callee(new Callable(std::forward<Other>(callee)))
-        {}
-        functor_box_wrapper(const functor_box_wrapper& other)
-                : callee(new Callable(*other.callee))
-        {}
-        functor_box_wrapper(functor_box_wrapper&& other)
-                : callee(other.callee)
-        { other.callee = nullptr; }
-        ~functor_box_wrapper(){ delete callee; }
-
-        Ret operator()(Args... args)
+        template<typename Callable, typename Ret, typename... Args>
+        struct functor_box_wrapper
         {
-            return (*callee)(std::forward<Args>(args)...);
-        }
+            Callable* callee;
 
-        const Callable* get() const noexcept { return callee; }
-    };
+            template<typename Other>
+            explicit functor_box_wrapper(Other&& callee)
+                    : callee(new Callable(std::forward<Other>(callee))) {}
+
+            functor_box_wrapper(const functor_box_wrapper& other)
+                    : callee(new Callable(*other.callee)) {}
+
+            functor_box_wrapper(functor_box_wrapper&& other)
+                    : callee(other.callee) { other.callee = nullptr; }
+
+            ~functor_box_wrapper() { delete callee; }
+
+            Ret operator()(Args... args)
+            {
+                return (*callee)(std::forward<Args>(args)...);
+            }
+
+            const Callable* get() const noexcept { return callee; }
+        };
+    }
 
     template<typename FuncT>
     struct function;
@@ -103,18 +106,21 @@ namespace auto_delegate
         {
             return uintptr_t(manager) & non_trivial_bit_mask;
         }
+
         const void* manage(void* self, void* other, func_storage_op op) const
         {
             auto m = manager_t(uintptr_t(manager) & pointer_mask);
             return m(self, other, op);
         }
+
         void set_manager_trivial(manager_t m, bool trivial)
         {
-            uintptr_t& ptr = *(uintptr_t*)&m;
+            uintptr_t& ptr = *(uintptr_t*) &m;
             assert((ptr & non_trivial_bit_mask) == 0);
             if (not trivial) ptr |= non_trivial_bit_mask;
             manager = manager_t(ptr);
         }
+
     public:
         template<typename Callable>
         requires std::same_as<std::invoke_result_t<Callable, Args...>, Ret>
@@ -127,15 +133,14 @@ namespace auto_delegate
             if constexpr (sizeof(callable_t) <= inline_storage_size)
             {
                 using inline_functor_t = callable_t;
-                using traits = functor_object_traits<inline_functor_t ,callable_t, Ret, Args...>;
+                using traits = functor_object_traits<inline_functor_t, callable_t, Ret, Args...>;
                 ::new(data) inline_functor_t(std::forward<Callable>(callable));
                 invoker = traits::invoker;
                 set_manager_trivial(traits::manager, traits::is_trivial);
-            }
-            else
+            } else
             {
                 using inline_functor_t = functor_box_wrapper<callable_t, Ret, Args...>;
-                using traits = functor_object_traits<inline_functor_t ,callable_t, Ret, Args...>;
+                using traits = functor_object_traits<inline_functor_t, callable_t, Ret, Args...>;
                 ::new(data) inline_functor_t(std::forward<Callable>(callable));
                 invoker = traits::invoker;
                 set_manager_trivial(traits::manager, false);
@@ -150,23 +155,25 @@ namespace auto_delegate
             return *this;
         }
 
-        function() : invoker(nullptr), manager(nullptr){}
+        function() : invoker(nullptr), manager(nullptr) {}
+
         function(const function& other) : invoker(other.invoker), manager(other.manager)
         {
-            if(non_trivial()) manage(data, (void*)other.data, func_storage_op::st_copy);
-            else std::memcpy(data, other.data, sizeof(data) );
+            if (non_trivial()) manage(data, (void*) other.data, func_storage_op::st_copy);
+            else std::memcpy(data, other.data, sizeof(data));
         }
 
-        function(function&& other)noexcept : invoker(other.invoker), manager(other.manager)
+        function(function&& other) noexcept: invoker(other.invoker), manager(other.manager)
         {
-            if(non_trivial()) manage(data, other.data, func_storage_op::st_move);
-            else std::memcpy(data, other.data, sizeof(data) );
+            if (non_trivial()) manage(data, other.data, func_storage_op::st_move);
+            else std::memcpy(data, other.data, sizeof(data));
             other.invoker = nullptr;
             other.manager = nullptr;
         }
+
         ~function()
         {
-            if(non_trivial()) manage(data, nullptr, func_storage_op::st_delete);
+            if (non_trivial()) manage(data, nullptr, func_storage_op::st_delete);
         }
 
         function& operator=(const function& other) noexcept
@@ -176,6 +183,7 @@ namespace auto_delegate
             new(this) function(other);
             return *this;
         }
+
         function& operator=(function&& other) noexcept
         {
             if (this == &other) return *this;
@@ -186,9 +194,11 @@ namespace auto_delegate
 
         Ret operator()(Args... args) const
         {
-            return invoker((void*)data, std::forward<Args>(args)...);
+            return invoker((void*) data, std::forward<Args>(args)...);
         }
-        operator bool() const{ return invoker != nullptr; }
+
+        operator bool() const { return invoker != nullptr; }
+
 #if __cpp_rtti
         [[nodiscard]] const type_info& target_type() const noexcept
         {
