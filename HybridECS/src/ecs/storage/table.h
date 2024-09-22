@@ -1,5 +1,5 @@
 #pragma once
-#include "lib/Lib.h"
+#include "core/hyecs_core.h"
 #include "ecs/type/archetype.h"
 #include "ecs/type/entity.h"
 #include "storage_key_registry.h"
@@ -335,10 +335,7 @@ namespace hyecs
 					{
 						byte* last_data = component_address(chunk, last_entity_offset, type);
 						byte* data = component_address(chunk, head_offset, type);
-                        //todo should the destructor be called here?
-                        //!!!note that deallocate_accessor will destroy the 'data'
-                        //is the component destruction needed for moved components?
-                        //type.destructor(data);
+                        //!!!note that int deallocation process 'data' is destroyed no need to call destructor for 'data'
 						type.move_constructor(data, last_data);
                         if constexpr (DESTROY_MOVED_COMPONENTS)
                             type.destructor(last_data);
@@ -346,6 +343,7 @@ namespace hyecs
 					last_entity_offset--;
 					head_hole_iter++;
 
+                    //todo this is the storage key change call back but 'm_on_entity_move' is not used yet
 					for (auto& callback : m_on_entity_move)
 					{
 						callback(last_entity, {m_table_index, table_offset({chunk_index, head_offset})});
