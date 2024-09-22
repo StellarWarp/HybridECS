@@ -37,6 +37,9 @@ namespace hyecs
 			size_t m_size = 0;
 
 		public:
+
+            chunk(){ ASSERTION_CODE(m_data.fill(0xFF));}
+
 			size_t size() const { return m_size; }
 			byte* data() { return m_data.data(); }
 			const byte* data() const { return m_data.data(); }
