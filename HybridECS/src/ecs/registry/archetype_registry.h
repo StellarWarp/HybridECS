@@ -16,8 +16,8 @@ namespace hyecs
 		vaildref_map<archetype_query_index, archetype_query_node> m_archetype_query_nodes;
 		vaildref_map<query_index, query_node> m_query_nodes;
 
-		std::function<void(archetype_index)> m_untag_archetype_addition_callback;
-		std::function<void(archetype_index, archetype_index)> m_tag_archetype_addition_callback;
+		function<void(archetype_index)> m_untag_archetype_addition_callback;
+		function<void(archetype_index, archetype_index)> m_tag_archetype_addition_callback;
 	public:
 		struct archetype_query_addition_info
 		{
@@ -30,7 +30,7 @@ namespace hyecs
 			archetype_query_node::notify_partial_convert_t& notify_partial_convert;
 		};
 	private:
-		using archetype_query_addition_callback_t = std::function<void(archetype_query_addition_info)>;
+		using archetype_query_addition_callback_t = function<void(archetype_query_addition_info)>;
 		archetype_query_addition_callback_t m_archetype_query_addition_callback;
 	public:
 		struct query_addition_info
@@ -40,16 +40,16 @@ namespace hyecs
 			query_node::callback_t& archetype_query_addition_callback;
 		};
 	private:
-		using query_addition_callback_t = std::function<void(query_addition_info)>;
+		using query_addition_callback_t = function<void(query_addition_info)>;
 		query_addition_callback_t m_query_addition_callback;
 
 	public:
-		void bind_untag_archetype_addition_callback(std::function<void(archetype_index)>&& callback)
+		void bind_untag_archetype_addition_callback(function<void(archetype_index)>&& callback)
 		{
 			m_untag_archetype_addition_callback = callback;
 		}
 
-		void bind_tag_archetype_addition_callback(std::function<void(archetype_index, archetype_index)>&& callback)
+		void bind_tag_archetype_addition_callback(function<void(archetype_index, archetype_index)>&& callback)
 		{
 			m_tag_archetype_addition_callback = callback;
 		}

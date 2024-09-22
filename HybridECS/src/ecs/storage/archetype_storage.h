@@ -24,11 +24,11 @@ namespace hyecs
 
 		//event
 		//add and remove event are inside the m_table
-		// vector<std::function<void(entity, storage_key)>> m_on_entity_add;
-		// vector<std::function<void(entity, storage_key)>> m_on_entity_remove;
-		vector<std::function<void(entity, storage_key, storage_key)>> m_on_entity_move; //from, to
-		vector<std::function<void()>> m_on_sparse_to_chunk;
-		vector<std::function<void()>> m_on_chunk_to_sparse;
+		// vector<function<void(entity, storage_key)>> m_on_entity_add;
+		// vector<function<void(entity, storage_key)>> m_on_entity_remove;
+		vector<function<void(entity, storage_key, storage_key)>> m_on_entity_move; //from, to
+		vector<function<void()>> m_on_sparse_to_chunk;
+		vector<function<void()>> m_on_chunk_to_sparse;
 
 		uint32_t sparse_to_chunk_convert_limit;
 		uint32_t chunk_to_sparse_convert_limit;
@@ -119,7 +119,7 @@ namespace hyecs
 		}
 
 
-		void add_callback_on_entity_add(std::function<void(entity, storage_key)> callback)
+		void add_callback_on_entity_add(function<void(entity, storage_key)> callback)
 		{
 			std::visit([&](auto& t)
 			{
@@ -127,7 +127,7 @@ namespace hyecs
 			}, m_table);
 		}
 
-		void add_callback_on_entity_remove(std::function<void(entity, storage_key)> callback)
+		void add_callback_on_entity_remove(function<void(entity, storage_key)> callback)
 		{
 			std::visit([&](auto& t)
 			{
@@ -309,12 +309,12 @@ namespace hyecs
             dest_accessor.construct_finish_external_notified();
 		}
 
-		void add_callback_on_sparse_to_chunk(std::function<void()>&& callback)
+		void add_callback_on_sparse_to_chunk(function<void()>&& callback)
 		{
 			m_on_sparse_to_chunk.emplace_back(callback);
 		}
 
-		void add_callback_on_chunk_to_sparse(std::function<void()>&& callback)
+		void add_callback_on_chunk_to_sparse(function<void()>&& callback)
 		{
 			m_on_chunk_to_sparse.emplace_back(callback);
 		}
@@ -520,7 +520,7 @@ namespace hyecs
 			}, m_table);
 		}
 
-		void dynamic_for_each(sequence_cref<uint32_t> component_indices, std::function<void(entity, sequence_ref<void*>)> func)
+		void dynamic_for_each(sequence_cref<uint32_t> component_indices, function<void(entity, sequence_ref<void*>)> func)
 		{
 			std::visit([&](auto& t)
 			{

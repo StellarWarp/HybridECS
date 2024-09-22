@@ -2,6 +2,7 @@
 
 #include "delegate/delegate.h"
 #include "delegate/multicast_delegate.h"
+#include "delegate/multicast_function.h"
 #include "meta/meta_utils.h"
 #include "runtime_type/generic_type.h"
 #include "utils.h"
@@ -9,5 +10,5 @@
 
 namespace hyecs
 {
-    using namespace auto_delegate_export;
+    using namespace auto_delegate;
 }

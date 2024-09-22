@@ -12,8 +12,8 @@ namespace hyecs
 		vector<component_storage*> m_component_storages;
 
 		//event
-		vector<std::function<void(entity, storage_key)>> m_on_entity_add;
-		vector<std::function<void(entity, storage_key)>> m_on_entity_remove;
+		vector<function<void(entity, storage_key)>> m_on_entity_add;
+		vector<function<void(entity, storage_key)>> m_on_entity_remove;
 
 	public:
 		sparse_table(sorted_sequence_cref<component_storage*> component_storages)
@@ -66,7 +66,7 @@ namespace hyecs
 		size_t entity_count() const { return m_entities.size(); }
 		const dense_set<entity>& get_entities() { return m_entities; }
 
-		void add_callback_on_entity_add(std::function<void(entity, storage_key)> callback)
+		void add_callback_on_entity_add(function<void(entity, storage_key)> callback)
 		{
 			for (auto e : m_entities)
 			{
@@ -75,7 +75,7 @@ namespace hyecs
 			m_on_entity_add.push_back(callback);
 		}
 
-		void add_callback_on_entity_remove(std::function<void(entity, storage_key)> callback)
+		void add_callback_on_entity_remove(function<void(entity, storage_key)> callback)
 		{
 			m_on_entity_remove.push_back(callback);
 		}
@@ -408,7 +408,7 @@ namespace hyecs
 			return deallocate_accessor(*this, entities);
 		}
 
-		void dynamic_for_each(sequence_cref<uint32_t> component_indices, std::function<void(entity, sequence_ref<void*>)> func)
+		void dynamic_for_each(sequence_cref<uint32_t> component_indices, function<void(entity, sequence_ref<void*>)> func)
 		{
 			vector<void*> addrs(component_indices.size()); //todo this allocation can be optimized
 			for (const auto& entity : m_entities)

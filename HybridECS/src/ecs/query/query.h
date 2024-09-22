@@ -285,7 +285,7 @@ namespace hyecs
 
 		void dynamic_for_each(
 			const access_info& info,
-			std::function<void(entity, sequence_ref<void*>)> func)
+			function<void(entity, sequence_ref<void*>)> func)
 		{
 			switch (m_query_type)
 			{
@@ -541,7 +541,7 @@ namespace hyecs
 
 		void dynamic_for_each(
 			const access_info& acc_info,
-			std::function<void(entity, sequence_ref<void*>)> func)
+			function<void(entity, sequence_ref<void*>)> func)
 		{
 			for (const auto& info : acc_info.archetype_access_infos)
 			{

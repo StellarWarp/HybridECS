@@ -291,10 +291,10 @@ namespace hyecs
 	class component_constructor
 	{
 		component_type_index type_index;
-		std::function<void* (void*)> constructor;
+		function<void* (void*)> constructor;
 
 	public:
-		component_constructor(component_type_index type_index, std::function<void* (void*)> constructor)
+		component_constructor(component_type_index type_index, function<void* (void*)> constructor)
 			: type_index(type_index), constructor(constructor)
 		{}
 

@@ -12,8 +12,8 @@ namespace hyecs
 		vector<component_storage*> m_tag_storages;
 
 		//event
-		vector<std::function<void(entity, storage_key)>> m_on_entity_add;
-		vector<std::function<void(entity, storage_key)>> m_on_entity_remove;
+		vector<function<void(entity, storage_key)>> m_on_entity_add;
+		vector<function<void(entity, storage_key)>> m_on_entity_remove;
 
 	public:
 		tag_archetype_storage(
@@ -33,7 +33,7 @@ namespace hyecs
 
 		dense_map<entity, storage_key>& entities() { return m_entities; }
 
-		void add_callback_on_entity_add(std::function<void(entity, storage_key)> callback)
+		void add_callback_on_entity_add(function<void(entity, storage_key)> callback)
 		{
 			for (auto [e, key] : m_entities)
 			{
@@ -42,7 +42,7 @@ namespace hyecs
 			m_on_entity_add.push_back(callback);
 		}
 
-		void add_callback_on_entity_remove(std::function<void(entity, storage_key)> callback)
+		void add_callback_on_entity_remove(function<void(entity, storage_key)> callback)
 		{
 			m_on_entity_remove.push_back(callback);
 		}

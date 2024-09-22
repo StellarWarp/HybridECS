@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/delegate/function.h"
 #include "core/meta/type_hash.h"
 #include "../marco.h"
 
@@ -401,7 +402,7 @@ namespace hyecs::generic
     class constructor
     {
         type_index m_type;
-        std::function<void*(void*)> m_constructor;
+        function<void*(void*)> m_constructor;
 
         // template <typename T>
         // struct lambda_forward_wrapper
@@ -426,7 +427,7 @@ namespace hyecs::generic
         {
         }
 
-        constructor(type_index type, std::function<void*(void*)> constructor)
+        constructor(type_index type, function<void*(void*)> constructor)
                 : m_type(type), m_constructor(constructor)
         {
         }

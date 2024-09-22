@@ -67,9 +67,9 @@ namespace hyecs
 	class archetype_query_node
 	{
 	public:
-		using notify_adding_tag_t = std::function<void(tag_archetype_node*)>;
-		using notify_adding_tag_archetype_t = std::function<void(archetype_index)>;
-		using notify_partial_convert_t = std::function<void()>;
+		using notify_adding_tag_t = function<void(tag_archetype_node*)>;
+		using notify_adding_tag_archetype_t = function<void(archetype_index)>;
+		using notify_partial_convert_t = function<void()>;
 		using tag_archetype_nodes_t = vector<tag_archetype_node*>;
 
 		enum set_type
@@ -225,7 +225,7 @@ namespace hyecs
 	class query_node
 	{
 	public:
-		using callback_t = std::function<void(query_index)>;
+		using callback_t = function<void(query_index)>;
 		using archetype_nodes_t = map<archetype_node*, const archetype_query_node*>;
 
 		enum query_type

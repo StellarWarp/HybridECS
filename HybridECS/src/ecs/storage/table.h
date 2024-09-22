@@ -147,12 +147,12 @@ namespace hyecs
 		stack<std::pair<chunk*, uint32_t>> m_free_chunks; //free chunk and it's index
 
 		//event
-        //adding or move into
-		vector<std::function<void(entity, storage_key)>> m_on_entity_add;
+        //adding or move into void(entity, storage_key)
+		multicast_function<void(entity, storage_key)> m_on_entity_add;
         //removing or move out of
-		vector<std::function<void(entity, storage_key)>> m_on_entity_remove;
+        multicast_function<void(entity, storage_key)> m_on_entity_remove;
         //mainly for internal move notify
-		vector<std::function<void(entity, storage_key)>> m_on_entity_move;
+        multicast_function<void(entity, storage_key)> m_on_entity_move;
 
 	public:
 		table(sorted_sequence_cref<component_type_index> components)
@@ -224,7 +224,7 @@ namespace hyecs
 		//}
 
 
-		void add_callback_on_entity_add(std::function<void(entity, storage_key)> callback)
+		void add_callback_on_entity_add(function<void(entity, storage_key)> callback)
 		{
 			for (uint32_t chunk_index = 0; chunk_index < m_chunks.size(); chunk_index++)
 			{
@@ -235,12 +235,12 @@ namespace hyecs
 				}
 			}
 
-			m_on_entity_add.push_back(callback);
+			m_on_entity_add += callback;
 		}
 
-		void add_callback_on_entity_remove(std::function<void(entity, storage_key)> callback)
+		void add_callback_on_entity_remove(function<void(entity, storage_key)> callback)
 		{
-			m_on_entity_remove.push_back(callback);
+			m_on_entity_remove += callback;
 		}
 
 	private:
@@ -344,10 +344,7 @@ namespace hyecs
 					head_hole_iter++;
 
                     //todo this is the storage key change call back but 'm_on_entity_move' is not used yet
-					for (auto& callback : m_on_entity_move)
-					{
-						callback(last_entity, {m_table_index, table_offset({chunk_index, head_offset})});
-					}
+                    m_on_entity_move.invoke(last_entity, {m_table_index, table_offset({chunk_index, head_offset})});
 				};
 
 				while (true)
@@ -869,8 +866,7 @@ namespace hyecs
 					for (auto& table_offset : table_offsets)
 					{
 						auto [chunk_index, chunk_offset] = m_table.chunk_index_offset(table_offset);
-						callback(m_table.m_chunks[chunk_index]->entities()[chunk_offset],
-						         {m_table.m_table_index, table_offset});
+						callback(m_table.m_chunks[chunk_index]->entities()[chunk_offset], {m_table.m_table_index, table_offset});
 					}
 				}
 				ASSERTION_CODE(m_is_destruct_finished = true);
@@ -932,7 +928,7 @@ namespace hyecs
 		// }
 
 	private:
-		//using Callable = std::function<void(entity, sequence_ref<void*>)>;
+		//using Callable = function<void(entity, sequence_ref<void*>)>;
 		template <typename Callable>
 		void dynamic_for_each_impl(Callable func, sequence_cref<uint32_t> component_indices, sequence_ref<void*> address_cache)
 		{
@@ -1002,25 +998,25 @@ namespace hyecs
 		}
 
 
-		void dynamic_for_each(sequence_cref<uint32_t> component_indices, std::function<void(entity, sequence_ref<void*>)> func)
+		void dynamic_for_each(sequence_cref<uint32_t> component_indices, function<void(entity, sequence_ref<void*>)> func)
 		{
 			vector<void*> address_cache(component_indices.size());
 			dynamic_for_each_impl(func, component_indices, address_cache);
 		}
 
-		void dynamic_for_each(sequence_cref<uint32_t> component_indices, std::function<void(sequence_ref<void*>)> func)
+		void dynamic_for_each(sequence_cref<uint32_t> component_indices, function<void(sequence_ref<void*>)> func)
 		{
 			vector<void*> address_cache(component_indices.size());
 			dynamic_for_each_impl(func, component_indices, address_cache);
 		}
 
-		void dynamic_for_each(sequence_cref<uint32_t> component_indices, std::function<void(entity, storage_key, sequence_ref<void*>)> func)
+		void dynamic_for_each(sequence_cref<uint32_t> component_indices, function<void(entity, storage_key, sequence_ref<void*>)> func)
 		{
 			vector<void*> address_cache(component_indices.size());
 			dynamic_for_each_impl(func, component_indices, address_cache);
 		}
 
-		void dynamic_for_each(sequence_cref<uint32_t> component_indices, std::function<void(storage_key, sequence_ref<void*>)> func)
+		void dynamic_for_each(sequence_cref<uint32_t> component_indices, function<void(storage_key, sequence_ref<void*>)> func)
 		{
 			vector<void*> address_cache(component_indices.size());
 			dynamic_for_each_impl(func, component_indices, address_cache);
