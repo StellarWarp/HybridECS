@@ -1,6 +1,8 @@
 #include "ecs/storage/table.h"
 #include "ecs/storage/sparse_table.h"
 #include "ut.hpp"
+#include "memleak_detect.h"
+#include "managed_object_tester.h"
 
 using namespace hyecs;
 
@@ -13,42 +15,7 @@ namespace
         int a, b, c, d;
     };
 
-    struct B
-    {
-        static inline size_t object_counter = 0;
-        static inline size_t construct_call = 0;
-        static inline size_t move_call = 0;
-        static inline size_t copy_call = 0;
-        static inline size_t destroy_call = 0;
-
-        int a, b, c, d;
-
-        B(int a, int b, int c, int d) : a(a), b(b), c(c), d(d)
-        {
-            object_counter++;
-            construct_call++;
-        }
-
-        B(const B& other) : a(other.a), b(other.b), c(other.c), d(other.d)
-        {
-            object_counter++;
-            copy_call++;
-        }
-
-        B(B&& other) : a(other.a), b(other.b), c(other.c), d(other.d)
-        {
-            object_counter++;
-            move_call++;
-        }
-
-        ~B()
-        {
-            a = b = c = d = 0;
-            object_counter--;
-            destroy_call++;
-        }
-
-    };
+    using B = managed_object_tester<[]{}>;
 }
 
 static ut::suite _ = []
@@ -66,6 +33,8 @@ static ut::suite _ = []
 
     "small scale table"_test = [&]
     {
+        MemoryLeakDetector detector;
+
         table table(comp_seq);
 
         vector<entity> entities;
@@ -140,6 +109,8 @@ static ut::suite _ = []
 
     "table"_test = [&]
     {
+        MemoryLeakDetector detector;
+
         table table(comp_seq);
 
         vector<entity> entities;
@@ -159,27 +130,30 @@ static ut::suite _ = []
                                                         entity_map.insert({key.get_table_offset(), e});
                                                     }
         );
+        const int B_offset = 12345;
 
-        int j = 0;
         for (auto& component_accessor: accessor)
         {
             int i = 0;
-            if (j == 0)
+            switch (component_accessor.comparable().hash())
             {
-                for (void* addr: component_accessor)
-                {
-                    new(addr) A{j * 10000 + i, j * 10000 + i + 1, j * 10000 + i + 2, j * 10000 + i + 3};
-                    i++;
-                }
-            } else
-            {
-                for (void* addr: component_accessor)
-                {
-                    new(addr) B{j * 10000 + i, j * 10000 + i + 1, j * 10000 + i + 2, j * 10000 + i + 3};
-                    i++;
-                }
+                case type_hash::of<A>():
+                    for (void* addr: component_accessor)
+                    {
+                        new(addr) A{i, i + 1, i + 2, i + 3};
+                        i++;
+                    }
+                    break;
+                case type_hash::of<B>():
+                    for (void* addr: component_accessor)
+                    {
+                        new(addr) B{B_offset + i, B_offset + i + 1, B_offset + i + 2, B_offset + i + 3};
+                        i++;
+                    }
+                    break;
+                default:
+                    assert(false);
             }
-            j++;
         }
 
         accessor.notify_construct_finish();
@@ -191,8 +165,35 @@ static ut::suite _ = []
             auto entity_iter = entity_accessor.begin();
             for (void* addr: component_accessor)
             {
-                A* a = (A*) addr;
-                expect(a->a + 1 == a->b && a->b + 1 == a->c && a->c + 1 == a->d);
+                switch (component_accessor.comparable().hash())
+                {
+                    case type_hash::of<A>():
+                    {
+                        A* a = (A*) addr;
+                        bool res = expect(entity_iter->id() == a->a
+                                          && a->a + 1 == a->b
+                                          && a->b + 1 == a->c
+                                          && a->c + 1 == a->d)
+                                << "entity : " << entity_iter->id()
+                                << "a : " << a->a << " " << a->b << " " << a->c << " " << a->d;
+                        assert(res);
+                    }
+                        break;
+                    case type_hash::of<B>():
+                    {
+                        B* b = (B*) addr;
+                        bool res = expect(entity_iter->id() + B_offset == b->a
+                                          && b->a + 1 == b->b
+                                          && b->b + 1 == b->c
+                                          && b->c + 1 == b->d)
+                                << "entity : " << entity_iter->id()
+                                << "b : " << b->a << " " << b->b << " " << b->c << " " << b->d;
+                        assert(res);
+                    }
+                        break;
+                    default:
+                        assert(false);
+                }
                 entity_iter++;
             }
         }
@@ -223,8 +224,35 @@ static ut::suite _ = []
             auto entity_iter = entity_accessor.begin();
             for (void* addr: component_accessor)
             {
-                A* a = (A*) addr;
-                expect(a->a + 1 == a->b && a->b + 1 == a->c && a->c + 1 == a->d);
+                switch (component_accessor.comparable().hash())
+                {
+                    case type_hash::of<A>():
+                    {
+                        A* a = (A*) addr;
+                        bool res = expect(entity_iter->id() == a->a
+                                          && a->a + 1 == a->b
+                                          && a->b + 1 == a->c
+                                          && a->c + 1 == a->d)
+                                << "entity : " << entity_iter->id()
+                                << "a : " << a->a << " " << a->b << " " << a->c << " " << a->d;
+                        assert(res);
+                    }
+                        break;
+                    case type_hash::of<B>():
+                    {
+                        B* b = (B*) addr;
+                        bool res = expect(entity_iter->id() + B_offset == b->a
+                                          && b->a + 1 == b->b
+                                          && b->b + 1 == b->c
+                                          && b->c + 1 == b->d)
+                                << "entity : " << entity_iter->id()
+                                << "b : " << b->a << " " << b->b << " " << b->c << " " << b->d;
+                        assert(res);
+                    }
+                        break;
+                    default:
+                        assert(false);
+                }
                 entity_iter++;
             }
         }

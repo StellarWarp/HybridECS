@@ -69,7 +69,8 @@ namespace hyecs
 		//	m_storage.emplace(e, std::forward<Args>(args)...);
 		//}
 
-		void emplace(sequence_cref<entity> entities, const generic::constructor& constructor)
+        template<std::invocable<void*> Constructor>
+		void emplace(sequence_cref<entity> entities, Constructor&& constructor)
 		{
 			for (auto e : entities)
 			{
@@ -83,14 +84,10 @@ namespace hyecs
 			return m_storage.allocate_value(e);
 		}
 
-        //todo this not the mean of deallocate but erase with destructor and copy constructor call
-		void deallocate_component(entity e)
-		{
-			m_storage.deallocate_value(
-                    e,
-                    [this](void* dest,void* src){ m_component_type.move_constructor(dest,src); },
-                    [this](void* o){ m_component_type.destructor(o); });
-		}
+        void deallocate_component(entity e)
+        {
+            m_storage.deallocate_value(e);
+        }
 
         void deallocate_components(sequence_cref<entity> entities)
         {
@@ -98,6 +95,33 @@ namespace hyecs
             {
                 deallocate_component(e);
             }
+        }
+
+		void erase_component(entity e)
+		{
+			m_storage.deallocate_value(
+                    e,
+                    [this](void* dest,void* src){ m_component_type.move_constructor(dest,src); },
+                    [this](void* o){ m_component_type.destructor(o); });
+		}
+
+        void erase_components(sequence_cref<entity> entities)
+        {
+            for (auto e : entities)
+            {
+                erase_component(e);
+            }
+        }
+
+        //todo untested
+        void move_out_component(void* dest, entity e)
+        {
+            m_storage.deallocate_value(
+                    e,
+                    [this](void* dest_,void* src_){ m_component_type.move_constructor(dest_,src_); },
+                    [&](void* src){ m_component_type.move_constructor(dest,src); },
+                    [this](void* o){ m_component_type.destructor(o); });
+
         }
 
 		template <typename SeqParam = const entity*>
@@ -112,6 +136,8 @@ namespace hyecs
 				++a_iter;
 			}
 		}
+
+
 
 
 		//void move_into(entity e, void* data)

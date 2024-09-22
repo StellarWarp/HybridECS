@@ -66,9 +66,7 @@ namespace hyecs
 			// }
 		}
 
-		//todo emplace entity etc..
-
-
+        //todo untested
 		void entity_change_archetype(
 			sequence_cref<entity> entities,
 			tag_archetype_storage* dest_archetype,
@@ -89,14 +87,24 @@ namespace hyecs
 				if (src_tag_storages.component_type() < dest_tag_storages.component_type())
 				{
 					//remove
-					src_tag_storages.deallocate_components(entities);
+                    src_tag_storages.erase_components(entities);
 				}
 				else if (src_tag_storages.component_type() > dest_tag_storages.component_type())
 				{
-					//add
+                    //new component
 					dest_tag_storages.emplace(entities, *constructors_iter);
 					constructors_iter++;
 				}
+                else
+                {
+                    //move
+                    for(auto e:entities)
+                    {
+                        dest_tag_storages.move_out_component(
+                                dest_tag_storages.allocate_component(e),
+                                e);
+                    }
+                }
 			}
 		}
 

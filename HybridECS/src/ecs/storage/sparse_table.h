@@ -35,9 +35,21 @@ namespace hyecs
             {
                 for(auto e: m_entities)
                 {
+                    storage->erase_component(e);
+                }
+            }
+        }
+
+        void deallocate_all()
+        {
+            for(auto storage : m_component_storages)
+            {
+                for(auto e: m_entities)
+                {
                     storage->deallocate_component(e);
                 }
             }
+            m_entities.clear();
         }
 
 	private:
@@ -216,7 +228,7 @@ namespace hyecs
 				ASSERTION_CODE(m_is_construct_finished = true);
 			}
 
-			void notify_move_construct_finish()
+			void construct_finish_external_notified()
 			{
 				ASSERTION_CODE(m_is_construct_finished = true);
 			}
@@ -352,40 +364,40 @@ namespace hyecs
 			}
 			deallocate_accessor& operator=(deallocate_accessor&&) = delete;
 
+        private:
+            template<bool Destruct>
+            void notify_finish_()
+            {
+                assert(!m_is_destruct_finished);
+
+                for (auto entity : m_entities)
+                {
+                    m_table.m_entities.erase(entity);
+                    for (auto storage : m_table.m_component_storages)
+                        if constexpr (Destruct)
+                            storage->erase_component(entity);
+                        else
+                            storage->deallocate_component(entity);
+                }
+                for (auto& callback : m_table.m_on_entity_remove)
+                {
+                    for (const auto& e : m_entities)
+                    {
+                        callback(e, {});
+                    }
+                }
+                ASSERTION_CODE(m_is_destruct_finished = true);
+            }
+        public:
+
 			void destruct()
 			{
-				assert(!m_is_destruct_finished);
-
-				for (const auto& e : m_entities)
-				{
-					for (auto& strorage : m_table.m_component_storages)
-					{
-						void* data = strorage->at(e);
-						auto type = strorage->component_type();
-						type.destructor(data, 1);
-					}
-				}
-
-				notify_destruct_finish();
+                notify_finish_<true>();
 			}
 
 			void notify_destruct_finish()
 			{
-				assert(!m_is_destruct_finished);
-				for (auto entity : m_entities)
-				{
-					m_table.m_entities.erase(entity);
-					for (auto storage : m_table.m_component_storages)
-						storage->deallocate_component(entity);
-				}
-				for (auto& callback : m_table.m_on_entity_remove)
-				{
-					for (const auto& e : m_entities)
-					{
-						callback(e, {});
-					}
-				}
-				ASSERTION_CODE(m_is_destruct_finished = true);
+                notify_finish_<false>();
 			}
 
 			~deallocate_accessor() { assert(m_is_destruct_finished); }

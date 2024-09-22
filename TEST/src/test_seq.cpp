@@ -1,4 +1,3 @@
-#pragma once
 //#include "ecs/archetype_registry.h"
 #include "container/container.h"
 #include "ut.hpp"

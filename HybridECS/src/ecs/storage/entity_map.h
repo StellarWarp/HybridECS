@@ -90,6 +90,15 @@ namespace hyecs
 
         vector<page*> pages;
 
+        page* alloc_page()
+        {
+            return new page();
+        }
+
+        void dealloc_page(page* p)
+        {
+            delete p;
+        }
     public:
 
         entity_sparse_table() {};
@@ -101,21 +110,19 @@ namespace hyecs
             {
                 if (other.pages[i])
                 {
-                    pages[i] = new page(*other.pages[i]);
+                    auto p = pages[i] = alloc_page();
+                    new(p) page(*other.pages[i]);
                 }
             }
         }
 
         entity_sparse_table(entity_sparse_table&& other) noexcept
-        {
-            pages = std::move(other.pages);
-            other.pages.clear();
-        }
+                : pages(std::move(other.pages)) {}
 
         ~entity_sparse_table()
         {
             for (auto page: pages)
-                delete page;
+                dealloc_page(page);
         }
 
         void clear()
@@ -126,12 +133,14 @@ namespace hyecs
 
     private:
 
+
+
         auto page_for_index(uint32_t page_index)
         {
             if (pages.size() <= page_index)
                 pages.resize(page_index + 1);
             if (!pages[page_index])
-                pages[page_index] = new page();
+                pages[page_index] = alloc_page();
             return pages[page_index];
         }
 
@@ -144,12 +153,11 @@ namespace hyecs
     public:
 
         template<typename... Args>
-        void emplace(Args... args)
+        void emplace(entity e, Args&&... args)
         {
             //e is first argument
-            auto e = std::get<0>(std::forward_as_tuple(args...));
             auto [page_index, page_offset] = table_location(e.id());
-            auto& pair = page_for_index(page_index)->emplace(page_offset, std::forward<Args>(args)...);
+            auto& pair = page_for_index(page_index)->emplace(page_offset, e, std::forward<Args>(args)...);
         }
 
         void insert(entity_value_pair&& pair)
@@ -233,15 +241,17 @@ namespace hyecs
 
         raw_entity_dense_map(size_t value_size, size_t alignment) :
                 m_sparse(),
-                m_dense(sizeof(entity) + value_size, std::max(alignment, alignof(entity))) {
+                m_dense(sizeof(entity) + value_size, std::max(alignment, alignof(entity)))
+        {
             assert(alignment <= sizeof(entity));//todo support for lager alignment
         }
+
         ~raw_entity_dense_map() = default; //warn that the need to delete value outside
 
         template<typename Deleter = no_deleter>
         void clear(Deleter deleter = {})
         {
-            for (entity_value pair : m_dense)
+            for (entity_value pair: m_dense)
             {
                 deleter(pair.value);
             }
@@ -259,11 +269,16 @@ namespace hyecs
         }
 
         template<typename Mover = std::nullptr_t,
-                typename Deleter = no_deleter>
+                typename Deleter = no_deleter,
+                typename MovedDeleter = std::nullptr_t>
         void deallocate_value(entity e,
                               Mover&& mover = {},
-                              Deleter&& deleter = {})
+                              Deleter&& deleter = {},
+                              MovedDeleter&& moved_deleter = {}//default using deleter
+                              )
         {
+            static constexpr bool has_mover = !std::is_same_v<Mover, std::nullptr_t>;
+            static constexpr bool has_moved_deleter = !std::is_same_v<MovedDeleter, std::nullptr_t>;
             const auto& [ptr, index] = m_sparse.at(e);
             m_dense.deallocate_value(
                     ptr, index, [&]//remapping on swap
@@ -273,9 +288,7 @@ namespace hyecs
                     },
                     [&]//move
                     {
-                        if constexpr (std::is_same_v<Mover, std::nullptr_t>)
-                            return nullptr_t{};
-                        else
+                        if constexpr (has_mover)
                             return [&](void* dest, void* src)
                             {
                                 auto dest_ = entity_value(dest);
@@ -283,11 +296,23 @@ namespace hyecs
                                 dest_.e = src_.e;
                                 mover(entity_value(dest).value, entity_value(src).value);
                             };
+                        else
+                            return std::nullptr_t{};
                     }(),
                     [&](void* o)//delete
                     {
                         deleter(entity_value(o).value);
-                    });
+                    },
+                    [&]{//moved deleter
+                        if constexpr (has_moved_deleter)
+                            return [&](void* o)//delete
+                            {
+                                moved_deleter(entity_value(o).value);
+                            };
+                        else
+                            return std::nullptr_t{};
+                    }()
+                    );
             m_sparse.erase(e);
         }
 

@@ -2,114 +2,67 @@
 
 #include "ecs/static_data_registry.h"
 #include "ecs/type/component_group.h"
-#include "ut.hpp"
+#include "../test_util/ut.hpp"
+#include "../test_util/managed_object_tester.h"
 
 using namespace hyecs;
 
-
-constexpr auto group_a = component_group_id("Group A");
-constexpr auto group_b = component_group_id("Group B");
-constexpr auto group_c = component_group_id("Group C");
-inline const auto _ = ecs_global_rtti_context::register_context.add_group("Group A");
-inline const auto __ = ecs_global_rtti_context::register_context.add_group("Group B");
-inline const auto ___ = ecs_global_rtti_context::register_context.add_group("Group C");
-
-struct A
+namespace
 {
-    int x;
-    size_t s;
-    static inline size_t objects;
-    static inline size_t seq = 0;
-    static inline auto flags = vector<bool>(1000, false);
-    static inline auto flags_ = vector<bool>(1000, false);
 
-    static inline size_t constructor_call;
-    static inline size_t move_call;
-    static inline size_t copy_call;
-    static inline size_t delete_call;
-    static void before_check()
+
+    constexpr auto group_a = component_group_id("Group A");
+    constexpr auto group_b = component_group_id("Group B");
+    constexpr auto group_c = component_group_id("Group C");
+    inline const auto _ = ecs_global_rtti_context::register_context.add_group("Group A");
+    inline const auto __ = ecs_global_rtti_context::register_context.add_group("Group B");
+    inline const auto ___ = ecs_global_rtti_context::register_context.add_group("Group C");
+
+    using tester = managed_object_tester<[]{}>;
+    struct A : tester
     {
-        flags_ = flags;
-    }
-    static void check()
+        A(int x) : tester(x,x+1,x+2,x+3){}
+    };
+
+    struct B
     {
-        for (size_t i = 0; i < flags.size(); i++)
-        {
-            boost::ut::expect(flags[i] == false) << "leaked object at " << i;
-        }
-    }
+        int x;
+    };
 
-    A(int x) : x(x)
+    static_assert(type_hash::of<A>() != type_hash::of<B>());
+
+    struct C
     {
-        s = seq;
-        flags[seq++] = true;
-        objects++;
-        constructor_call++;
-    }
+        int x;
+    };
 
-    A(A&& other) noexcept: x(other.x)
+    struct D
     {
-        s = seq;
-        flags[seq++] = true;
-        objects++;
-        move_call++;
-    }
+        int x;
+    };
 
-    A(const A& other) : x(other.x)
+    struct E
     {
-        s = seq;
-        flags[seq++] = true;
-        objects++;
-        copy_call++;
-    }
+        int x;
+    };
 
-    ~A()
+    struct F
     {
-        flags[s] = false;
-        delete_call++;
-        objects--;
-    }
-};
-
-struct B
-{
-    int x;
-};
-
-static_assert(type_hash::of<A>() != type_hash::of<B>());
-
-struct C
-{
-    int x;
-};
-
-struct D
-{
-    int x;
-};
-
-struct E
-{
-    int x;
-};
-
-struct F
-{
-    int x;
-};
+        int x;
+    };
 
 //todo untagged zero size types
-struct T1
-{
-};
+    struct T1
+    {
+    };
 
-struct T2
-{
-};
+    struct T2
+    {
+    };
 
-struct T3
-{
-};
+    struct T3
+    {
+    };
 
 
 #define CONCATENATE_DIRECT(a, b) a##b
@@ -117,30 +70,30 @@ struct T3
 #define ANON_TYPE using CONCATENATE(_inline_reflect_, __LINE__)
 #define ANON CONCATENATE(_inline_reflect_, __LINE__)
 
-ecs_rtti_register<A, group_a> ANON;
-ecs_rtti_register<B, group_a> ANON;
-ecs_rtti_register<C, group_a> ANON;
-ecs_rtti_register<D, group_a> ANON;
-ecs_rtti_register<E, group_a> ANON;
-ecs_rtti_register<F, group_a> ANON;
-ecs_rtti_register<T1, group_a> ANON;
-ecs_rtti_register<T2, group_a> ANON;
-ecs_rtti_register<T3, group_a> ANON;
+    ecs_rtti_register<A, group_a> ANON;
+    ecs_rtti_register<B, group_a> ANON;
+    ecs_rtti_register<C, group_a> ANON;
+    ecs_rtti_register<D, group_a> ANON;
+    ecs_rtti_register<E, group_a> ANON;
+    ecs_rtti_register<F, group_a> ANON;
+    ecs_rtti_register<T1, group_a> ANON;
+    ecs_rtti_register<T2, group_a> ANON;
+    ecs_rtti_register<T3, group_a> ANON;
 
-struct register_idents
-{
-    enum
+    struct register_idents
     {
-        main,
+        enum
+        {
+            main,
+        };
     };
-};
 
 
-class main_registry : public immediate_data_registry<register_idents::main>
-{
-    using immediate_data_registry::immediate_data_registry;
-};
-
+    class main_registry : public immediate_data_registry<register_idents::main>
+    {
+        using immediate_data_registry::immediate_data_registry;
+    };
+}
 namespace ut = boost::ut;
 
 static ut::suite test_suite = []
@@ -219,19 +172,14 @@ static ut::suite test_suite = []
         registry.emplace_static(entities2, A{1}, D{4}, E{5}, T1{}, T2{});
         entities2.resize(300);
 
-        ut::log << std::format("object {}, ctor {}, move {}, copy {}, delete {}\n",
-                               A::objects, A::constructor_call, A::move_call, A::copy_call, A::delete_call);
         registry.emplace_static(entities2, A{1}, B{2});
-        ut::log << std::format("object {}, ctor {}, move {}, copy {}, delete {}\n",
-                               A::objects, A::constructor_call, A::move_call, A::copy_call, A::delete_call);
-//        A::check();
 
 
         q.dynamic_for_each(q.get_access_info(registry.component_types<A, B>()),
                            [](entity e, sequence_ref<void*> data)
                            {
                                auto [a, b] = data.cast_tuple<A*, B*>();
-                               expect(a->x == 1 && b->x == 2);
+                               expect(a->a == 1 && b->x == 2);
                            });
 
         auto& qa = registry.get_query({
@@ -245,13 +193,10 @@ static ut::suite test_suite = []
                             {
                                 Acounter++;
                             });
-        expect(A::objects == Acounter)
-                << "A::objects" << A::objects << "\n"
-                << "Acounter" << Acounter << "\n"
-                << "A::constructor_call" << A::constructor_call << "\n"
-                << "A::move_call" << A::move_call << "\n"
-                << "A::copy_call" << A::copy_call << "\n"
-                << "A::delete_call" << A::delete_call << "\n";
+        if(!expect(A::object_counter == Acounter))
+        {
+            A::check_log();
+        }
 
 //         registry.query_with()
 //        .all<B2,A,A3,B,A2>()
@@ -267,8 +212,10 @@ static ut::suite test_suite = []
 
     "leak"_test = []
     {
-        expect(A::objects == 0) << "A objects should be 0 value: " << A::objects;
-        A::check();
+        if(!expect(A::object_counter == 0))
+        {
+            A::check_log();
+        }
     };
 
 

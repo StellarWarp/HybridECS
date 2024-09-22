@@ -55,7 +55,12 @@ namespace hyecs::generic
         ((T*) addr)->~T();
     }
 
-    //todo support for trivially copyable types
+    ASSERTION_CODE(inline bool g_debug_dynamic_move_signature = 0);
+    ASSERTION_CODE(struct debug_scope_dynamic_move_signature{
+           debug_scope_dynamic_move_signature() { g_debug_dynamic_move_signature = 1; }
+           ~debug_scope_dynamic_move_signature() { g_debug_dynamic_move_signature = 0; }
+    };)
+
     template<typename T>
     constexpr move_constructor_ptr_t nullable_move_constructor()
     {
@@ -86,8 +91,8 @@ namespace hyecs::generic
 
     struct type_info
     {
-        size_t size;
-        size_t alignment;
+        uint32_t size;
+        uint32_t alignment;
         copy_constructor_ptr_t copy_constructor;
         move_constructor_ptr_t move_constructor;
         destructor_ptr_t destructor;
@@ -95,8 +100,8 @@ namespace hyecs::generic
         const char* name;
         type_flags flags;
 
-        type_info(size_t size,
-                  size_t align,
+        type_info(uint32_t size,
+                  uint32_t align,
                   copy_constructor_ptr_t copy_constructor,
                   move_constructor_ptr_t move_constructor,
                   destructor_ptr_t destructor,
@@ -159,24 +164,24 @@ namespace hyecs::generic
     struct type_index_interface
     {
 
-        size_t size(this auto&& self) requires (requires { self.m_size; })
+        uint32_t size(this auto&& self) requires (requires { self.m_size; })
         {
             return self.m_size;
         }
 
-        size_t size(this auto&& self) requires (!requires { self.m_size; })
+        uint32_t size(this auto&& self) requires (!requires { self.m_size; })
 
         && (requires { self.m_info; })
         {
             return self.m_info->size;
         }
 
-        size_t alignment(this auto&& self) requires (requires { self.m_alignment; })
+        uint32_t alignment(this auto&& self) requires (requires { self.m_alignment; })
         {
             return self.m_alignment;
         }
 
-        size_t alignment(this auto&& self) requires (!requires { self.m_alignment; })
+        uint32_t alignment(this auto&& self) requires (!requires { self.m_alignment; })
 
         && (requires { self.m_info; })
         {
@@ -293,6 +298,7 @@ namespace hyecs::generic
 
         void* move_constructor(this auto&& self, void* dest, void* src) requires (requires { self.move_constructor_ptr(); })
         {
+            ASSERTION_CODE(generic::debug_scope_dynamic_move_signature _{});
             if (self.is_trivially_move_constructible())
                 return std::memcpy(dest, src, self.size());
             else

@@ -1,29 +1,37 @@
-#pragma once
-
 #include "ecs/storage/table.h"
 #include "ecs/storage/sparse_table.h"
 
 #include "ut.hpp"
+#include "memleak_detect.h"
+#include "managed_object_tester.h"
 
 using namespace hyecs;
 
 namespace ut = boost::ut;
 
-static ut::suite _ = [] {
-    using namespace ut;
-    "sparse_table"_test = [] {
-        struct A
-        {
-            int a, b, c, d;
-        };
 
-        struct B
-        {
-            int a, b, c, d;
-        };
+namespace
+{
+    struct A
+    {
+        int a, b, c, d;
+    };
+
+
+    using B = managed_object_tester<[] {}>;
+}
+
+static ut::suite _ = []
+{
+    using namespace ut;
+    "sparse_table"_test = []
+    {
+
+        MemoryLeakDetector detector;
+
 
         component_group_index g = component_group_info{
-            .id = component_group_id{}
+                .id = component_group_id{}
         };
 
         component_type_index c1 = component_type_info(generic::type_info::of<A>(), g, false);
@@ -33,13 +41,14 @@ static ut::suite _ = [] {
         component_storage s2(c2);
 
         vector<component_storage*> storages{&s1, &s2};
-        std::sort(storages.begin(), storages.end(), [](const component_storage* a, const component_storage* b) { return a->component_type() < b->component_type(); });
+        std::sort(storages.begin(), storages.end(),
+                  [](const component_storage* a, const component_storage* b)
+                  {
+                      return a->component_type() < b->component_type();
+                  });
 
         auto seq = sorted_sequence_cref(sequence_cref(storages));
         sparse_table table(seq);
-
-
-        //table table({ c1,c2 });
 
         const uint32_t scale = 2048;
 
@@ -51,10 +60,12 @@ static ut::suite _ = [] {
 
         unordered_map<entity, storage_key> key_map;
 
-        auto accessor = table.get_allocate_accessor(sequence_ref(entities).as_const(), [&](entity e, storage_key key)
-                                                    {
+        auto accessor = table.get_allocate_accessor(
+                sequence_ref(entities).as_const(),
+                [&](entity e, storage_key key)
+                {
 
-                                                    }
+                }
         );
 
         for (auto e: entities)
@@ -62,19 +73,31 @@ static ut::suite _ = [] {
             key_map.insert({e, {}});
         }
 
+        const int B_offset = 12345;
 
-        int j = 0;
         for (auto& component_accessor: accessor)
         {
             int i = 0;
-            for (void* addr: component_accessor)
+            switch (component_accessor.comparable().hash())
             {
-                new(addr) A{j * 10000 + i, j * 10000 + i + 1, j * 10000 + i + 2, j * 10000 + i + 3};
-                i++;
+                case type_hash::of<A>():
+                    for (void* addr: component_accessor)
+                    {
+                        new(addr) A{i, i + 1, i + 2, i + 3};
+                        i++;
+                    }
+                    break;
+                case type_hash::of<B>():
+                    for (void* addr: component_accessor)
+                    {
+                        new(addr) B{B_offset + i, B_offset + i + 1, B_offset + i + 2, B_offset + i + 3};
+                        i++;
+                    }
+                    break;
+                default:
+                    assert(false);
             }
-            j++;
         }
-
         accessor.notify_construct_finish();
 
         auto raw_accessor = table.get_raw_accessor();
@@ -84,15 +107,41 @@ static ut::suite _ = [] {
             auto entity_iter = entity_accessor.begin();
             for (void* addr: component_accessor)
             {
-                A* a = (A*) addr;
-                std::cout << entity_iter->id() << " : "
-                          << a->a << " " << a->b << " " << a->c << " " << a->d << std::endl;
+                switch (component_accessor.comparable().hash())
+                {
+                    case type_hash::of<A>():
+                    {
+                        A* a = (A*) addr;
+                        bool res = expect(entity_iter->id() == a->a
+                                          && a->a + 1 == a->b
+                                          && a->b + 1 == a->c
+                                          && a->c + 1 == a->d)
+                                << "entity : " << entity_iter->id()
+                                << "a : " << a->a << " " << a->b << " " << a->c << " " << a->d;
+                        assert(res);
+                    }
+                        break;
+                    case type_hash::of<B>():
+                    {
+                        B* b = (B*) addr;
+                        bool res = expect(entity_iter->id() + B_offset == b->a
+                                          && b->a + 1 == b->b
+                                          && b->b + 1 == b->c
+                                          && b->c + 1 == b->d)
+                                << "entity : " << entity_iter->id()
+                                << "b : " << b->a << " " << b->b << " " << b->c << " " << b->d;
+                        assert(res);
+                    }
+                        break;
+                    default:
+                        assert(false);
+                }
                 entity_iter++;
             }
         }
 
         vector<entity> deallocate_entities;
-        //radom deallocate
+        //remove
         for (uint32_t _ = 0; _ < scale; _++)
         {
             if (uint32_t i = rand() % scale; key_map.contains(entities[i]))
@@ -115,9 +164,35 @@ static ut::suite _ = [] {
                 auto entity_iter = entity_accessor.begin();
                 for (void* addr: component_accessor)
                 {
-                    A* a = (A*) addr;
-                    std::cout << entity_iter->id() << " : "
-                              << a->a << " " << a->b << " " << a->c << " " << a->d << std::endl;
+                    switch (component_accessor.comparable().hash())
+                    {
+                        case type_hash::of<A>():
+                        {
+                            A* a = (A*) addr;
+                            bool res = expect(entity_iter->id() == a->a
+                                              && a->a + 1 == a->b
+                                              && a->b + 1 == a->c
+                                              && a->c + 1 == a->d)
+                                    << "entity : " << entity_iter->id()
+                                    << "a : " << a->a << " " << a->b << " " << a->c << " " << a->d;
+                            assert(res);
+                        }
+                            break;
+                        case type_hash::of<B>():
+                        {
+                            B* b = (B*) addr;
+                            bool res = expect(entity_iter->id() + B_offset == b->a
+                                              && b->a + 1 == b->b
+                                              && b->b + 1 == b->c
+                                              && b->c + 1 == b->d)
+                                    << "entity : " << entity_iter->id()
+                                    << "b : " << b->a << " " << b->b << " " << b->c << " " << b->d;
+                            assert(res);
+                        }
+                            break;
+                        default:
+                            assert(false);
+                    }
                     entity_iter++;
                 }
             }
@@ -128,5 +203,14 @@ static ut::suite _ = [] {
         {
             expect(key_map.contains(e));
         }
+    };
+
+    "object leak test"_test = []
+    {
+        expect(B::object_counter == 0) << "B::object_counter = " << B::object_counter << "\n"
+                                       << "B::construct_call = " << B::construct_call << "\n"
+                                       << "B::move_call = " << B::move_call << "\n"
+                                       << "B::copy_call = " << B::copy_call << "\n"
+                                       << "B::destroy_call = " << B::destroy_call << "\n";
     };
 };

@@ -135,7 +135,7 @@ namespace hyecs
 			}, m_table);
 		}
 
-
+        //todo untested
 		void entity_change_archetype(
 			sequence_cref<entity> entities,
 			archetype_storage* dest_archetype,
@@ -186,36 +186,43 @@ namespace hyecs
 				auto src_component_accessors = src_accessor.begin();
 				auto dest_component_accessors = dest_accessor.begin();
 				while (src_component_accessors != src_accessor.end())
-					if (src_component_accessors.comparable() < dest_component_accessors.comparable())
-					{
-						component_type_index type = src_component_accessors.component_type();
-						for (void* addr : src_component_accessors)
-							type.destructor(addr);
-						src_component_accessors++;
-					}
-					else if (src_component_accessors.comparable() > dest_component_accessors.comparable())
-					{
-						assert(constructors_iter->type() == dest_component_accessors.component_type());
-						auto& constructor = *constructors_iter;
-						for (void* addr : dest_component_accessors)
-							constructor(addr);
-						dest_component_accessors++;
-						constructors_iter++;
-					}
-					else
-					{
-						auto src_comp_iter = src_component_accessors.begin();
-						auto dest_comp_iter = dest_component_accessors.begin();
-						component_type_index type = src_component_accessors.component_type();
-						while (src_comp_iter != src_component_accessors.end())
-						{
-							type.move_constructor(*dest_comp_iter, *src_comp_iter);
-							src_comp_iter++;
-							dest_comp_iter++;
-						}
-						src_component_accessors++;
-						dest_component_accessors++;
-					}
+                {
+                    if (src_component_accessors.comparable() < dest_component_accessors.comparable())
+                    {
+                        //remove
+                        component_type_index type = src_component_accessors.component_type();
+                        for (void* addr: src_component_accessors)
+                            type.destructor(addr);
+                        src_component_accessors++;
+                    } else if (src_component_accessors.comparable() > dest_component_accessors.comparable())
+                    {
+                        //new component
+                        assert(constructors_iter->type() == dest_component_accessors.component_type());
+                        auto& constructor = *constructors_iter;
+                        for (void* addr: dest_component_accessors)
+                            constructor(addr);
+                        dest_component_accessors++;
+                        constructors_iter++;
+                    } else
+                    {
+                        //move component
+                        auto src_comp_iter = src_component_accessors.begin();
+                        auto dest_comp_iter = dest_component_accessors.begin();
+                        component_type_index type = src_component_accessors.component_type();
+                        while (src_comp_iter != src_component_accessors.end())
+                        {
+                            type.move_constructor(*dest_comp_iter, *src_comp_iter);
+                            if constexpr (DESTROY_MOVED_COMPONENTS)
+                                type.destructor(*src_comp_iter);
+                            src_comp_iter++;
+                            dest_comp_iter++;
+                        }
+                        src_component_accessors++;
+                        dest_component_accessors++;
+                    }
+                }
+                src_accessor.notify_destruct_finish();
+                dest_accessor.notify_construct_finish();
 			}, src_accessor_var, dest_accessor_var);
 		}
 
@@ -257,7 +264,8 @@ namespace hyecs
 				on_sparse_to_chunk();
 			}
 
-			dest_accessor.notify_move_construct_finish();
+            dest_accessor.construct_finish_external_notified();
+            if constexpr (not DESTROY_MOVED_COMPONENTS) sparse_table_ptr->deallocate_all();
 		}
 
 		void chunk_convert_to_sparse()
@@ -298,7 +306,7 @@ namespace hyecs
 				on_chunk_to_sparse();
 			}
 
-			dest_accessor.notify_move_construct_finish();
+            dest_accessor.construct_finish_external_notified();
 		}
 
 		void add_callback_on_sparse_to_chunk(std::function<void()>&& callback)

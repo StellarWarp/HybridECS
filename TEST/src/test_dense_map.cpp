@@ -1,8 +1,8 @@
-#pragma once
-
 #include "ecs/storage/entity_map.h"
 
 #include "ut.hpp"
+#include "memleak_detect.h"
+#include "managed_object_tester.h"
 
 using namespace hyecs;
 
@@ -10,66 +10,8 @@ namespace ut = boost::ut;
 
 namespace
 {
-    struct B
-    {
-        static inline size_t object_counter = 0;
-        static inline size_t construct_call = 0;
-        static inline size_t move_call = 0;
-        static inline size_t copy_call = 0;
-        static inline size_t destroy_call = 0;
 
-        static void check_log()
-        {
-            ut::log << "object_counter: " << object_counter << "\n"
-            << "construct_call: " << construct_call << "\n"
-            << "move_call: " << move_call << "\n"
-            << "copy_call: " << copy_call << "\n"
-            << "destroy_call: " << destroy_call << "\n";
-        }
-
-        int a, b, c, d;
-
-        B(int a, int b, int c, int d) : a(a), b(b), c(c), d(d)
-        {
-            object_counter++;
-            construct_call++;
-        }
-
-        B(const B& other) : a(other.a), b(other.b), c(other.c), d(other.d)
-        {
-            object_counter++;
-            copy_call++;
-        }
-
-        B(B&& other) : a(other.a), b(other.b), c(other.c), d(other.d)
-        {
-            object_counter++;
-            move_call++;
-        }
-
-        B& operator=(const B& other)
-        {
-            a = other.a;
-            b = other.b;
-            c = other.c;
-            d = other.d;
-            return *this;
-        }
-
-
-        ~B()
-        {
-            a = b = c = d = 0;
-            object_counter--;
-            destroy_call++;
-        }
-
-        bool operator==(const B& o) const
-        {
-            return a == o.a && b == o.b && c == o.c && d == o.d;
-        }
-
-    };
+    using B = managed_object_tester<[] {}>;
 }
 
 static ut::suite _ = []
@@ -78,6 +20,8 @@ static ut::suite _ = []
 
     "dense_map class"_test = []
     {
+        MemoryLeakDetector detector;
+
         raw_entity_dense_map table(sizeof(B), alignof(B));
 
         unordered_map<entity, B> map;
@@ -102,7 +46,11 @@ static ut::suite _ = []
         {
             table.deallocate_value(
                     e,
-                    [](void* dest, void* src) { new(dest) B(std::move(*(B*) src)); },
+                    [](void* dest, void* src)
+                    {
+                        generic::debug_scope_dynamic_move_signature _{};
+                        new(dest) B(std::move(*(B*) src));
+                    },
                     [](void* ptr) { ((B*) ptr)->~B(); }
             );
         };
@@ -129,7 +77,7 @@ static ut::suite _ = []
         }
 
         //random remove
-        for (uint32_t i = 0; i < test_scale*2; i++)
+        for (uint32_t i = 0; i < test_scale * 2; i++)
         {
             if (rand() % 2 == 0)
             {
@@ -176,16 +124,19 @@ static ut::suite _ = []
 
     };
 
-    "leak test"_test = []{
+    "object leak test"_test = []
+    {
         expect(B::object_counter == 0) << "B::object_counter = " << B::object_counter << "\n"
-        << "B::construct_call = " << B::construct_call << "\n"
-        << "B::move_call = " << B::move_call << "\n"
-        << "B::copy_call = " << B::copy_call << "\n"
-        << "B::destroy_call = " << B::destroy_call << "\n";
+                                       << "B::construct_call = " << B::construct_call << "\n"
+                                       << "B::move_call = " << B::move_call << "\n"
+                                       << "B::copy_call = " << B::copy_call << "\n"
+                                       << "B::destroy_call = " << B::destroy_call << "\n";
     };
 
     "dense_map"_test = []
     {
+        MemoryLeakDetector detector;
+
         raw_entity_dense_map table(sizeof(int), alignof(int));
 
         unordered_map<entity, int> map;
@@ -236,11 +187,6 @@ static ut::suite _ = []
         }
 
 
-        for (raw_entity_dense_map::entity_value ev: table)
-        {
-            std::cout << ev.e << " " << *(int*) ev.value << std::endl;
-        }
-
         for (auto& [e, v]: map)
         {
             expect(*(int*) table.at(e) == v);
@@ -256,6 +202,103 @@ static ut::suite _ = []
             bool b1 = map.contains(e);
             auto b2 = table.contains(e);
             expect(b1 == b2);
+        }
+
+    };
+
+
+    "dense_map leak test"_test = []
+    {
+        MemoryLeakDetector detector;
+
+        raw_entity_dense_map table(sizeof(int), alignof(int));
+
+
+        const int test_scale = 1 << 12;
+
+        for (uint32_t i = 0; i < test_scale; i++)
+        {
+            new(table.allocate_value(entity{i, 0})) int(i);
+        }
+
+
+        //random remove
+        for (uint32_t i = 0; i < test_scale; i++)
+        {
+            if (rand() % 2 == 0)
+            {
+                table.deallocate_value(entity{i, 0});
+            }
+        }
+
+        for (uint32_t i = test_scale; i < test_scale + test_scale; i++)
+        {
+            new(table.allocate_value(entity{i, 0})) int(i);
+        }
+
+        for (uint32_t i = 0; i < test_scale; i++)
+        {
+            if (rand() % 2 == 0)
+            {
+                if (table.contains(entity{i, 0}))
+                    table.deallocate_value(entity{i, 0});
+            }
+        }
+
+        for (uint32_t i = 0; i < test_scale; i++)
+        {
+            if (rand() % 2 == 0)
+            {
+                if (table.contains(entity{i, 0}))
+                    table.deallocate_value(entity{i, 0});
+            }
+        }
+
+
+    };
+
+    "unordered map leak"_test = []
+    {
+        MemoryLeakDetector detector;
+
+        unordered_map<entity, int> map;
+
+        const int test_scale = 1 << 12;
+
+        for (uint32_t i = 0; i < test_scale; i++)
+        {
+            map[entity{i, 0}] = i;
+        }
+
+
+        //random remove
+        for (uint32_t i = 0; i < test_scale; i++)
+        {
+            if (rand() % 2 == 0)
+            {
+                map.erase(entity{i, 0});
+            }
+        }
+
+        for (uint32_t i = test_scale; i < test_scale + test_scale; i++)
+        {
+            map[entity{i, 0}] = i;
+        }
+
+        for (uint32_t i = 0; i < test_scale; i++)
+        {
+            if (rand() % 2 == 0)
+            {
+                map.erase(entity{i, 0});
+            }
+        }
+
+        for (uint32_t i = 0; i < test_scale; i++)
+        {
+            if (rand() % 2 == 0)
+            {
+                map.erase(entity{i, 0});
+            }
         }
 
     };

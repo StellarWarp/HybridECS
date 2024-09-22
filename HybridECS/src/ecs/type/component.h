@@ -9,8 +9,8 @@ namespace hyecs
 	{
         friend struct generic::type_index_interface;
 		generic::type_index_container_cached m_type_index;
-        size_t m_size;
-        size_t m_alignment;
+        uint32_t m_size;
+        uint32_t m_alignment;
         generic::copy_constructor_ptr_t m_copy_constructor;
         generic::move_constructor_ptr_t m_move_constructor;
         generic::destructor_ptr_t m_destructor;
@@ -49,19 +49,19 @@ namespace hyecs
     struct component_type_index_interface
     {
 
-        size_t size(this auto&& self) requires (requires { self.m_size; })
+        uint32_t size(this auto&& self) requires (requires { self.m_size; })
         {
             return self.m_size;
         }
-        size_t size(this auto&& self) requires (!requires { self.m_size; }) && (requires { self.m_info; })
+        uint32_t size(this auto&& self) requires (!requires { self.m_size; }) && (requires { self.m_info; })
         {
             return self.m_info->size();
         }
-        size_t alignment(this auto&& self) requires (requires { self.m_alignment; })
+        uint32_t alignment(this auto&& self) requires (requires { self.m_alignment; })
         {
             return self.m_alignment;
         }
-        size_t alignment(this auto&& self) requires (!requires { self.m_alignment; }) && (requires { self.m_info; })
+        uint32_t alignment(this auto&& self) requires (!requires { self.m_alignment; }) && (requires { self.m_info; })
         {
             return self.m_info->alignment();
         }
@@ -158,6 +158,7 @@ namespace hyecs
 
         void* move_constructor(this auto&& self, void* dest, void* src) requires (requires { self.move_constructor_ptr(); })
         {
+            ASSERTION_CODE(generic::debug_scope_dynamic_move_signature _{});
             if (self.is_trivially_move_constructible())
                 return std::memcpy(dest, src, self.size());
             else

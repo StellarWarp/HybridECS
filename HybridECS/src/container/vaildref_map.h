@@ -22,7 +22,7 @@ namespace hyecs
 	class vaildref_map
 	{
 
-		//todo add allocator for this?
+		//todo add allocator for ValueContainer?
 		using ValueContainer = deque<Value>;
 		using Map = MapContainer<Key, Value*, Hash, Equal, Alloc>;
 

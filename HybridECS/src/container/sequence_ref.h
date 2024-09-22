@@ -1,6 +1,7 @@
 #pragma once
 #include "core/meta/meta_utils.h"
 #include "stl_container.h"
+#include "container_config.h"
 
 namespace hyecs
 {

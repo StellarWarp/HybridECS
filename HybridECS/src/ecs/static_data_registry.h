@@ -104,9 +104,8 @@ namespace hyecs
 			
 			const auto constructors = [&](){
 					std::array<generic::constructor, sizeof...(T)> res{};
-					for_each_arg_indexed([&](auto&& component, size_t index)
+					for_each_arg_indexed([&]<typename type>(type&& component, size_t index)
 					{
-						using type = std::decay_t<decltype(component)>;
 						res[order_mapping[index]] = generic::constructor(std::forward<type>(component));
 					}, std::forward<T>(components)...);
 					return res;

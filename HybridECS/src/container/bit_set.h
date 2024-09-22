@@ -65,7 +65,6 @@ namespace hyecs
 			return (data[key.section] & key.mask) != 0;
 		}
 
-		//todo require test
 		bool contains(const basic_bit_set& other) const
 		{
 			if (other.size > size)

@@ -5,6 +5,7 @@
 #include "storage_key_registry.h"
 #include "ecs/query/system_callable_invoker.h"
 
+
 #if defined(_MSC_VER)
 #define no_unique_address msvc::no_unique_address
 #endif
@@ -143,8 +144,11 @@ namespace hyecs
 		stack<std::pair<chunk*, uint32_t>> m_free_chunks; //free chunk and it's index
 
 		//event
+        //adding or move into
 		vector<std::function<void(entity, storage_key)>> m_on_entity_add;
+        //removing or move out of
 		vector<std::function<void(entity, storage_key)>> m_on_entity_remove;
+        //mainly for internal move notify
 		vector<std::function<void(entity, storage_key)>> m_on_entity_move;
 
 	public:
@@ -153,7 +157,7 @@ namespace hyecs
 		{
 			size_t column_size = sizeof(entity);
 			size_t offset = 0;
-            size_t max_align = 4;
+            uint32_t max_align = 4;
 
 			for (auto& type : components)
 			{
@@ -333,8 +337,8 @@ namespace hyecs
                         //is the component destruction needed for moved components?
                         //type.destructor(data);
 						type.move_constructor(data, last_data);
-                        //todo does the last_data need to be destroyed?
-                        type.destructor(last_data);
+                        if constexpr (DESTROY_MOVED_COMPONENTS)
+                            type.destructor(last_data);
 					}
 					last_entity_offset--;
 					head_hole_iter++;
@@ -806,7 +810,7 @@ namespace hyecs
 				ASSERTION_CODE(m_is_construct_finished = true);
 			}
 
-			void notify_move_construct_finish()
+			void construct_finish_external_notified()
 			{
 				ASSERTION_CODE(m_is_construct_finished = true);
 			}
@@ -941,9 +945,9 @@ namespace hyecs
 				auto chunk = m_chunks[chunk_index];
 				for (uint32_t chunk_offset = 0; chunk_offset < chunk->size(); chunk_offset++)
 				{
-					for (uint32_t i : component_indices)
+					for (uint32_t i = 0; i < component_indices.size(); i++)
 					{
-						auto& type = m_notnull_components[i];
+						auto& type = m_notnull_components[component_indices[i]];
 						byte* data = component_address(chunk, chunk_offset, type.offset(), type.size());
 						address_cache[i] = data;
 					}

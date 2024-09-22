@@ -24,7 +24,9 @@ namespace hyecs
         struct chunk
         {
             uint8_t data[default_chunk_byte_capacity];
-            size_t element_count;
+            size_t element_count = 0;
+
+            ASSERTION_CODE(chunk(){std::memset(data,0xFFFF'FFFF,default_chunk_byte_capacity);})
         };
         vector<chunk*> m_chunks;
         stack<std::pair<chunk*, uint32_t>> m_free_chunks;
@@ -51,7 +53,7 @@ namespace hyecs
         {
             for (auto& chunk : m_chunks)
             {
-                m_allocator.deallocate((std::byte*) chunk, sizeof(chunk));
+                deallocate_chunk(chunk);
             }
         }
 
@@ -69,7 +71,7 @@ namespace hyecs
             return new(m_allocator.allocate(sizeof(chunk))) chunk();
         }
 
-        chunk* deallocate_chunk(chunk* ptr)
+        void deallocate_chunk(chunk* ptr)
         {
             m_allocator.deallocate((std::byte*) ptr, sizeof(chunk));
         }
@@ -89,6 +91,11 @@ namespace hyecs
             return static_cast<index_t>(index.chunk_index << m_chunk_offset_bits | index.chunk_offset);
         }
 
+        void* at_(chunk* c, uint32_t offset) const noexcept
+        {
+            assert(offset < chunk_element_capacity);
+            return c->data + offset * m_type_size;
+        }
 
     public:
 
@@ -110,29 +117,32 @@ namespace hyecs
         void* at(const size_t& index) noexcept
         {
             auto [chunk_index, chunk_offset] = chunk_index_offset(index);
-            return m_chunks[chunk_index]->data + chunk_offset * m_type_size;
+            return at_(m_chunks[chunk_index], chunk_offset);
         }
 
         const void* at(const size_t& index) const noexcept
         {
             auto [chunk_index, chunk_offset] = chunk_index_offset(index);
-            return m_chunks[chunk_index]->data + chunk_offset * m_type_size;
+            return at_(m_chunks[chunk_index], chunk_offset);
         }
 
-        void* operator[](const size_t& index) noexcept
-        {
-            return at(index);
-        }
+        /// this container is not designed for consistent index access
 
-        const void* operator[](const size_t& index) const noexcept
-        {
-            return at(index);
-        }
+//        void* operator[](const size_t& index) noexcept
+//        {
+//            return at(index);
+//        }
+//
+//        const void* operator[](const size_t& index) const noexcept
+//        {
+//            return at(index);
+//        }
 
 
     public:
 
         //the index is a internal allocate non-consistent index
+        //note that value is not inited
         std::pair<void*, index_t> allocate_value()
         {
             chunk* chunk;
@@ -146,7 +156,7 @@ namespace hyecs
                 chunk = info.first;
                 chunk_index = info.second;
                 chunk_offset = chunk->element_count;
-                ptr = chunk->data + chunk_offset * m_type_size;
+                ptr = at_(chunk, chunk_offset);
                 chunk->element_count++;
                 if (chunk->element_count == chunk_element_capacity)
                     m_free_chunks.pop();
@@ -158,8 +168,8 @@ namespace hyecs
                 chunk_index = m_chunks.size() - 1;
                 ptr = chunk->data;
                 m_free_chunks.push({chunk, chunk_index});
+                assert(chunk->element_count < chunk_element_capacity);
                 chunk->element_count++;
-
             }
 
             element_count++;
@@ -168,31 +178,43 @@ namespace hyecs
 
         template<std::invocable<> OnSwapBack,
                 typename Mover = std::nullptr_t,
-                typename Deleter = decltype([](void*) {})>
+                typename Deleter = std::nullptr_t,
+                typename MovedDeleter = std::nullptr_t>
         void deallocate_value(
                 void* ptr, index_t index,
                 OnSwapBack&& on_swap_back,
                 Mover&& mover = {},
-                Deleter&& deleter = {}
+                Deleter&& deleter = {},
+                MovedDeleter&& moved_deleter = {}//default using deleter
         )
         {
-            deleter(ptr);
+            static constexpr bool has_mover = !std::is_same_v<Mover, std::nullptr_t>;
+            static constexpr bool has_deleter = !std::is_same_v<Deleter, std::nullptr_t>;
+            static constexpr bool has_moved_deleter = !std::is_same_v<MovedDeleter, std::nullptr_t>;
             auto [chunk_index, chunk_offset] = chunk_index_offset(index);
             assert(chunk_index < m_chunks.size());
             assert(chunk_offset < chunk_element_capacity);
             chunk* chunk = m_chunks[chunk_index];
+            assert(at_(chunk, chunk_offset) == ptr);
+            if constexpr (has_deleter) deleter(ptr);
+
             if (chunk->element_count == chunk_element_capacity)
                 m_free_chunks.push({chunk, chunk_index});
             bool swap_element = chunk_offset != chunk->element_count - 1;
             if (swap_element)
             {
-                uint32_t last_element_offset = (chunk->element_count - 1) * m_type_size;
-                void* last_element_ptr = chunk->data + last_element_offset;
+                void* last_element_ptr = at_(chunk, chunk->element_count - 1);
                 if constexpr (std::same_as<std::nullptr_t, std::decay_t<decltype(mover)>>)
                     std::memcpy(ptr, last_element_ptr, m_type_size);
                 else
                     mover(ptr, last_element_ptr);
-                deleter(last_element_ptr);
+                if constexpr (DESTROY_MOVED_COMPONENTS)
+                {
+                    if constexpr (has_moved_deleter)
+                        moved_deleter(last_element_ptr);
+                    else if constexpr (has_deleter)
+                        deleter(last_element_ptr);
+                }
                 on_swap_back();
             }
 
@@ -215,7 +237,6 @@ namespace hyecs
             uint32_t m_chunk_index;
             uint32_t m_chunk_offset;
 
-
         public:
 
             //todo chunk element count should not be 0
@@ -229,6 +250,7 @@ namespace hyecs
                 }
             }
 
+            //todo and here
             iterator& operator++()
             {
                 m_chunk_offset++;
