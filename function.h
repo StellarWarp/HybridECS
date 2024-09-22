@@ -147,7 +147,7 @@ namespace auto_delegate::details
             }
         }
 
-        template<typename Callable>
+        template<typename Callable> requires (not std::same_as<std::decay_t<Callable>, function>)
         function& operator=(Callable&& callable)
         {
             this->~function();
