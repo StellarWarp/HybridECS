@@ -561,7 +561,3 @@ namespace auto_delegate
 }
 #undef DELEGATE_no_unique_address
 
-namespace auto_delegate_export
-{
-    using auto_delegate::multicast_delegate;
-}

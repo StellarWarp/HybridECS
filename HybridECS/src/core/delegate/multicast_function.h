@@ -183,7 +183,7 @@ namespace auto_delegate
 
         //bind methods
         template<auto MemFunc, typename T_ptr>
-        requires std::same_as<typename function_traits<decltype(MemFunc)>::decay_function_type, Ret(Args...)>
+        requires std::same_as<typename details::function_traits<decltype(MemFunc)>::decay_function_type, Ret(Args...)>
         decltype(auto) bind(const T_ptr& obj)
         {
             return bind(member_func_wrapper<T_ptr, MemFunc>(obj));
@@ -472,6 +472,7 @@ namespace auto_delegate
     template<std::derived_from<object_binder_tag> ObjectBinder, auto Memfunc>
     auto operator | (ObjectBinder&& b_obj, bind_memfn_impl<Memfunc>)
     {
+        using namespace details;
         using function_type = function_traits<decltype(Memfunc)>::decay_function_type;
         using object_type = function_traits<decltype(Memfunc)>::class_type;
         return [&]<typename Ret, typename... Args>(function_traits<Ret(Args...)>){
@@ -516,6 +517,7 @@ namespace auto_delegate
     template<std::derived_from<object_binder_tag> ObjectBinder, typename Lambda>
     auto operator | (ObjectBinder&& b_obj, bind_into_lambda<Lambda> b_lambda)
     {
+        using namespace details;
         using object_type = std::decay_t<ObjectBinder>::type;
         using function_type = function_traits<decltype(&Lambda::template operator()<object_type&>)>::decay_function_type;
         return [&]<typename Ret,typename _T_, typename... Args>(function_traits<Ret(_T_,Args...)>){
@@ -619,6 +621,7 @@ namespace auto_delegate
     template<typename Callable>
     auto operator | (Callable&& callable, bind_handle_t)
     {
+        using namespace details;
         using func_traits = function_traits<decltype(&Callable::operator())>;
         return [&]<typename Ret, typename... Args>(function_traits<Ret(Args...)>){
             using callable_t = std::decay_t<Callable>;
@@ -717,5 +720,6 @@ namespace auto_delegate
 
 
 }
+
 
 #undef no_unique_address
