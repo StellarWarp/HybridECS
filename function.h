@@ -5,7 +5,7 @@
 #include <assert.h>
 #include "function_traits.h"
 
-namespace auto_delegate
+namespace auto_delegate::details
 {
     namespace
     {
@@ -222,4 +222,9 @@ namespace auto_delegate
         }
 #endif
     };
+}
+
+namespace auto_delegate
+{
+    using details::function;
 }

@@ -3,7 +3,7 @@
 
 namespace auto_delegate
 {
-    namespace
+    namespace details
     {
 
         template<typename...>
@@ -56,28 +56,28 @@ namespace auto_delegate
             using member_function_type = ReturnType(ClassType::*)(Args...) specifier;\
     }
 
-        DECLARE_MEMBER_FUNCTION_TRAITS(const);
-        DECLARE_MEMBER_FUNCTION_TRAITS(volatile);
-        DECLARE_MEMBER_FUNCTION_TRAITS(noexcept);
-                                               DECLARE_MEMBER_FUNCTION_TRAITS(const noexcept);
-        DECLARE_MEMBER_FUNCTION_TRAITS(volatile noexcept);
-        DECLARE_MEMBER_FUNCTION_TRAITS(const volatile);
-        DECLARE_MEMBER_FUNCTION_TRAITS(const volatile noexcept);
-        DECLARE_MEMBER_FUNCTION_TRAITS(&);
-        DECLARE_MEMBER_FUNCTION_TRAITS(const          &);
-        DECLARE_MEMBER_FUNCTION_TRAITS(volatile &);
-        DECLARE_MEMBER_FUNCTION_TRAITS(&noexcept);
-                                               DECLARE_MEMBER_FUNCTION_TRAITS(const          &  noexcept);
-        DECLARE_MEMBER_FUNCTION_TRAITS(volatile &  noexcept);
-        DECLARE_MEMBER_FUNCTION_TRAITS(const volatile &);
+        DECLARE_MEMBER_FUNCTION_TRAITS(const                     );
+        DECLARE_MEMBER_FUNCTION_TRAITS(      volatile            );
+        DECLARE_MEMBER_FUNCTION_TRAITS(                  noexcept);
+        DECLARE_MEMBER_FUNCTION_TRAITS(const             noexcept);
+        DECLARE_MEMBER_FUNCTION_TRAITS(      volatile    noexcept);
+        DECLARE_MEMBER_FUNCTION_TRAITS(const volatile            );
+        DECLARE_MEMBER_FUNCTION_TRAITS(const volatile    noexcept);
+        DECLARE_MEMBER_FUNCTION_TRAITS(               &          );
+        DECLARE_MEMBER_FUNCTION_TRAITS(const          &          );
+        DECLARE_MEMBER_FUNCTION_TRAITS(      volatile &          );
+        DECLARE_MEMBER_FUNCTION_TRAITS(               &  noexcept);
+        DECLARE_MEMBER_FUNCTION_TRAITS(const          &  noexcept);
+        DECLARE_MEMBER_FUNCTION_TRAITS(      volatile &  noexcept);
+        DECLARE_MEMBER_FUNCTION_TRAITS(const volatile &          );
         DECLARE_MEMBER_FUNCTION_TRAITS(const volatile &  noexcept);
-        DECLARE_MEMBER_FUNCTION_TRAITS(&&);
-        DECLARE_MEMBER_FUNCTION_TRAITS(const          &&);
-        DECLARE_MEMBER_FUNCTION_TRAITS(volatile &&);
-        DECLARE_MEMBER_FUNCTION_TRAITS(&& noexcept);
+        DECLARE_MEMBER_FUNCTION_TRAITS(               &&         );
+        DECLARE_MEMBER_FUNCTION_TRAITS(const          &&         );
+        DECLARE_MEMBER_FUNCTION_TRAITS(      volatile &&         );
+        DECLARE_MEMBER_FUNCTION_TRAITS(               && noexcept);
         DECLARE_MEMBER_FUNCTION_TRAITS(const          && noexcept);
-        DECLARE_MEMBER_FUNCTION_TRAITS(volatile && noexcept);
-        DECLARE_MEMBER_FUNCTION_TRAITS(const volatile &&);
+        DECLARE_MEMBER_FUNCTION_TRAITS(      volatile && noexcept);
+        DECLARE_MEMBER_FUNCTION_TRAITS(const volatile &&         );
         DECLARE_MEMBER_FUNCTION_TRAITS(const volatile && noexcept);
 
 #undef DECLARE_MEMBER_FUNCTION_TRAITS
