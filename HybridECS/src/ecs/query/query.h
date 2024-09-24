@@ -615,9 +615,9 @@ namespace hyecs
 			
 		};
 
-		auto distribute(size_t num, const access_info& acc_info) -> iteration_distributor
-		{
-			
-		}
+//		auto distribute(size_t num, const access_info& acc_info) -> iteration_distributor
+//		{
+//
+//		}
 	};
 }

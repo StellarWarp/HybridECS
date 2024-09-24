@@ -275,7 +275,7 @@ namespace hyecs
 
 
 
-			uint64_t iterate_version = seqence_allocator<query_node>::allocate();
+			uint64_t iterate_version = sequence_allocator<query_node>::allocate();
 
 			//update for original arch related queries
 			if (!origin_arch.empty())
@@ -379,7 +379,7 @@ namespace hyecs
 			//add to direct set this will dispatch to all sub-archetype_query_node
 			base_arch_full_q_node->add_matched(tag_arch_node);
 			//for pure tag queries
-			uint64_t iterate_version = seqence_allocator<query_node>::allocate();
+			uint64_t iterate_version = sequence_allocator<query_node>::allocate();
 			for (decltype(auto) component : tag_adding_vec)
 			{
 				auto com_node_hash = archetype::addition_hash(0, { component });

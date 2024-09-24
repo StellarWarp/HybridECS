@@ -20,7 +20,7 @@ namespace hyecs
         generic::type_flags m_flags : generic::type_flags_count;
 		uint8_t m_is_tag : 1;
 
-		static inline seqence_allocator<component_type_info, uint32_t> seqence_index_allocator;
+		static inline sequence_allocator<component_type_info, uint32_t> seqence_index_allocator;
 	public:
 		component_type_info(
 			const generic::type_index& type_index,

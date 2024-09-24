@@ -3,6 +3,7 @@
 #include "storage/archetype_storage.h"
 #include "storage/tag_archetype_storage.h"
 #include "ecs/query/query.h"
+#include "ecs/query/query_parser.h"
 
 namespace hyecs
 {
@@ -510,286 +511,7 @@ namespace hyecs
 
 	};
 
-	namespace query_parameter
-	{
-		struct wo_component_param {};
-		struct descriptor_param {};
-		struct filter_param : descriptor_param {};
-		struct all_param : filter_param {};
-		struct any_param : filter_param {};
-		struct none_param : filter_param {};
-		struct variant_param : descriptor_param {};
-		struct optional_param : descriptor_param {};
-		struct relation_param : descriptor_param {};
-		struct entity_relation_param : descriptor_param {};
-		struct entity_multi_relation_param : descriptor_param {};
 
-		namespace internal
-		{
-			template<typename T>
-			concept decayed_type = std::is_same_v<std::decay_t<T>, T>;
-
-			template<typename T>
-			concept is_query_descriptor = std::is_base_of_v<descriptor_param, T>;
-		}
-
-		template<typename T> 
-			requires (internal::decayed_type<T> && !std::is_base_of_v<descriptor_param, T>)
-		using read = const T&;
-
-		template<typename T>
-			requires (internal::decayed_type<T> && !std::is_base_of_v<descriptor_param, T>)
-		using read_copy = T;
-
-		template<typename T>
-			requires (internal::decayed_type<T> && !std::is_base_of_v<descriptor_param, T>)
-		using read_write = T&;
-
-		template<typename T>
-			requires (internal::decayed_type<T> && !std::is_base_of_v<descriptor_param, T>)
-		struct write : wo_component_param
-		{
-			using type = T;
-			void operator=(const T& other) { value = other; }
-			write(T& val) : value(val) {}
-		private:
-			T& value;
-		};
-
-		//template<typename T>
-		//using input = RO<T>;
-		//template<typename T>
-		//using output = WO<T>;
-		//template<typename T>
-		//using inout = RW<T>;
-
-		template<internal::decayed_type... T>
-		struct all_of : all_param { using types = type_list<T...>; };
-
-		template<internal::decayed_type... T>
-		struct any_of : any_param { using types = type_list<T...>; };
-
-		template<internal::decayed_type... T>
-		struct none_of : none_param { using types = type_list<T...>; };
-
-		template<typename... T>
-		struct variant : variant_param { using types = type_list<T...>; };
-
-		template<typename T>
-		struct optional : optional_param { using type = T; };
-
-		template<typename...>
-		struct relation;
-
-		template<typename First, typename Second>
-		struct relation<First, Second> : relation_param
-		{
-			static_assert(!std::is_same_v<First, entity> && !std::is_same_v<Second, entity>);
-			using first = First;
-			using second = Second;
-		};
-
-		namespace internal
-		{
-			template<typename T>
-			struct is_filter : std::is_base_of<filter_param, T> {};
-		}
-
-		template<typename First, typename... QueryParam>
-		struct relation<First(QueryParam...)> : entity_relation_param
-		{
-			using relation_tag = First;
-			using query_param = type_list<QueryParam...>;
-			using accessable = query_param::template filter_without<internal::is_filter>;
-			entity e;
-			accessable::tuple_t components;
-
-		};
-
-		template<typename...>
-		struct multi_relation;
-
-		template<typename First, typename... QueryParam>
-		struct multi_relation<First(QueryParam...)> : entity_multi_relation_param
-		{
-			using relation_tag = First;
-			using query_param = type_list<QueryParam...>;
-			using accessable = query_param::template filter_without<internal::is_filter>;
-			entity e;
-			vector<typename accessable::tuple_t> components;
-		};
-
-
-	}
-
-	struct query_descriptor
-	{
-
-
-		enum class relation_category
-		{
-			single, multi
-		};
-
-
-		struct access_info
-		{
-			enum read_write_tag {
-				ro, wo, rw
-			};
-
-			type_hash hash;
-			//uint32_t param_index;
-			read_write_tag read_write;
-
-		};
-
-		small_vector<type_hash> cond_all;
-		small_vector<type_hash> cond_none;
-		vector<small_vector<type_hash>> cond_anys;
-
-		vector<std::tuple<type_hash, relation_category, query_descriptor>> relation;
-
-		small_vector<access_info> access_components;
-		small_vector<access_info> optional_access_components;
-		small_vector<small_vector<access_info>> variant_access_components;
-		bool entity_access;
-		bool storage_key_access;
-
-		//template<template <typename...> typename T, typename... U>
-		//static auto cast_to_type_list_helper(T<U...>){
-		//	return type_list<U...>{};
-		//};
-		//template<typename T>
-		//using cast_to_type_list = decltype(cast_to_type_list_helper(std::declval<T>()));
-
-		//using comp_list = cast_to_type_list<query_parameter::any_of<int, float>>;
-
-		template<typename T>
-		auto access_info_from()
-		{
-			using decayed = std::decay_t<T>;
-			static constexpr bool is_const = std::is_const_v<T>;
-			static constexpr bool is_ref = std::is_reference_v<T>;
-			static constexpr bool is_wo = std::is_base_of_v<query_parameter::wo_component_param, T>;
-
-			std::cout << type_name<T> << std::endl;
-
-
-			if constexpr (is_wo)
-			{
-				static_assert(!std::is_empty_v<typename T::type>, "empty component is not allowed to access");
-				return access_info{ type_hash::of<typename T::type>(), access_info::wo };
-			}
-			else
-			{
-				static_assert(!std::is_empty_v<decayed>, "empty component is not allowed to access");
-
-				if constexpr (is_const)
-					return access_info{ type_hash::of<decayed>(), access_info::ro };
-				else
-					if constexpr (is_ref)
-						return access_info{ type_hash::of<decayed>(), access_info::rw };
-					else
-						return access_info{ type_hash::of<decayed>(), access_info::wo };
-			}
-		};
-
-		template<typename...Args>
-		query_descriptor(type_list<Args...> list)
-		{
-			for_each_type([&]<typename T>(type_wrapper<T>) {
-				if constexpr (std::is_base_of_v<query_parameter::descriptor_param, T>)
-				{
-					if constexpr (std::is_base_of_v<query_parameter::all_param, T>)
-					{
-						for_each_type([&]<typename U>(type_wrapper<U>) {
-							cond_all.push_back(type_hash::of<U>());
-						}, typename T::types{});
-					}
-					else if constexpr (std::is_base_of_v<query_parameter::any_param, T>)
-					{
-						auto& cond_any = cond_anys.emplace_back();
-						for_each_type([&]<typename U>(type_wrapper<U>) {
-							cond_any.push_back({ type_hash::of<U>() });
-						}, typename T::types{});
-					}
-					else if constexpr (std::is_base_of_v<query_parameter::none_param, T>)
-					{
-						for_each_type([&]<typename U>(type_wrapper<U>) {
-							cond_none.push_back(type_hash::of<U>());
-						}, typename T::types{});
-					}
-					else if constexpr (std::is_base_of_v<query_parameter::variant_param, T>)
-					{
-						auto& cond_any = cond_anys.emplace_back();
-						auto& access_any = variant_access_components.emplace_back();
-						for_each_type([&]<typename U>(type_wrapper<U>) {
-							auto info = access_info_from<U>();
-							cond_any.push_back(info.hash);
-							access_any.push_back(info);
-						}, typename T::types{});
-					}
-					else if constexpr (std::is_base_of_v<query_parameter::optional_param, T>)
-					{
-						auto info = access_info_from<typename T::type>();
-						optional_access_components.push_back(info);
-					}
-					else if constexpr (std::is_base_of_v<query_parameter::relation_param, T>)
-					{
-
-					}
-					else if constexpr (std::is_base_of_v<query_parameter::entity_relation_param, T>)
-					{
-						using relation_tag = typename T::relation_tag;
-						using query_param = typename T::query_param;
-						relation.emplace_back(
-							type_hash::of<relation_tag>(),
-							relation_category::single,
-							query_descriptor(query_param{}));
-					}
-					else if constexpr (std::is_base_of_v<query_parameter::entity_multi_relation_param, T>)
-					{
-						using relation_tag = typename T::relation_tag;
-						using query_param = typename T::query_param;
-						relation.emplace_back(
-							type_hash::of<relation_tag>(),
-							relation_category::multi,
-							query_descriptor(query_param{}));
-					}
-					else
-					{
-						static_assert(false, "unknown type");
-					}
-				}
-				else if constexpr (is_static_component<T>::value || std::is_base_of_v<query_parameter::wo_component_param, T>)
-				{
-					access_info info = access_info_from<T>();
-					cond_all.push_back(info.hash);
-					access_components.push_back(info);
-				}
-				else if constexpr (std::is_same_v<std::decay_t<T>, entity>)
-				{
-					static_assert(std::is_same_v<T, entity>, "entity must be value parameter");
-					std::cout << type_name<T> << std::endl;
-					entity_access = true;
-				}
-				else if constexpr (std::is_same_v<std::decay_t<T>, storage_key>)
-				{
-					static_assert(std::is_same_v<T, storage_key>, "storage_key must be value parameter");
-					std::cout << type_name<T> << std::endl;
-					storage_key_access = true;
-				}
-				else
-				{
-					//std::cout << "unknown type " << type_name<T> << std::endl;
-					static_assert(false, "unknown type");
-				}
-
-			}, list);
-
-		}
-	};
 
 	class executer_builder
 	{
@@ -810,56 +532,57 @@ namespace hyecs
 
 			auto descriptor = query_descriptor(params{});
 
-			small_vector<component_type_index> cond_all;
-			small_vector<component_type_index> cond_none;
-			small_vector<small_vector<component_type_index>> cond_anys;
-			cond_all.reserve(descriptor.cond_all.size());
-			cond_none.reserve(descriptor.cond_none.size());
-			cond_anys.reserve(descriptor.cond_anys.size());
-
-			std::ranges::sort(descriptor.cond_all);
-			std::ranges::sort(descriptor.cond_none);
-
-			for (auto hash : descriptor.cond_all)
-				cond_all.push_back(m_registry.get_component_index(hash));
-			for (auto hash : descriptor.cond_none)
-				cond_none.push_back(m_registry.get_component_index(hash));
-			for (auto& vec : descriptor.cond_anys)
-			{
-				auto& cond_any = cond_anys.emplace_back();
-				cond_any.reserve(vec.size());
-				for (auto hash : vec)
-					cond_any.push_back(m_registry.get_component_index(hash));
-			}
-
-			//todo enhance the assertion
-			ASSERTION_CODE(
-
-				auto is_unique = [](auto& sorted_range)->bool {
-				if (sorted_range.size() <= 1) return true;
-				for (int i = 1; i < sorted_range.size(); ++i)
-					if (sorted_range[i] == sorted_range[i - 1])
-						return false;
-				return true;
-				};
-
-				assert(is_unique(descriptor.cond_all));
-				assert(is_unique(descriptor.cond_none));
-				for (auto& vec : descriptor.cond_anys)
-					assert(is_unique(vec));
-
-				);
-
-
-
-
-
-			query_condition cond(cond_all, cond_anys, cond_none);
-
-
-			const auto& q = m_registry.get_query(cond);
-
-			q.condition_debug();
+            //todo scoped description formation
+//			small_vector<component_type_index> cond_all;
+//			small_vector<component_type_index> cond_none;
+//			small_vector<small_vector<component_type_index>> cond_anys;
+//			cond_all.reserve(descriptor.cond_all.size());
+//			cond_none.reserve(descriptor.cond_none.size());
+//			cond_anys.reserve(descriptor.cond_anys.size());
+//
+//			std::ranges::sort(descriptor.cond_all);
+//			std::ranges::sort(descriptor.cond_none);
+//
+//			for (auto hash : descriptor.cond_all)
+//				cond_all.push_back(m_registry.get_component_index(hash));
+//			for (auto hash : descriptor.cond_none)
+//				cond_none.push_back(m_registry.get_component_index(hash));
+//			for (auto& vec : descriptor.cond_anys)
+//			{
+//				auto& cond_any = cond_anys.emplace_back();
+//				cond_any.reserve(vec.size());
+//				for (auto hash : vec)
+//					cond_any.push_back(m_registry.get_component_index(hash));
+//			}
+//
+//			//todo enhance the assertion
+//			ASSERTION_CODE(
+//
+//				auto is_unique = [](auto& sorted_range)->bool {
+//				if (sorted_range.size() <= 1) return true;
+//				for (int i = 1; i < sorted_range.size(); ++i)
+//					if (sorted_range[i] == sorted_range[i - 1])
+//						return false;
+//				return true;
+//				};
+//
+//				assert(is_unique(descriptor.cond_all));
+//				assert(is_unique(descriptor.cond_none));
+//				for (auto& vec : descriptor.cond_anys)
+//					assert(is_unique(vec));
+//
+//				);
+//
+//
+//
+//
+//
+//			query_condition cond(cond_all, cond_anys, cond_none);
+//
+//
+//			const auto& q = m_registry.get_query(cond);
+//
+//			q.condition_debug();
 
 
 			//vector<component_type_index> access_components = std::ranges::views::transform(descriptor.access_components,

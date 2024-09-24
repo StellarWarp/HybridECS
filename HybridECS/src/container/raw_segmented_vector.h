@@ -243,10 +243,9 @@ namespace hyecs
             iterator(sequence_ref<chunk*> chunks, size_t type_size) noexcept
                     : m_chunks(chunks), m_type_size(type_size), m_chunk_index(0), m_chunk_offset(0)
             {
-                while (m_chunks[m_chunk_index]->element_count == 0)
+                while (m_chunk_index < m_chunks.size() && m_chunks[m_chunk_index]->element_count == 0)
                 {
                     m_chunk_index++;
-                    if(m_chunk_index == m_chunks.size()) break;
                 }
             }
 

@@ -7,16 +7,20 @@
 
 using namespace hyecs;
 
-namespace
+namespace test_static_data_registry
 {
 
+#define CONCATENATE_DIRECT(a, b) a##b
+#define CONCATENATE(a, b) CONCATENATE_DIRECT(a, b)
+#define ANON_TYPE using CONCATENATE(_inline_reflect_, __LINE__)
+#define ANON CONCATENATE(_ecs_register_, __COUNTER__)
 
     constexpr auto group_a = component_group_id("Group A");
     constexpr auto group_b = component_group_id("Group B");
     constexpr auto group_c = component_group_id("Group C");
-    inline const auto _ = ecs_global_rtti_context::register_context.add_group("Group A");
-    inline const auto __ = ecs_global_rtti_context::register_context.add_group("Group B");
-    inline const auto ___ = ecs_global_rtti_context::register_context.add_group("Group C");
+    ecs_rtti_group_register ANON("Group A");
+    ecs_rtti_group_register ANON("Group B");
+    ecs_rtti_group_register ANON("Group C");
 
     using tester = managed_object_tester<[]{}>;
     struct A : tester
@@ -65,10 +69,7 @@ namespace
     };
 
 
-#define CONCATENATE_DIRECT(a, b) a##b
-#define CONCATENATE(a, b) CONCATENATE_DIRECT(a, b)
-#define ANON_TYPE using CONCATENATE(_inline_reflect_, __LINE__)
-#define ANON CONCATENATE(_inline_reflect_, __LINE__)
+
 
     ecs_rtti_register<A, group_a> ANON;
     ecs_rtti_register<B, group_a> ANON;
@@ -99,6 +100,7 @@ namespace ut = boost::ut;
 static ut::suite test_suite = []
 {
     using namespace ut;
+    using namespace test_static_data_registry;
 
 //    "object small scale"_test = []{
 //        data_registry registry(ecs_global_rtti_context::register_context);
@@ -116,8 +118,7 @@ static ut::suite test_suite = []
     "registry"_test = []
     {
 
-
-        main_registry registry(ecs_global_rtti_context::register_context);
+        main_registry registry(ecs_global_rtti_context::register_context());
 
 
         vector <entity> entities2(10);

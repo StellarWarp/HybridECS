@@ -402,7 +402,7 @@ namespace hyecs::generic
     class constructor
     {
         type_index m_type;
-        function<void*(void*)> m_constructor;
+        auto_delegate::function<void*(void*)> m_constructor;
 
         // template <typename T>
         // struct lambda_forward_wrapper
@@ -427,7 +427,7 @@ namespace hyecs::generic
         {
         }
 
-        constructor(type_index type, function<void*(void*)> constructor)
+        constructor(type_index type, auto_delegate::function<void*(void*)> constructor)
                 : m_type(type), m_constructor(constructor)
         {
         }
@@ -437,7 +437,7 @@ namespace hyecs::generic
                 :m_type(type_info::of<std::decay_t<T>>())
         {
             if constexpr (!std::is_empty_v<std::decay_t<T>>)
-                m_constructor = [src = std::forward<T>(src)](void* ptr) mutable
+                m_constructor = [src = std::forward<T>(src)](void* ptr) mutable -> void*
                 {
                     return new(ptr) std::decay_t<T>(src);
                 };

@@ -11,7 +11,7 @@ namespace hyecs
     public:
         constexpr component_group_id() : id(0) {}
         template <size_t Np1, typename CharT = char>
-        constexpr component_group_id(const CharT (&str)[Np1])
+        constexpr explicit component_group_id(const CharT (&str)[Np1])
                 :id (string_hash32(str)){}
         constexpr component_group_id(const component_group_id& id) : id(id.id) {}
         component_group_id(const std::string& name)
@@ -44,7 +44,7 @@ namespace hyecs
 
     template<class T,
             size_t N = 0,
-            auto tag = []{}>
+            auto tag [[maybe_unused]]= []{}>
     static consteval size_t mapping_count()
     {
 #ifdef __INTELLISENSE__
@@ -85,8 +85,8 @@ namespace hyecs
         using info_t = component_static_info<T, Group, IsTag>;
         using setter_t = component_info_mappings<T>::template set<info_t{}>;
         using index_setter_t = mapping_<index_mapping_tag, index>::template set<info_t{}>;
-        static constexpr auto _0 = setter_t();
-        static constexpr auto _1 = index_setter_t();
+        static constexpr auto _0 [[maybe_unused]] = setter_t();
+        static constexpr auto _1 [[maybe_unused]] = index_setter_t();
     };
 
     template<auto...>
@@ -120,9 +120,9 @@ namespace hyecs
 
 
 
-	//this is not for muti-thread
+	//this is not for multi-thread
 	template<typename ForType, typename Integer = uint64_t>
-	struct seqence_allocator
+	struct sequence_allocator
 	{
 		static Integer allocate() {
 			static Integer next = 0;
@@ -177,15 +177,16 @@ namespace hyecs
 			unordered_map<generic::type_index, component_register_info> components;
 		};
 	private:
-		unordered_map<component_group_id, component_group_register_info> m_groups;
+		unordered_map<component_group_id, component_group_register_info> m_groups{};
 	public:
 		template <size_t Np1, typename CharT = char>
-		component_group_id add_group(const CharT(&name)[Np1])
+		void add_group(const CharT(&name)[Np1])
 		{
 			component_group_id id(name);
 			component_group_register_info info{ id, name, {} };
-			m_groups[id] = info;
-			return component_group_id(name);
+            if (m_groups.contains(id)) return;
+            else
+			    m_groups.insert({ id, info });
 		}
 
 
@@ -198,9 +199,9 @@ namespace hyecs
 			group.components.insert({ 
 				type, 
 				component_register_info{
-					type,
-					seqence_allocator<component_register_info,uint32_t>::allocate(),
-					is_tag
+                        type,
+                        sequence_allocator<component_register_info,uint32_t>::allocate(),
+                        is_tag
 				} 
 				});
 		}
@@ -225,7 +226,11 @@ namespace hyecs
 
 	struct ecs_global_rtti_context
 	{
-		inline static ecs_rtti_context register_context;
+		static ecs_rtti_context& register_context()
+        {
+            static ecs_rtti_context context;
+            return context;
+        }
 	};
 
 
@@ -235,16 +240,16 @@ namespace hyecs
     {
         using _ = register_ecs_component<T, GroupId, IsTag>;
         ecs_rtti_register(){
-            ecs_global_rtti_context::register_context.add_component<T>(GroupId, IsTag);
+            ecs_global_rtti_context::register_context().add_component<T>(GroupId, IsTag);
         }
     };
 
-	struct ecs_component_group_static_register
+	struct ecs_rtti_group_register
 	{
 		template <size_t Np1, typename CharT = char>
-		ecs_component_group_static_register(const CharT(&name)[Np1])
+		ecs_rtti_group_register(const CharT(&name)[Np1])
 		{
-			ecs_global_rtti_context::register_context.add_group(name);
+			ecs_global_rtti_context::register_context().add_group(name);
 		}
 	};
 

@@ -327,4 +327,14 @@ namespace hyecs {
 		//return for_each_type_impl(callable, list);
 	}
 
+    template <typename... T, typename Callable>
+    auto for_each_type_indexed(Callable callable, type_list<T...> list)
+    {
+        using ls = type_list<T...>;
+        [&]<size_t... Is>(std::index_sequence<Is...>){
+            (callable(type_wrapper<T>{},std::integral_constant<size_t,Is>{}), ...);
+        }(std::make_index_sequence<ls::size>{});
+        //return for_each_type_impl(callable, list);
+    }
+
 } // namespace hyecs
