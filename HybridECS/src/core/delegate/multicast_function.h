@@ -437,12 +437,11 @@ namespace auto_delegate
             for (; iter < end; iter++)
             {
                 auto& functor = *iter;
-                bool fake_return = false;
-                func([&](Args... args) mutable
+                func([&](Args... args)->bool
                      {
-                         if (fake_return) return;
+                         assert(iter < end);
                          functor(std::forward<Args>(args)...);
-                         if (iter == end) fake_return = true;//fake invoke
+                         return iter == end;
                      });
             }
 
@@ -459,9 +458,9 @@ namespace auto_delegate
             for (; iter < end; iter++)
             {
                 auto& functor = *iter;
-                bool fake_return = false;
-                func([&](Args... args) mutable
+                func([&](Args... args) -> std::pair<Ret, bool>
                      {
+                         assert(iter < end);
                          return std::pair<Ret, bool>(functor(std::forward<Args>(args)...), iter == end);
                      });
             }
