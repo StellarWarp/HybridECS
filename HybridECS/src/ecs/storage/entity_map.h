@@ -10,9 +10,42 @@ namespace hyecs
 #define no_unique_address msvc::no_unique_address
 #endif
 
+    namespace details
+    {
+        struct version_value_pair_base
+        {
+            entity_version_t version{};
+
+            ~version_value_pair_base()
+            {
+                version = null_entity.version();
+            }
+        };
+
+        template<typename T>
+        struct version_value_pair_default : version_value_pair_base
+        {
+            struct empty_t {};
+            using value_type = std::conditional_t<std::is_void_v<T>, empty_t, T>;
+            [[no_unique_address]] value_type _value;//not init
+            value_type& value() { return _value; }
+
+            using reference_type = value_type&;
+            using pointer_type = value_type*;
+
+            version_value_pair_default() = default;
+            template<typename... Args>
+            version_value_pair_default(entity_version_t v, Args&& ... args) :
+                    version_value_pair_base{v},
+                    _value(std::forward<Args>(args)...) {}
+        };
+    }
+
     // sparse container dont support for iteration
     // if iteration is needed, use dense container
-    template<typename T>
+    template<typename T,
+            typename VersionValuePair = details::version_value_pair_default<T>
+    > requires std::is_trivially_destructible_v<T> or std::is_void_v<T>
     class entity_sparse_table
     {
         //using T = void*;
@@ -28,21 +61,24 @@ namespace hyecs
             entity e;
             [[no_unique_address]] value_type value;
         };
+        static_assert(!std::is_void_v<T> || sizeof(entity_value_pair) == sizeof(entity));
 
+        using version_value_pair = VersionValuePair;
 
         //static constexpr size_t page_byte_size = 4096;
         //static constexpr size_t page_capacity = page_byte_size / sizeof(entity_value_pair);
-        static constexpr size_t max_page_byte_size = 4096;
+        static constexpr size_t max_page_byte_size = 2048;
         //choose a page_capacity of power of 2
         static constexpr size_t page_capacity = []() -> size_t
         {
             for (size_t capacity = 1;; capacity *= 2)
-                if (capacity * sizeof(entity_value_pair) > max_page_byte_size)
+                if (capacity * sizeof(version_value_pair) > max_page_byte_size)
                     return capacity / 2;
             return 0;
         }();
-        static constexpr size_t page_byte_size = page_capacity * sizeof(entity_value_pair);
+        static constexpr size_t page_byte_size = page_capacity * sizeof(version_value_pair);
 
+        static_assert(page_capacity != 0);
         static_assert(std::has_single_bit(page_capacity), "for optimization");
 
         using table_offset_t = uint32_t;
@@ -56,33 +92,33 @@ namespace hyecs
                     : page_index(offset / page_capacity), page_offset(offset % page_capacity) {}
         };
 
+
         struct page
         {
         private:
-            entity_value_pair data[page_capacity];
+            version_value_pair data[page_capacity];
             uint8_t padding[page_byte_size - sizeof(data)];
         public:
-            page() { for (auto& p: data) p.e = null_entity; }
+            page() = default;//entity_version_t default inited
 
-            entity_value_pair& at(uint32_t offset)
+            version_value_pair& at(uint32_t offset)
             {
                 assert(offset < page_capacity);
                 return data[offset];
             }
 
             template<class... Args>
-            entity_value_pair& emplace(uint32_t offset, Args&& ... args)
+            version_value_pair& emplace(uint32_t offset, entity_version_t version, Args&& ... args)
             {
                 auto& pair = at(offset);
-                new(&pair) entity_value_pair{std::forward<Args>(args)...};
+                new(&pair) version_value_pair{version, std::forward<Args>(args)...};
                 return pair;
             }
 
             void erase(uint32_t offset)
             {
                 auto& pair = at(offset);
-                pair.e = null_entity;
-                pair.value.~value_type();
+                pair.~version_value_pair();
             }
         };
 
@@ -99,6 +135,7 @@ namespace hyecs
         {
             delete p;
         }
+
     public:
 
         entity_sparse_table() {};
@@ -116,8 +153,11 @@ namespace hyecs
             }
         }
 
-        entity_sparse_table(entity_sparse_table&& other) noexcept
-                : pages(std::move(other.pages)) {}
+        entity_sparse_table(entity_sparse_table&& other) = default;
+
+        entity_sparse_table& operator=(const entity_sparse_table& other) = default;
+
+        entity_sparse_table& operator=(entity_sparse_table&& other) = default;
 
         ~entity_sparse_table()
         {
@@ -134,8 +174,7 @@ namespace hyecs
     private:
 
 
-
-        auto page_for_index(uint32_t page_index)
+        page* page_for_index(uint32_t page_index)
         {
             if (pages.size() <= page_index)
                 pages.resize(page_index + 1);
@@ -145,28 +184,38 @@ namespace hyecs
         }
 
 
-        auto pair_for_location(table_location loc)
+        version_value_pair& pair_for_location(table_location loc)
         {
             return page_for_index(loc.page_index)->at(loc.page_offset);
         }
 
+        template<typename U>
+        struct add_ref_t { using type = U; };
+        template<>
+        struct add_ref_t<void> { using type = void; };
+        template<typename U> using add_ref = typename add_ref_t<U>::type;
     public:
 
         template<typename... Args>
-        void emplace(entity e, Args&&... args)
+        add_ref<T> emplace(entity e, Args&& ... args)
         {
             //e is first argument
             auto [page_index, page_offset] = table_location(e.id());
-            auto& pair = page_for_index(page_index)->emplace(page_offset, e, std::forward<Args>(args)...);
+            auto& pair = page_for_index(page_index)->emplace(page_offset, e.version(), std::forward<Args>(args)...);
+            return pair.value();
         }
 
-        void insert(entity_value_pair&& pair)
+        void insert(const entity_value_pair& pair) requires is_map
         {
-            auto [page_index, page_offset] = table_location(pair.e.id());
-            auto& pair_ = page_for_index(page_index)->emplace(page_offset, std::move(pair));
+            emplace(pair.e, pair.value);
         }
 
-        void insert(entity e)
+        void insert(entity_value_pair&& pair) requires is_map
+        {
+            emplace(pair.e, std::move(pair.value));
+        }
+
+        void insert(entity e) requires is_set
         {
             emplace(e);
         }
@@ -178,29 +227,51 @@ namespace hyecs
             pages[page_index]->erase(page_offset);
         }
 
-        bool contains(entity e)
+        bool contains(entity e) const
         {
             auto [page_index, page_offset] = table_location(e.id());
             if (pages.size() <= page_index || !pages[page_index])
                 return false;
             auto& pair = pages[page_index]->at(page_offset);
-            assert(pair.e == null_entity || pair.e.version() == e.version());
-            return pair.e != null_entity;
+            //entity is reused without remove from table
+            assert(pair.version == e.version() || pair.version == null_entity.version());
+            return pair.version != null_entity.version();
         }
 
-        value_type& at(entity e)
+    private:
+        using value_ref_t = version_value_pair::reference_type;
+        using value_pointer_t = version_value_pair::pointer_type;
+
+        const value_ref_t at_(entity e) const
         {
             auto [page_index, page_offset] = table_location(e.id());
             auto& pair = pages[page_index]->at(page_offset);
-            assert(pair.e != null_entity);
-            assert(pair.e.version() == e.version());
-            return pair.value;
+            assert(pair.version == e.version());
+            return pair.value();
         }
 
-        value_type& operator[](entity e)
+    public:
+        value_ref_t at(entity e) { return (value_ref_t) at_(e); }
+
+        const value_ref_t at(entity e) const { return at_(e); }
+
+        value_pointer_t find(entity e)
+        {
+            auto [page_index, page_offset] = table_location(e.id());
+            auto& pair = pages[page_index]->at(page_offset);
+            if (pair.version == null_entity.version())
+                return nullptr;
+            //not allow entity reuse without remove from table
+            assert(pair.version == e.version());
+            return &pair.value();
+        }
+
+        value_ref_t operator[](entity e)
         {
             auto& pair = pair_for_location(table_location(e.id()));
-            return pair.value;
+            //entity is reused without remove from table
+            assert(pair.version == e.version() || pair.version == null_entity.version());
+            return pair.value();
         }
 
 
@@ -220,10 +291,201 @@ namespace hyecs
     template<typename T>
     using entity_sparse_map = entity_sparse_table<T>;
 
+    class entity_dense_set
+    {
+        entity_sparse_map<uint32_t> m_sparse;
+        vector<entity> m_dense;
+
+    public:
+
+        entity_dense_set() = default;
+
+        ~entity_dense_set() = default;
+
+        void clear()
+        {
+            m_sparse.clear();
+            m_dense.clear();
+        }
+
+        bool contains(entity e)
+        {
+            return m_sparse.contains(e);
+        }
+
+        void insert(entity e)
+        {
+            assert(not contains(e));
+            uint32_t
+                    index = (uint32_t)
+                    m_dense.size();
+            m_dense.push_back(e);
+            m_sparse.emplace(e, index);
+        }
+
+        void erase(entity e)
+        {
+            assert(contains(e));
+            uint32_t index = m_sparse.at(e);
+            entity replaced = m_dense[index] = m_dense.back();
+            m_dense.pop_back();
+            m_sparse.at(replaced) = index;
+            m_sparse.erase(e);
+        }
+
+        auto begin(this auto&& self) { return self.m_dense.begin(); }
+
+        auto end(this auto&& self) { return self.m_dense.end(); }
+
+        [[nodiscard]] const auto& entities() const { return m_dense; }
+
+        [[nodiscard]] size_t size() const { return m_dense.size(); }
+
+    };
+
+    template<typename T>
+    class entity_dense_map
+    {
+        entity_sparse_map<uint32_t> m_sparse;
+        vector<std::pair<entity, T>> m_dense;
+
+    public:
+
+        entity_dense_map() = default;
+
+        ~entity_dense_map() = default;
+
+        bool contains(entity e) const
+        {
+            return m_sparse.contains(e);
+        }
+
+        auto find(entity e)
+        {
+            uint32_t* ptr = m_sparse.find(e);
+            if (!ptr) return end();
+            uint32_t index = *ptr;
+            return m_dense.begin() + index;
+        }
+
+        const T& at(entity e) const
+        {
+            return m_dense[m_sparse.at(e)].second;
+        }
+
+
+        T& at(entity e)
+        {
+            return m_dense[m_sparse.at(e)].second;
+        }
+
+        std::pair<entity, T>& emplace(entity e, auto&& value)
+        {
+            assert(not contains(e));
+            uint32_t index = (uint32_t) m_dense.size();
+            auto& ref = m_dense.emplace_back(e, std::forward<decltype(value)>(value));
+            m_sparse.emplace(e, index);
+            return ref;
+        }
+
+        void insert(std::pair<entity, T>&& pair)
+        {
+            assert(not contains(pair.first));
+            uint32_t
+                    index = (uint32_t)
+                    m_dense.size();
+            m_dense.push_back(std::move(pair));
+            m_sparse.emplace(pair.first, index);
+        }
+
+        void erase(entity e)
+        {
+            assert(contains(e));
+            uint32_t index = m_sparse.at(e);
+            auto& replaced_pair = m_dense[index] = m_dense.back();
+            entity replaced = replaced_pair.first;
+            m_dense.pop_back();
+            m_sparse.at(replaced) = index;
+            m_sparse.erase(e);
+        }
+
+        size_t size() const { return m_dense.size(); }
+
+        auto begin(this auto&& self) { return self.m_dense.begin(); }
+
+        auto end(this auto&& self) { return self.m_dense.end(); }
+
+        auto entities() const { return m_dense; }
+
+    };
+
+//    template<
+//            typename Key,
+//            typename Value,
+//            typename Hash = std::hash<Key>,
+//            typename Equal = std::equal_to<Key>,
+//            typename Alloc = std::allocator<std::pair<Key, Value>>
+//    >
+//    struct dense_map : unordered_map<Key, Value, Hash, Equal, Alloc>{};
+//
+//    template <
+//            class T,
+//            typename Hash = std::hash<T>,
+//            typename Equal = std::equal_to<T>,
+//            typename Alloc = std::allocator<T>
+//    >
+//    struct dense_set : unordered_set<T, Hash, Equal, Alloc>{};
+
+    template<
+            typename Key,
+            typename Value,
+            typename Hash = std::hash<Key>,
+            typename Equal = std::equal_to<Key>,
+            typename Alloc = std::allocator<std::pair<Key, Value>>
+    >
+    struct dense_map;
+
+    template<
+            class T,
+            typename Hash = std::hash<T>,
+            typename Equal = std::equal_to<T>,
+            typename Alloc = std::allocator<T>
+    >
+    struct dense_set;
+
+    template<typename Value>
+    struct dense_map<entity, Value> : entity_dense_map<Value> {};
+
+    template<>
+    struct dense_set<entity> : entity_dense_set {};
+
 
     class raw_entity_dense_map
     {
-        entity_sparse_map<std::pair<void*, raw_segmented_vector::index_t>> m_sparse;
+        struct version_value_pair : details::version_value_pair_base
+        {
+            raw_segmented_vector::index_t index;
+            void* ptr;
+
+            using value_t = std::pair<void*&, raw_segmented_vector::index_t&>;
+
+            value_t value()
+            {
+                return {ptr, index};
+            }
+
+            using reference_type = value_t;
+            using pointer_type = value_t*;
+
+            version_value_pair() = default;
+            version_value_pair(entity_version_t v, void* ptr, raw_segmented_vector::index_t index) :
+                    version_value_pair_base{v},
+                    index(index),
+                    ptr(ptr){}
+        };
+
+
+        entity_sparse_table<std::pair<void*, raw_segmented_vector::index_t>, version_value_pair> m_sparse;
         raw_segmented_vector m_dense;// element type <entity, value>
 
         using no_deleter = decltype([](void*) {});
@@ -262,7 +524,7 @@ namespace hyecs
         void* allocate_value(entity e)
         {
             auto info = m_dense.allocate_value();
-            m_sparse.emplace(e, info);
+            m_sparse.emplace(e, info.first, info.second);
             entity_value ref(info.first);
             ref.e = e;
             return ref.value;
@@ -275,7 +537,7 @@ namespace hyecs
                               Mover&& mover = {},
                               Deleter&& deleter = {},
                               MovedDeleter&& moved_deleter = {}//default using deleter
-                              )
+        )
         {
             static constexpr bool has_mover = !std::is_same_v<Mover, std::nullptr_t>;
             static constexpr bool has_moved_deleter = !std::is_same_v<MovedDeleter, std::nullptr_t>;
@@ -284,7 +546,9 @@ namespace hyecs
                     ptr, index, [&]//remapping on swap
                     {
                         const entity& swap_remap = entity_value(ptr).e;
-                        m_sparse.at(swap_remap) = {ptr, index};
+                        auto [s_ptr, s_index] = m_sparse.at(swap_remap);
+                        s_ptr = ptr;
+                        s_index = index;
                     },
                     [&]//move
                     {
@@ -303,7 +567,8 @@ namespace hyecs
                     {
                         deleter(entity_value(o).value);
                     },
-                    [&]{//moved deleter
+                    [&]
+                    {//moved deleter
                         if constexpr (has_moved_deleter)
                             return [&](void* o)//delete
                             {
@@ -312,7 +577,7 @@ namespace hyecs
                         else
                             return std::nullptr_t{};
                     }()
-                    );
+            );
             m_sparse.erase(e);
         }
 

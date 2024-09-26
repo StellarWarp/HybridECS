@@ -100,10 +100,13 @@ namespace hyecs
 
 	public:
 		template <typename GetEntity, typename GetStorageKey, typename GetAddress>
-		auto invoke(GetEntity get_entity, GetStorageKey get_storage_key, GetAddress get_address)
+		auto invoke(GetEntity&& get_entity, GetStorageKey&& get_storage_key, GetAddress&& get_address)
 		{
 			using args = typename function_traits<Callable>::args;
-			invoke_impl(get_entity, get_storage_key, get_address, args{});
+			invoke_impl(std::forward<GetEntity>(get_entity),
+                        std::forward<GetStorageKey>(get_storage_key),
+                        std::forward<GetAddress>(get_address),
+                        args{});
 		}
 
 

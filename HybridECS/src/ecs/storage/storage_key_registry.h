@@ -1,6 +1,7 @@
 #pragma once
 #include "ecs/type/entity.h"
 #include "container/container.h"
+#include "ecs/storage/entity_map.h"
 
 
 namespace hyecs
@@ -67,6 +68,20 @@ namespace hyecs
 
 	public:
 
+        storage_key at(entity e)
+        {
+            return m_entity_storage_keys.at(e);
+        }
+
+        auto find(entity e)
+        {
+            return m_entity_storage_keys.find(e);
+        }
+
+        auto begin() { return m_entity_storage_keys.begin(); }
+
+        auto end() { return m_entity_storage_keys.end(); }
+
 		class group_key_accessor
 		{
 			storage_key_registry& m_registry;
@@ -74,6 +89,10 @@ namespace hyecs
 			{
 				return m_registry.m_entity_storage_keys;
 			}
+            const dense_map<entity, storage_key>& storage_map() const
+            {
+                return m_registry.m_entity_storage_keys;
+            }
 		public:
 			group_key_accessor(storage_key_registry& registry) : m_registry(registry) {}
 			void insert(entity e, storage_key key)
@@ -86,17 +105,17 @@ namespace hyecs
 				storage_map().erase(e);
 			}
 
-			storage_key at(entity e)
+			storage_key at(entity e) const
 			{
 				return storage_map().at(e);
 			}
 
-			storage_key operator[](entity e)
-			{
-				return storage_map()[e];
-			}
+//			storage_key operator[](entity e) const
+//			{
+//				return storage_map()[e];
+//			}
 
-			bool contains(entity e)
+			bool contains(entity e) const
 			{
 				return storage_map().contains(e);
 			}

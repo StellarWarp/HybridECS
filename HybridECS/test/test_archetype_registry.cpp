@@ -4,6 +4,7 @@
 #include "ecs/type/component_group.h"
 #include "../test_util/ut.hpp"
 #include "../test_util/managed_object_tester.h"
+#include "../test_util/memleak_detect.h"
 
 using namespace hyecs;
 
@@ -15,12 +16,12 @@ namespace test_static_data_registry
 #define ANON_TYPE using CONCATENATE(_inline_reflect_, __LINE__)
 #define ANON CONCATENATE(_ecs_register_, __COUNTER__)
 
-    constexpr auto group_a = component_group_id("Group A");
-    constexpr auto group_b = component_group_id("Group B");
-    constexpr auto group_c = component_group_id("Group C");
-    ecs_rtti_group_register ANON("Group A");
-    ecs_rtti_group_register ANON("Group B");
-    ecs_rtti_group_register ANON("Group C");
+    constexpr auto group_a = named_component_group<"Group A">();
+    constexpr auto group_b = named_component_group<"Group B">();
+    constexpr auto group_c = named_component_group<"Group C">();
+    ecs_rtti_group_register ANON(group_a);
+    ecs_rtti_group_register ANON(group_b);
+    ecs_rtti_group_register ANON(group_c);
 
     using tester = managed_object_tester<[]{}>;
     struct A : tester
@@ -69,8 +70,6 @@ namespace test_static_data_registry
     };
 
 
-
-
     ecs_rtti_register<A, group_a> ANON;
     ecs_rtti_register<B, group_a> ANON;
     ecs_rtti_register<C, group_a> ANON;
@@ -117,6 +116,8 @@ static ut::suite test_suite = []
 
     "registry"_test = []
     {
+        MemoryLeakDetector detector;
+
 
         main_registry registry(ecs_global_rtti_context::register_context());
 

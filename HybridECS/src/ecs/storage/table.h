@@ -157,7 +157,7 @@ namespace hyecs
         //adding or move into void(entity, storage_key)
         multicast_function<void(entity, storage_key)> m_on_entity_add;
         //removing or move out of
-        multicast_function<void(entity, storage_key)> m_on_entity_remove;
+        multicast_function<void(entity)> m_on_entity_remove;
         //mainly for internal move notify
         multicast_function<void(entity, storage_key)> m_on_entity_move;
 
@@ -230,7 +230,7 @@ namespace hyecs
         //}
 
 
-        void add_callback_on_entity_add(function<void(entity, storage_key)> callback)
+        void bind_on_entity_add(function<void(entity, storage_key)> callback)
         {
             for (uint32_t chunk_index = 0; chunk_index < m_chunks.size(); chunk_index++)
             {
@@ -244,7 +244,7 @@ namespace hyecs
             m_on_entity_add += callback;
         }
 
-        void add_callback_on_entity_remove(function<void(entity, storage_key)> callback)
+        void bind_on_entity_remove(function<void(entity)> callback)
         {
             m_on_entity_remove += callback;
         }
@@ -888,7 +888,7 @@ namespace hyecs
                             for (auto& table_offset: table_offsets)
                             {
                                 auto [chunk_index, chunk_offset] = m_table.chunk_index_offset(table_offset);
-                                bool invalid = callback(m_table.m_chunks[chunk_index]->entities()[chunk_offset], {m_table.m_table_index, table_offset});
+                                bool invalid = callback(m_table.m_chunks[chunk_index]->entities()[chunk_offset]);
                                 if(invalid) break;
                             }
                         });
@@ -1040,6 +1040,26 @@ namespace hyecs
         {
             vector<void*> address_cache(component_indices.size());
             dynamic_for_each_impl(func, component_indices, address_cache);
+        }
+
+        void get_component_indices(
+                sorted_sequence_cref<component_type_index> types,
+                sequence_ref<uint32_t> component_indices) const
+        {
+            get_sub_sequence_indices(
+                    sorted_sequence_cref(m_notnull_components),
+                    types,
+                    component_indices);
+        }
+
+        void get_component_indices(
+                sequence_cref<component_type_index> types,
+                sequence_ref<uint32_t> component_indices) const
+        {
+            get_sub_sequence_indices(
+                    sorted_sequence_cref(m_notnull_components),
+                    types,
+                    component_indices);
         }
 
         void components_addresses(

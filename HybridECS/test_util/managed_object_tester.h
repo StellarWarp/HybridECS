@@ -6,6 +6,7 @@
 
 template<
         auto IDENT,
+        bool AllowMultiDestroy = false,
         auto NewObjectCallback = nullptr,
         auto DestroyObjectCallback = nullptr>
 struct managed_object_tester
@@ -30,7 +31,9 @@ struct managed_object_tester
         copy_assigned = 1 << 4,
         destroyed = 1 << 5,
         moved = 1 << 6,
-        moved_dynamic = 1 << 7
+        moved_dynamic = 1 << 7,
+        default_construct = 1 << 8,
+        multiple_destroyed = 1 << 9
     };
 
     static void check_log()
@@ -65,6 +68,16 @@ struct managed_object_tester
     friend state_flags operator|(state_flags lhs, state_flags rhs )
     {
         return static_cast<state_flags>(static_cast<int>(lhs) | static_cast<int>(rhs));
+    }
+
+    managed_object_tester()
+    : a(0), b(0), c(0), d(0)
+    {
+        id = id_counter++;
+        object_counter++;
+        construct_call++;
+        flags |= default_construct;
+        new_object_callback();
     }
 
     managed_object_tester(int a, int b, int c, int d) : a(a), b(b), c(c), d(d)
@@ -118,7 +131,12 @@ struct managed_object_tester
         if constexpr (!hyecs::DESTROY_MOVED_COMPONENTS)
             assert((flags & moved_dynamic) == 0);
         assert(object_counter != 0);
-        assert((flags & destroyed) == 0);
+        if (flags & destroyed)
+        {
+            flags |= multiple_destroyed;
+            if(!AllowMultiDestroy)
+                assert(false);
+        }
         flags |= destroyed;
         a = b = c = d = 0;
         object_counter--;

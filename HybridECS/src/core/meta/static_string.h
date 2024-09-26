@@ -108,7 +108,8 @@ namespace hyecs
 
         constexpr CharT& operator[](size_t i) { return _data[i]; }
 
-        constexpr uint64_t hash() const { return string_hash(_data); }
+        constexpr uint64_t hash64() const { return string_hash(_data); }
+        constexpr uint32_t hash32() const { return string_hash32(_data); }
 
         constexpr const CharT* begin() const { return _data; }
 

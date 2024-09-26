@@ -1,6 +1,7 @@
 #pragma once
 
 #include "sequence_ref.h"
+#include "core/runtime_type/generic_type.h"
 
 namespace hyecs
 {

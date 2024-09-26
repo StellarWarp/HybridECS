@@ -21,9 +21,18 @@ namespace hyecs
 	>
 	class vaildref_map
 	{
-
+        union non_construct_value
+        {
+            Value value;
+            char dummy[sizeof(Value)];
+            non_construct_value(){}
+            ~non_construct_value()
+            {
+                value.~Value();
+            }
+        };
 		//todo add allocator for ValueContainer?
-		using ValueContainer = deque<Value>;
+		using ValueContainer = deque<non_construct_value>;
 		using Map = MapContainer<Key, Value*, Hash, Equal, Alloc>;
 
 		Map m_key_to_index;
@@ -96,30 +105,43 @@ namespace hyecs
 		iterator begin() { return iterator(m_key_to_index.begin()); }
 		iterator end() { return iterator(m_key_to_index.end()); }
 
+        template<typename Constructor> requires std::invocable<Constructor, Value*>
+        mapped_type& emplace_at(const key_type& key, Constructor&& constructor)
+        {
+            assert(!m_key_to_index.contains(key));
+            if (m_free_value_iter.empty())
+            {
+                uint32_t index = (uint32_t)m_values.size();
+                auto& ref = m_values.emplace_back();
+                auto ptr = &ref.value;
+                m_key_to_index.emplace(key, ptr);
+                constructor(ptr);
+                return ref.value;
+            }
+            else
+            {
+                auto iter = m_free_value_iter.top();
+                m_free_value_iter.pop();
+                auto& ref = *iter;
+                auto ptr = &ref;
+                m_key_to_index.emplace(key, ptr);
+                constructor(ptr);
+                return ref;
+            }
+        }
+
 		template<typename... Args>
 		mapped_type& emplace_value(const key_type& key, Args&&... args)
 		{
-			if (m_free_value_iter.empty())
-			{
-				auto& ref = m_values.emplace_back(std::forward<Args>(args)...);
-				m_key_to_index.emplace(key, &*(m_values.end() - 1));
-				return ref;
-			}
-			else
-			{
-				auto iter = m_free_value_iter.top();
-				m_free_value_iter.pop();
-				new(iter) mapped_type(std::forward<Args>(args)...);
-				m_key_to_index.emplace(key, &*iter);
-				return *iter;
-			}
+            return emplace_at(key, [&](Value* value) { new (value) Value(std::forward<Args>(args)...); });
 		}
 
-		mapped_type& emplace(const key_type& key, mapped_type&& value)
-		{
-			assert(!m_key_to_index.contains(key));
-			return emplace_value(key, std::forward<mapped_type>(value));
-		}
+        mapped_type& emplace(const key_type& key, auto&& value)
+        {
+            return emplace_value(key,  std::forward<decltype(value)>(value));
+        }
+
+
 
 
 

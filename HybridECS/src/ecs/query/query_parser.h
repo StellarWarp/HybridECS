@@ -47,7 +47,7 @@ namespace hyecs
             type_hash tag_hash;
             uint32_t param_index;
             relation_category category;
-            uint32_t scope_index = -1;
+            uint32_t scope_index = uint32_t(-1);
         };
 
         struct entity_access_info

@@ -6,21 +6,34 @@
 
 namespace hyecs
 {
+//    using entity_id_t = uint32_t;
+    struct entity_id_t
+    {
+        uint32_t value ;
+        constexpr entity_id_t() : value(std::numeric_limits<uint32_t>::max()) {}
+        constexpr entity_id_t(uint32_t value) : value(value) {}
+        constexpr operator uint32_t() const{ return value; }
+    };
+    struct entity_version_t
+    {
+        uint32_t value ;
+        constexpr entity_version_t() : value(std::numeric_limits<uint32_t>::max()) {}
+        constexpr entity_version_t(uint32_t value) : value(value) {}
+        constexpr operator uint32_t() const{ return value; }
+    };
 	struct entity
 	{
 	private:
-		uint32_t m_id;
-		uint32_t m_version;
+        entity_id_t m_id;
+        entity_version_t m_version;
 
 	public:
 
-		constexpr entity() :
-			m_id(std::numeric_limits<uint32_t>::max()),
-			m_version(std::numeric_limits<uint32_t>::max()) {}
-		constexpr entity(uint32_t m_id, uint32_t version) : m_id(m_id), m_version(version) {}
+		constexpr entity() :m_id(), m_version() {}
+		constexpr entity(entity_id_t m_id, entity_version_t version) : m_id(m_id), m_version(version) {}
 
-		uint32_t id() const { return m_id; }
-		uint32_t version() const { return m_version; }
+        entity_id_t id() const { return m_id; }
+        entity_version_t version() const { return m_version; }
 
 		bool operator==(const entity& other) const
 		{

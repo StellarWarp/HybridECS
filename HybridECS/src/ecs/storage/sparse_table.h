@@ -13,7 +13,7 @@ namespace hyecs
 
 		//event
 		vector<function<void(entity, storage_key)>> m_on_entity_add;
-		vector<function<void(entity, storage_key)>> m_on_entity_remove;
+		vector<function<void(entity)>> m_on_entity_remove;
 
 	public:
 		sparse_table(sorted_sequence_cref<component_storage*> component_storages)
@@ -66,7 +66,7 @@ namespace hyecs
 		size_t entity_count() const { return m_entities.size(); }
 		const dense_set<entity>& get_entities() { return m_entities; }
 
-		void add_callback_on_entity_add(function<void(entity, storage_key)> callback)
+		void bind_on_entity_add(function<void(entity, storage_key)> callback)
 		{
 			for (auto e : m_entities)
 			{
@@ -75,7 +75,7 @@ namespace hyecs
 			m_on_entity_add.push_back(callback);
 		}
 
-		void add_callback_on_entity_remove(function<void(entity, storage_key)> callback)
+		void bind_on_entity_remove(function<void(entity)> callback)
 		{
 			m_on_entity_remove.push_back(callback);
 		}
@@ -383,7 +383,7 @@ namespace hyecs
                 {
                     for (const auto& e : m_entities)
                     {
-                        callback(e, {});
+                        callback(e);
                     }
                 }
                 ASSERTION_CODE(m_is_destruct_finished = true);

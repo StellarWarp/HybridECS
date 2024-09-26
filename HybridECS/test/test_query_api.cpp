@@ -8,6 +8,14 @@
 
 using namespace hyecs;
 
+int g;
+
+
+template<static_string Name>
+constexpr named_component_group<Name> test_func()
+{
+    g ++;
+}
 
 namespace test_query_api
 {
@@ -16,12 +24,12 @@ namespace test_query_api
 #define ANON_TYPE using CONCATENATE(_inline_reflect_, __LINE__)
 #define ANON CONCATENATE(_inline_reflect_, __LINE__)
 
-    constexpr auto group_a = component_group_id("Group A");
-    constexpr auto group_b = component_group_id("Group B");
-    constexpr auto group_c = component_group_id("Group C");
-    ecs_rtti_group_register ANON("Group A");
-    ecs_rtti_group_register ANON("Group B");
-    ecs_rtti_group_register ANON("Group C");
+    constexpr auto group_a = named_component_group<"Group A">();
+    constexpr auto group_b = named_component_group<"Group B">();
+    constexpr auto group_c = named_component_group<"Group C">();
+    ecs_rtti_group_register ANON(group_a);
+    ecs_rtti_group_register ANON(group_b);
+    ecs_rtti_group_register ANON(group_c);
 
     using tester = managed_object_tester<[] {}>;
 

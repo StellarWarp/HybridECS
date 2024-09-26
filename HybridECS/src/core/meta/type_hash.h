@@ -13,7 +13,7 @@ namespace hyecs
 		constexpr type_hash(uint64_t hash) : hash(hash) {}
 	public:
 		template<typename T>
-		static constexpr type_hash of(){ return type_name<T>.hash();}
+		static constexpr type_hash of(){ return type_name<T>.hash64();}
 
         constexpr type_hash() : hash(0) {}
 		constexpr type_hash(const type_hash& other) noexcept : hash(other.hash) {}

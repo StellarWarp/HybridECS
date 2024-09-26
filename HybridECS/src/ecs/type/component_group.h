@@ -5,6 +5,7 @@
 namespace hyecs
 {
 
+
     struct component_group_id
     {
         uint32_t id;
@@ -13,6 +14,8 @@ namespace hyecs
         template <size_t Np1, typename CharT = char>
         constexpr explicit component_group_id(const CharT (&str)[Np1])
                 :id (string_hash32(str)){}
+        template <size_t Np1, typename CharT = char>
+        constexpr component_group_id(static_string<Np1, CharT> str) : id(str.hash32()) {}
         constexpr component_group_id(const component_group_id& id) : id(id.id) {}
         component_group_id(const std::string& name)
         {
@@ -20,6 +23,11 @@ namespace hyecs
         }
         component_group_id(const volatile component_group_id& other) : id(other.id) {}
         constexpr auto operator <=> (const component_group_id& other) const = default;
+    };
+
+    template<static_string Name>
+    struct named_component_group{
+        constexpr operator component_group_id() const { return component_group_id(Name); }
     };
 
     template<class>
@@ -98,7 +106,7 @@ namespace hyecs
         if constexpr ( requires { T::static_group_id; } )
             return T::static_group_id;
         else
-            return component_group_id();
+            return {};
     }
     template<typename T>
     constexpr bool default_is_tag()
@@ -179,8 +187,7 @@ namespace hyecs
 	private:
 		unordered_map<component_group_id, component_group_register_info> m_groups{};
 	public:
-		template <size_t Np1, typename CharT = char>
-		void add_group(const CharT(&name)[Np1])
+		void add_group(const std::string& name)
 		{
 			component_group_id id(name);
 			component_group_register_info info{ id, name, {} };
@@ -246,10 +253,10 @@ namespace hyecs
 
 	struct ecs_rtti_group_register
 	{
-		template <size_t Np1, typename CharT = char>
-		ecs_rtti_group_register(const CharT(&name)[Np1])
+		template <static_string Name>
+		ecs_rtti_group_register(named_component_group<Name>)
 		{
-			ecs_global_rtti_context::register_context().add_group(name);
+			ecs_global_rtti_context::register_context().add_group(Name.c_str());
 		}
 	};
 

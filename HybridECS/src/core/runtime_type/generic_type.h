@@ -336,9 +336,9 @@ namespace hyecs::generic
     template<typename T1, typename T2>
     requires std::derived_from<std::decay_t<T1>, type_index_interface> &&
              std::derived_from<std::decay_t<T2>, type_index_interface>
-    std::strong_ordering operator<=>(T1&& a, T2&& b) requires (requires { a.hash(); b.hash(); })
+    std::strong_ordering operator<=>(T1&& a, T2&& b) requires (requires { a.hash64(); b.hash64(); })
     {
-        return a.hash() <=> b.hash();
+        return a.hash64() <=> b.hash64();
     }
 //        template<typename T1, typename T2>
 //        requires std::derived_from<std::decay_t<T1>,type_index_interface> &&
