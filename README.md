@@ -1,7 +1,3 @@
-Here’s the complete translation of the document:
-
-------
-
 # Hybrid ECS
 
 Hybrid ECS is a C++23 header-only library for ECS (Entity Component System) offering high performance and ease of use.
