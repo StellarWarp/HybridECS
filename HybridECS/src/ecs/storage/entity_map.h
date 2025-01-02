@@ -111,8 +111,7 @@ namespace hyecs
             version_value_pair& emplace(uint32_t offset, entity_version_t version, Args&& ... args)
             {
                 auto& pair = at(offset);
-                new(&pair) version_value_pair{version, std::forward<Args>(args)...};
-                return pair;
+                return *new(&pair) version_value_pair{version, std::forward<Args>(args)...};;
             }
 
             void erase(uint32_t offset)

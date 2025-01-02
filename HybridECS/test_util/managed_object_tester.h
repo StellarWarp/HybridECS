@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cassert>
-#include "ecs/config.h"
 #include "ut.hpp"
 
 template<

@@ -76,40 +76,40 @@ namespace hyecs
         };
 
 
-        class iteration_distributor
-        {
-            const cross_query& m_q;
-
-
-            class iteration_set
-            {
-                sequence_cref<entity> m_entities;
-                sorted_sequence_cref<component_type_index> components;
-                small_vector<void*> m_addresses;
-                sequence_cref<uint32_t> access_i_to_component_i;
-                function<void(entity,
-                              sorted_sequence_cref<component_type_index>,
-                              sequence_ref<void*>)> m_random_access;
-
-                template<typename Callable>
-                void for_each(Callable&& func)
-                {
-                    for(auto e: m_entities)
-                    {
-                        m_random_access(e, components, m_addresses);
-                        system_callable_invoker<Callable&&> invoker(func);
-                        invoker.invoke(
-                                [&]{ return e; },
-                                [&]{ return storage_key{}; },
-                                [&]<typename type>(type_wrapper<type>, size_t access_i){
-                                    return m_addresses[access_i_to_component_i[access_i]];
-                                }
-                        );
-                    }
-                }
-            };
-
-        }
+//        class iteration_distributor
+//        {
+//            cross_query& m_q;
+//
+//
+//            class iteration_set
+//            {
+//                sequence_cref<entity> m_entities;
+//                sorted_sequence_cref<component_type_index> components;
+//                small_vector<void*> m_addresses;
+//                sequence_cref<uint32_t> access_i_to_component_i;
+//                function<void(entity,
+//                              sorted_sequence_cref<component_type_index>,
+//                              sequence_ref<void*>)> m_random_access;
+//
+//                template<typename Callable>
+//                void for_each(Callable&& func)
+//                {
+//                    for(auto e: m_entities)
+//                    {
+//                        m_random_access(e, components, m_addresses);
+//                        system_callable_invoker<Callable&&> invoker(func);
+//                        invoker.invoke(
+//                                [&]{ return e; },
+//                                [&]{ return storage_key{}; },
+//                                [&]<typename type>(type_wrapper<type>, size_t access_i){
+//                                    return m_addresses[access_i_to_component_i[access_i]];
+//                                }
+//                        );
+//                    }
+//                }
+//            };
+//
+//        }
 
 
     };
