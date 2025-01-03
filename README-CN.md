@@ -266,7 +266,7 @@ Cross-Group 无法进行顺序访问，只能逐组进行随机访问
 
 ### Random Access
 
-![image-20250103095400482](C:\Users\Estelle\AppData\Roaming\Typora\typora-user-images\image-20250103095400482.png)
+![image-20250103095400482](https://cdn.jsdelivr.net/gh/StellarWarp/StellarWarp.github.io@main/img/image-20250103095400482.png)
 
 
 ## 查询结构

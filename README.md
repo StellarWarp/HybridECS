@@ -261,7 +261,7 @@ Cross-Group cannot be accessed sequentially, only randomly group by group.
 
 ### Random Access
 
-![image-20250103095400482](C:\Users\Estelle\AppData\Roaming\Typora\typora-user-images\image-20250103095400482.png)
+![image-20250103095400482](https://cdn.jsdelivr.net/gh/StellarWarp/StellarWarp.github.io@main/img/image-20250103095400482.png)
 
 ## Query Structure
 
