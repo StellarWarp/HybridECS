@@ -27,7 +27,7 @@ Refer to the following links:
 - [ECS Back and Forth - EnTT](https://skypjack.github.io/2021-08-29-ecs-baf-part-12/)
 - [Open Source C++ ECS Framework: UECS](https://zhuanlan.zhihu.com/p/141255752)
 
-The creator of Flecs has a comprehensive overview of the current state of ECS development:
+The author of Flecs has a comprehensive overview of the current state of ECS development:
 
 - [ECS FAQ](https://github.com/SanderMertens/ecs-faq)
 
@@ -52,10 +52,6 @@ The essence of components lies not in what they store but in how they are stored
 - Enhancing task scheduling parallelism through modular logic design.
 
 This design positions ECS not just as an architectural pattern but as a holistic optimization mindset from hardware to program logic.
-
-Certainly! Continuing from where we left off:
-
-------
 
 ## Component Storage
 
