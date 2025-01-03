@@ -126,3 +126,235 @@ Because Archetypes with few entities not only waste memory but also exacerbate f
 - When an Archetype's memory usage exceeds a threshold, chunk-based Archetype storage is used to reduce the addressing overhead for random component access.
 
 In some cases, Sparse Sets, with their tightly packed components, can improve cache hit rates during random access.
+
+### Tag Component
+
+Adding or removing components with Archetype storage incurs copying overhead.
+
+While adding or removing components should be minimized, it is often unavoidable in ECS development, where components are frequently added or removed to control the execution of systems.
+
+Various ECS implementations offer solutions to this problem. For example, Unity's `IEnableableComponent` occupies space within the Archetype just like normal components. By adding a series of masks to mark whether the component is present for a specific entity, this solution is straightforward but introduces issues:
+
+1. **Memory Waste**: Especially when only a small subset of entities in an Archetype requires this feature.
+2. **Query Overhead**: Queries must traverse the Archetype, which can become costly if only a small portion of entities in the Archetype need this feature.
+
+To address this, frequently added or removed components can be marked as **Tag Components**.
+
+Tag Components are not stored in Archetypes but in Sparse Sets, avoiding memory waste and making them inherently efficient for addition and removal. Empty components require no storage at all.
+
+> Tag Components are typically components without associated data and are generally represented as empty structs. I couldn't think of a better name, so "Tag Component" seems the most fitting.
+
+To enable efficient querying of Tag Components, **Tag Archetypes** are introduced. Essentially, a Tag Archetype represents a subset of entities within an Archetype.
+
+- Tag Archetypes are mutually exclusive but are always subsets of an Archetype.
+- During queries, Tag Archetypes within the same Archetype are aggregated, improving cache hit rates.
+
+---
+
+# Query
+
+## Introduction
+
+In ECS, users focus on logic within Systems and the data required by Queries, while ECS handles many other considerations.
+
+A Query serves as the bridge between logic and data, forming a core concept in ECS.
+
+Queries identify the relevant data by describing the conditions.
+
+In many ECS implementations, Queries are relatively simple. For example:
+
+- In Archetype-based systems, implementations typically iterate through all Archetypes to filter the desired data. Since Queries are not performance bottlenecks in purely Archetype-based ECS systems, this approach suffices.
+- In Sparse Set-based systems, Queries often cache the entities matching the conditions and monitor additions/removals in the relevant component tables to update the cache.
+
+In Hybrid ECS (HECS), due to its mixed storage architecture, optimization for aggregation, and the potential presence of numerous Queries and Archetypes, Query complexity increases significantly, necessitating a dedicated module to address these issues.
+
+Queries are divided into two parts: **data access updates** and **data querying**.
+
+---
+
+## Data Querying
+
+### What Queries Do
+
+A Query specifies conditions to identify a subset of entities.
+
+Archetypes represent individual points within this subset.
+
+Essentially, Queries perform two tasks:
+1. Adding new Archetypes that match the Query.
+2. Adding new Queries that match the Archetype.
+
+#### In-Group Query
+
+Supported query types include:
+- **All Matching (`all`)**
+- **Any Matching (`any`)**
+- **Exclude (`none`)**
+
+A complete condition can be described as:  
+`base... tag... ((base...|tag...) ...) none(base...,tag...)`
+
+This can be split into three parts:
+- **All Part**: `base... tag...`
+- **Any Part**: `(base...|tag...) ...`
+- **None Part**: `none(base...,tag...)`
+
+Depending on the presence of tags, Queries can be classified as:
+1. **Untagged Queries / Direct Queries**:
+   - Conditions do not include tags.
+   - Directly access Archetypes.
+   - Format: `base... (base...) none(base...)`
+2. **Mixed Queries**:
+   - Conditions include tags.
+   - Access Archetypes or Tag Archetypes.
+   - Format: `base... tag... ((base...|tag...) ...) none(base...,tag...)`
+3. **Pure Tag Queries**:
+   - All matching conditions consist only of tags.
+   - Access only Tag Archetypes.
+   - Format: `tag... ((base...|tag...) ...) none(base...,tag...)`
+
+Additionally, there are special Query types:
+- **Archetype Query**: Queries Tag Archetypes with identical Archetypes.
+- **Component Query**: Queries containing only one component, used as a basic node.
+
+---
+
+#### Subquery
+
+A **Subquery** is a subset of entities defined by another Query.
+
+Filtering Archetypes from a parent Query reduces the search space, improving efficiency.
+
+---
+
+### Query Matching Algorithm
+
+*Work in progress.*
+
+![Query Matching Algorithm](https://cdn.jsdelivr.net/gh/StellarWarp/StellarWarp.github.io@main/img/image-20250102230357678.png)
+
+---
+
+## Memory Access Model
+
+The memory access model for In-Group Queries is illustrated below:
+
+![Memory Access Model](https://cdn.jsdelivr.net/gh/StellarWarp/StellarWarp.github.io@main/img/image-20250102225808834.png)
+
+An example of a query instance:
+
+![Query Instance Example](https://cdn.jsdelivr.net/gh/StellarWarp/StellarWarp.github.io@main/img/image-20250102231558304.png)
+
+---
+
+### Cross-Group Query
+
+Cross-Group Queries use potential combinations to achieve their purpose.  
+This involves:
+- **A Count Table**: Tracks the number of matching Groups for each entity.
+- **An Entity Cache Table**: Records entities satisfying the conditions.
+
+![Cross-Group Query](https://cdn.jsdelivr.net/gh/StellarWarp/StellarWarp.github.io@main/img/image-20250102231322481.png)
+
+
+---
+
+## API Design
+
+C++ provides strong type description capabilities. For convenience in writing Systems, it is ideal to describe static query conditions directly in the function parameters of a System.
+
+*Work in progress.*
+
+```cpp
+builder.register_executer([](
+        const A& a,
+        B& b,
+        D& d,
+        optional<const C&> c,
+        none_of<E, F>,
+
+        relation_ref<"o1">,
+        relation_ref<"o2">,
+
+        begin_rel_scope<relation1, "o1">,
+            const A& a1,
+            B& b1,
+            none_of<C, D>,
+            relation_ref<"o3">,
+        end_rel_scope,
+
+        begin_rel_scope<relation2, "o2">,
+            const A& a2,
+            const B& b2,
+            const C& c2,
+            relation_ref<"o3">,
+        end_rel_scope,
+
+        begin_rel_scope<relation3, "o3">,
+            A& a3,
+            B& b3,
+        end_rel_scope,
+
+        multi_relation<child(
+                A&,
+                B&
+        )> rel2
+)
+{
+  // System body...
+});
+```
+
+---
+
+# Event
+
+## Introduction
+
+Event-driven programming is indispensable in logic development, yet many ECS frameworks lack comprehensive support for it. Unity's ECS, for instance, does not support event-driven programming at all, making certain logic challenging to implement purely through ECS.
+
+Event-driven programming provides timely responses and ensures the proper execution order of Systems.
+
+While data-oriented programming may seem unrelated to event-driven programming, events can be conceptually viewed as responses to changes in specific data. Unlike the highly coupled approach of "calling one procedure during another," event-driven programming delegates the scheduling of processes to a data management mechanism.
+
+In ECS, event responses are treated as writing and processing specific data.  
+For example, after updating numeric data in a UI component, there should be a System to handle the change.
+
+---
+
+## Event System
+
+*Work in progress.*
+
+---
+
+# Relation
+
+## Introduction
+
+When developing logic, it’s often necessary to process data across multiple entities. However, handling interactions between entities without a dedicated Relation system in ECS can be cumbersome.
+
+Typically, developers need to manually record related entities within a component and access their data through random component lookups. This approach leads to several issues:
+1. **Uncontrolled Lifecycles**: The lifecycle of the other entity is not managed, potentially leading to invalid entity references.
+2. **Unconstrained Components**: The presence of specific components in other entities is not guaranteed, requiring the developer to handle these cases manually, which affects reliability and maintainability.
+3. **Inefficient Access**: Jointly accessing multiple components of other entities introduces more random access overhead.
+
+Without a Relation system to handle these complexities, ECS development becomes increasingly painful.
+
+---
+
+## Relationship
+
+### Relation Type
+
+![Relation Types](https://cdn.jsdelivr.net/gh/StellarWarp/StellarWarp.github.io@main/img/image-20250102230727428.png)
+
+*Work in progress.*
+
+---
+
+## Relation Query
+
+![Relation Query](https://cdn.jsdelivr.net/gh/StellarWarp/StellarWarp.github.io@main/img/image-20250102230811267.png)
+
+*Work in progress.*
