@@ -98,6 +98,7 @@ System 的意义不仅在于计算逻辑的实现，更在于如何最大化利�
 1. 对于Component的组合查询，只能对其中一个Component进行有序访问，其它Component需要进行随机访问，但这也属于是Archetype的优势应用场景
 2. Query更加复杂：使用Archetype时，Query只要知道有哪些Archetype是查询目标即可；但是对于SparseSet，Query需要通过与其有关的组件表追踪实体的组件状态，考虑是否要将实体加入到访问列表中。相当于对于SparseSet中的Query而言，每个一个实体都是一个Archetype
 
+---
 
 ## Hydrid Method
 
@@ -156,6 +157,8 @@ Tag Archetype 与 Tag Archetype 间没有交集，但 Tag Archetype 一定是某
 
 在查询时也会对同一个 Archetype 下的 Tag Archetype 做聚合，这样就能有更好的缓存命中率
 
+---
+
 # Query
 
 ## Introduction
@@ -171,7 +174,7 @@ Query需要通过数据的描述找到对应的数据
 - 使用 Archetype 的实现中，一般的实现是将所有的Archetype都遍历一遍来筛选需要的数据。因为对于只使用Archetype的ECS来说Query的查询并不是性能热点。
 - 使用 SparseSet 的实现中，Query往往需要缓存满足条件的实体，并监听各有关组件表的增删来更新缓存
 
-因为HECS的混合存储架构，以及需要聚合优化、考虑存在大量Query和Archetype下的性能等原因，Query的算法复杂度增加不少，以至于需要独立的模块来处理这些问题
+因为 HECS 的混合存储架构，以及需要聚合优化、考虑存在大量 Query 和 Archetype 下的性能等原因，Query 的算法复杂度增加不少，以至于需要独立的模块来处理这些问题
 
 Query主要分为两部分，数据更新访问 与 数据查询
 
@@ -190,29 +193,29 @@ Archetype是集合中的一点
 ### In-Group Query
 
 支持的查询类型有
-- 全匹配：all
-- 任一匹配：any
-- 排除：none
+- **全匹配**：`all`
+- **任一匹配**：`any`
+- **排除**：`none`
 
 一个完整的条件可以被描述为
 `base... tag... ((base...|tag...) ...) none(base...,tag...)`
 
 拆分为三部分为
-- all part `base... tag...`
-- any part `(base...|tag...) ...`
-- none part `none(base...,tag...)`
+- **all part** `base... tag...`
+- **any part** `(base...|tag...) ...`
+- **none part** `none(base...,tag...)`
 
 根据是否有 tag， Query可以被分为以下几类
 
-- untag query / direct query
+- **untag query / direct query**
   - 条件不含 tag
   - 直接访问 Archetype
   - `base... (base...) none(base...)`
-- mix query
+- **mix query**
   - 条件含 tag
   - 直接访问 Archetype 或访问 Tag Archetype
   - `base... tag... ((base...|tag...) ...) none(base...,tag...)`
-- pure tag query
+- **pure tag query**
   - 全匹配的条件只有 tag
   - 只访问 Tag Archetype
   - `tag... ((base...|tag...) ...) none(base...,tag...)`
@@ -229,15 +232,20 @@ Subquery 指一个 Query 的 Entity 集是另一个 Query 的子集
 
 通过从父查询中筛选Archetype可减少查询量
 
-## Query Matching Algorithm
+### Cross-Group Query
 
-[todo]
-
-![image-20250102230357678](https://cdn.jsdelivr.net/gh/StellarWarp/StellarWarp.github.io@main/img/image-20250102230357678.png)
+Cross-Group Query 是 In-Group Query 的扩展，其可以跨越多个Group进行查询
 
 ## 访存模型
 
 In-Group Query 的访存模型如下
+
+- **query**: 一个 In-Group Query 访问存入口
+- **table tag query**: 按tag筛选，访问一个table的子集，对每一个table而言，对其tag的query
+- **arch storage**: 存储Archetype的存储，对每一个table而言，对其base的query
+  - **sparse table**: Archetype 采用**稀疏集**存储
+  - **table**: Archetype 采用**表**存储
+- **component storage**: 采用**稀疏集**存储实现的组件
 
 ![image-20250102225808834](https://cdn.jsdelivr.net/gh/StellarWarp/StellarWarp.github.io@main/img/image-20250102225808834.png)
 
@@ -245,19 +253,45 @@ In-Group Query 的访存模型如下
 
 ![image-20250102231558304](https://cdn.jsdelivr.net/gh/StellarWarp/StellarWarp.github.io@main/img/image-20250102231558304.png)
 
+### Cross-Group Query & Access
+
+Cross-Group 的 Query 则要通过潜在组合的计数来实现
+
+一个计数表：记录Entity对应Match的Group的数量
+一个Entity缓存表：记录满足条件的Entity
+
+Cross-Group 无法进行顺序访问，只能逐组进行随机访问
+
+![image-20250102231322481](https://cdn.jsdelivr.net/gh/StellarWarp/StellarWarp.github.io@main/img/image-20250102231322481.png)
+
+### Random Access
+
+![image-20250103095400482](C:\Users\Estelle\AppData\Roaming\Typora\typora-user-images\image-20250103095400482.png)
+
+
 ## 查询结构
 
 ![image-20250102230117513](https://cdn.jsdelivr.net/gh/StellarWarp/StellarWarp.github.io@main/img/image-20250102230117513.png)
 
+[todo]
 
-### Cross-Group Query
+### In-Group Query Matching Algorithm
+
+[todo]
+
+![image-20250102230357678](https://cdn.jsdelivr.net/gh/StellarWarp/StellarWarp.github.io@main/img/image-20250102230357678.png)
+
+
+### Cross-Group Query Matching Algorithm
 
 跨Group的Query则要通过潜在组合的计数来实现
 
 一个计数表：记录Entity对应Match的Group的数量
 一个Entity缓存表：记录满足条件的Entity
 
-![image-20250102231322481](https://cdn.jsdelivr.net/gh/StellarWarp/StellarWarp.github.io@main/img/image-20250102231322481.png)
+## 访存容器
+
+[todo]
 
 ## API Design
 
@@ -305,6 +339,8 @@ builder.register_executer([](
 });
 ```
 
+---
+
 # Evemt
 
 ## Introduction
@@ -327,6 +363,7 @@ ECS把事件响应视为对特定数据的写入和处理
 
 [todo]
 
+---
 
 # Relation
 

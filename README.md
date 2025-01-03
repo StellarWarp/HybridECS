@@ -227,34 +227,64 @@ Filtering Archetypes from a parent Query reduces the search space, improving eff
 
 ---
 
-### Query Matching Algorithm
+#### Cross-Group Query
 
-*Work in progress.*
-
-![Query Matching Algorithm](https://cdn.jsdelivr.net/gh/StellarWarp/StellarWarp.github.io@main/img/image-20250102230357678.png)
-
----
+Cross-Group Query is an extension of In-Group Query, which can query across multiple groups.
 
 ## Memory Access Model
 
-The memory access model for In-Group Queries is illustrated below:
+The memory access model of In-Group Query is as follows:
 
-![Memory Access Model](https://cdn.jsdelivr.net/gh/StellarWarp/StellarWarp.github.io@main/img/image-20250102225808834.png)
+- **query**: An entry point for accessing an In-Group Query
+- **table tag query**: Filter by tag, access a subset of a table, for each table, query its tags
+- **arch storage**: Storage of Archetypes, for each table, query its base
+  - **sparse table**: Archetypes use **sparse set** storage
+  - **table**: Archetypes use **table** storage
+- **component storage**: Components implemented using **sparse set** storage
 
-An example of a query instance:
+![image-20250102225808834](https://cdn.jsdelivr.net/gh/StellarWarp/StellarWarp.github.io@main/img/image-20250102225808834.png)
 
-![Query Instance Example](https://cdn.jsdelivr.net/gh/StellarWarp/StellarWarp.github.io@main/img/image-20250102231558304.png)
+An example of a query might be as follows:
 
----
+![image-20250102231558304](https://cdn.jsdelivr.net/gh/StellarWarp/StellarWarp.github.io@main/img/image-20250102231558304.png)
 
-### Cross-Group Query
+### Cross-Group Query & Access
 
-Cross-Group Queries use potential combinations to achieve their purpose.  
-This involves:
-- **A Count Table**: Tracks the number of matching Groups for each entity.
-- **An Entity Cache Table**: Records entities satisfying the conditions.
+Cross-Group Query is implemented by counting potential combinations.
 
-![Cross-Group Query](https://cdn.jsdelivr.net/gh/StellarWarp/StellarWarp.github.io@main/img/image-20250102231322481.png)
+A count table: Records the number of groups that match each entity.
+An entity cache table: Records entities that meet the conditions.
+
+Cross-Group cannot be accessed sequentially, only randomly group by group.
+
+![image-20250102231322481](https://cdn.jsdelivr.net/gh/StellarWarp/StellarWarp.github.io@main/img/image-20250102231322481.png)
+
+### Random Access
+
+![image-20250103095400482](C:\Users\Estelle\AppData\Roaming\Typora\typora-user-images\image-20250103095400482.png)
+
+## Query Structure
+
+![image-20250102230117513](https://cdn.jsdelivr.net/gh/StellarWarp/StellarWarp.github.io@main/img/image-20250102230117513.png)
+
+[todo]
+
+### In-Group Query Matching Algorithm
+
+[todo]
+
+![image-20250102230357678](https://cdn.jsdelivr.net/gh/StellarWarp/StellarWarp.github.io@main/img/image-20250102230357678.png)
+
+### Cross-Group Query Matching Algorithm
+
+Cross-Group Query is implemented by counting potential combinations.
+
+A count table: Records the number of groups that match each entity.
+An entity cache table: Records entities that meet the conditions.
+
+## Memory Access Container
+
+[todo]
 
 
 ---
