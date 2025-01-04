@@ -1,7 +1,7 @@
 #pragma once
 #include "ecs/type/entity.h"
 #include "ecs/type/component.h"
-#include "ecs/storage/storage_key_registry.h"
+#include "ecs/storage/storage_key.h"
 
 namespace hyecs
 {

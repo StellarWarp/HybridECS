@@ -21,6 +21,7 @@ namespace hyecs
         ~scope_output_color()
         {
             std::cout << "\033[0m";
+            std::cout.flush();
         }
     };
 

@@ -23,7 +23,7 @@ public:
 private:
     void reportFailure(unsigned int unfreedBytes) {
         boost::ut::expect(unfreedBytes == 0) << "Memory leak of " << unfreedBytes << " byte(s) detected.";
-        assert(unfreedBytes == 0);
+        // assert(unfreedBytes == 0);
     }
     _CrtMemState memState_;
 };

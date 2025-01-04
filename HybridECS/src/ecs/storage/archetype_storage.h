@@ -233,12 +233,13 @@ namespace hyecs
                        }, src_accessor_var, dest_accessor_var);
         }
 
-        //fixme event callback move
+        //fixme event callback for entity move?
         void sparse_convert_to_chunk()
         {
             auto sparse_table_ptr = std::make_unique<sparse_table>(std::move(std::get<sparse_table>(m_table)));
             sorted_sequence_cref<component_type_index> components(m_index.begin(), m_index.end());
-            m_table.emplace<table>(components);
+            table& tb = m_table.emplace<table>(components);
+            m_key_registry.register_table(&tb);
             auto& entities = sparse_table_ptr->get_entities();
 
             auto src_accessor = sparse_table_ptr->get_raw_accessor();
@@ -267,18 +268,21 @@ namespace hyecs
                 dest_component_accessors++;
             }
 
-            for (auto& on_sparse_to_chunk: m_on_sparse_to_chunk)
+            for (const auto& on_sparse_to_chunk: m_on_sparse_to_chunk)
             {
                 on_sparse_to_chunk();
             }
 
             dest_accessor.construct_finish_external_notified();
             if constexpr (not DESTROY_MOVED_COMPONENTS) sparse_table_ptr->deallocate_all();
+
+
         }
 
         void chunk_convert_to_sparse()
         {
             table* table_ptr = &std::get<table>(m_table);
+            m_key_registry.unregister_table(table_ptr);
             auto sparse_ptr = std::make_unique<sparse_table>(sorted_sequence_cref(m_component_storages));
             auto entities = table_ptr->get_entities();
             auto src_accessor = table_ptr->get_raw_accessor();

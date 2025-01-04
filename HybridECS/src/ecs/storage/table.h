@@ -3,7 +3,7 @@
 #include "core/hyecs_core.h"
 #include "ecs/type/archetype.h"
 #include "ecs/type/entity.h"
-#include "storage_key_registry.h"
+#include "storage_key.h"
 #include "ecs/query/system_callable_invoker.h"
 
 
@@ -209,6 +209,16 @@ namespace hyecs
             {
                 deallocate_chunk(chunk);
             }
+        }
+
+        void set_table_index(table_index_t table_index)
+        {
+            m_table_index = table_index;
+        }
+
+        table_index_t get_table_index() const
+        {
+            return m_table_index;
         }
 
         //table(const table&) = delete;
@@ -1062,6 +1072,11 @@ namespace hyecs
                     component_indices);
         }
 
+        auto get_all_component_indices()
+        {
+            return sorted_sequence_cref(m_notnull_components);
+        }
+
         void components_addresses(
                 storage_key key,
                 sequence_cref<uint32_t> component_indices,
@@ -1074,6 +1089,23 @@ namespace hyecs
                 auto& type = m_notnull_components[i];
                 byte* data = component_address(chunk, chunk_offset, type.offset(), type.size());
                 addresses[i] = data;
+            }
+        }
+
+        template<typename IndexGen,typename AddressOut>
+        void components_addresses(
+        storage_key key,
+        size_t count,
+        IndexGen next_component_index,
+        AddressOut out_address)
+        {
+            auto [chunk_index, chunk_offset] = chunk_index_offset(key.get_table_offset());
+            chunk* chunk = m_chunks[chunk_index];
+            for (size_t i = 0; i < count; i++)
+            {
+                auto& type = m_notnull_components[next_component_index()];
+                byte* data = component_address(chunk, chunk_offset, type.offset(), type.size());
+                out_address(data);
             }
         }
 

@@ -385,14 +385,7 @@ namespace hyecs
             const auto& elem = *sub_iter;
             if constexpr (AssureSubset)
             {
-                ASSERTION_CODE(
-                        if (elem < sequence[index])
-                        {
-                            sub_iter++;
-                            write_iter++;
-                            assert(false);//element not found
-                        }
-                );
+                assert(elem >= sequence[index]);
                 if (elem == sequence[index])
                 {
                     *write_iter = index;
