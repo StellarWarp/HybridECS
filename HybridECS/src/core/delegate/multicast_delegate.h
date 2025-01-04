@@ -1,7 +1,6 @@
 #pragma once
 
 #include <memory>
-#include <ranges>
 #include <cassert>
 #include <vector>
 #include "delegate.h"
@@ -487,6 +486,16 @@ namespace auto_delegate
             for (auto&& [obj, mem_fn, _]: objects)
             {
                 result_proc(invoke_single(obj, mem_fn, std::forward<Args>(args)...));
+            }
+        }
+        template<typename Callable>
+        void for_each(Callable&& func)
+        {
+            for (auto&& [obj, mem_fn, _]: objects)
+            {
+                func([&](Args... args) {
+                    return invoke_single(obj, mem_fn, std::forward<decltype(args)>(args)...);
+                });
             }
         }
 
