@@ -7,17 +7,14 @@
 namespace auto_delegate
 {
     template<auto>
-    struct tag {};
-
-    template<auto Value>
-    static constexpr auto sval = Value;
+    struct func_tag {};
 
     template<typename Func, typename GenericPtr = void*>
     class delegate;
 
     template<typename T_ptr, typename T_MemFunc>
     delegate(T_ptr, T_MemFunc) ->
-    delegate<typename function_traits<T_MemFunc>::function_type, void*>;
+    delegate<typename details::function_traits<T_MemFunc>::function_type, void*>;
 
     template<typename Ret, typename... Args, typename GenericPtr>
     class delegate<Ret(Args...), GenericPtr>
@@ -67,11 +64,11 @@ namespace auto_delegate
 
         //bind methods
         template<auto MemFunc, typename T_ptr>
-        delegate(const T_ptr& obj, tag<MemFunc>) : ptr(obj), invoker(Invoker<value_of<T_ptr>, MemFunc>) {}
+        delegate(const T_ptr& obj, func_tag<MemFunc>) : ptr(obj), invoker(Invoker<value_of<T_ptr>, MemFunc>) {}
 
         //bind methods
         template<auto MemFunc, typename T_ptr>
-        void bind(const T_ptr& obj, tag<MemFunc> = {})
+        void bind(const T_ptr& obj, func_tag<MemFunc> = {})
         {
             ptr = obj;
             invoker = Invoker<value_of<T_ptr>, MemFunc>;
@@ -155,9 +152,4 @@ namespace auto_delegate
         }
     };
 
-}
-
-namespace auto_delegate_export
-{
-    using auto_delegate::delegate;
 }

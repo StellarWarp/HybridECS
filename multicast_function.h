@@ -6,6 +6,7 @@
 #include "function.h"
 #include "multicast_delegate.h"
 #include <vector>
+#include <array>
 #include <optional>
 
 #ifdef no_unique_address
@@ -34,18 +35,21 @@ namespace auto_delegate
         using wrapper_ret_t = std::conditional_t<std::is_void_v<Ret>, void, std::optional<Ret>>;
 
     public:
-        struct object_container : public std::vector<function<Ret(Args...)>>
+        using function_t = function<Ret(Args...)>;
+
+        struct object_container : public std::vector<function_t>
         {
-            using super = std::vector<function<Ret(Args...)>>;
+            using super = std::vector<function_t>;
             super::iterator iteraion_end;
 #ifndef NDEBUG
             bool in_iteration = false;
 #endif
+
             void remove(const void* func)
             {
                 assert(!in_iteration);
-                assert((intptr_t(func) - intptr_t(super::data())) % sizeof(function<Ret(Args...)>) == 0);
-                size_t index = (function<Ret(Args...)>*) func - super::data();
+                assert((intptr_t(func) - intptr_t(super::data())) % sizeof(function_t) == 0);
+                size_t index = (function_t*) func - super::data();
                 auto& back = super::back();
                 super::data()[index] = std::move(back);
                 super::pop_back();
@@ -54,21 +58,21 @@ namespace auto_delegate
             Ret remove_on_call(const void* func, Args... args)
             {
                 assert(in_iteration);
-                assert((intptr_t(func) - intptr_t(super::data())) % sizeof(function<Ret(Args...)>) == 0);
-                size_t index = (function<Ret(Args...)>*) func - super::data();
-                function<Ret(Args...)>& current = super::at(index);
+                assert((intptr_t(func) - intptr_t(super::data())) % sizeof(function_t) == 0);
+                size_t index = (function_t*) func - super::data();
+                function_t& current = super::at(index);
                 --iteraion_end;
                 auto& end = *iteraion_end;
+                //if last element is remove in call would cause a fake return
                 if (&current == &end)
                 {
-                    if constexpr (!std::is_void_v<Ret>)
+                    if constexpr (not std::is_void_v<Ret>)
                     {
                         union no_return
                         {
                             Ret ret;
-                            std::nullptr_t _;
-
-                            no_return() : _() {}
+                            std::array<uint8_t, sizeof(Ret)> dammy;
+                            no_return() { dammy.fill(0xFF); }
                         };
                         return no_return().ret;
                     } else return;
@@ -183,7 +187,7 @@ namespace auto_delegate
 
         //bind methods
         template<auto MemFunc, typename T_ptr>
-        requires std::same_as<typename function_traits<decltype(MemFunc)>::decay_function_type, Ret(Args...)>
+        requires std::same_as<typename details::function_traits<decltype(MemFunc)>::decay_function_type, Ret(Args...)>
         decltype(auto) bind(const T_ptr& obj)
         {
             return bind(member_func_wrapper<T_ptr, MemFunc>(obj));
@@ -364,12 +368,12 @@ namespace auto_delegate
         void bind_weak(const T_Ptr& obj, Lambda&& lambda)
         {
             using T = value_of<T_Ptr>;
-            bind(weak_ptr_wrapper_lambda<T,std::decay_t<Lambda>>(obj,std::forward<Lambda>(lambda)));
+            bind(weak_ptr_wrapper_lambda<T, std::decay_t<Lambda>>(obj, std::forward<Lambda>(lambda)));
         }
 
         template<typename Callable>
         requires bindable<Callable>
-        decltype(auto) operator += (Callable&& callable)
+        decltype(auto) operator+=(Callable&& callable)
         {
             return bind(std::forward<Callable>(callable));
         }
@@ -419,14 +423,55 @@ namespace auto_delegate
             {
                 auto& functor = *iter;
                 Ret&& ret = functor(std::forward<Args>(args)...);
+                if (iter == end) break;//fake return
                 result_proc(std::forward<Ret>(ret));
+            }
+            objects.release_removed();
+        }
+
+        template<typename Callable>
+        void for_each(Callable&& func) requires std::same_as<Ret, void>
+        {
+            auto iter = objects.begin();
+            auto& end = objects.end();
+            //require iter < end there in call remove and ++iter get iterator out of range
+            for (; iter < end; iter++)
+            {
+                auto& functor = *iter;
+                bool fake_return = false;
+                func([&](Args... args) mutable
+                     {
+                         if (fake_return) return;
+                         functor(std::forward<Args>(args)...);
+                         if (iter == end) fake_return = true;//fake invoke
+                     });
+            }
+
+            objects.release_removed();
+        }
+
+        //the call need to be interrupt when the second is true
+        template<typename Callable>
+        void for_each(Callable&& func) requires (!std::same_as<Ret, void>)
+        {
+            auto iter = objects.begin();
+            auto& end = objects.end();
+            //require iter < end there in call remove and ++iter get iterator out of range
+            for (; iter < end; iter++)
+            {
+                auto& functor = *iter;
+                bool fake_return = false;
+                func([&](Args... args) mutable
+                     {
+                         return std::pair<Ret, bool>(functor(std::forward<Args>(args)...), iter == end);
+                     });
             }
             objects.release_removed();
         }
     };
 
 
-    struct object_binder_tag{};
+    struct object_binder_tag {};
 
     template<typename... Binders>
     using bind_info = std::tuple<Binders...>;
@@ -437,96 +482,111 @@ namespace auto_delegate
         using type = T;
         using pointer = T*;
         T* obj;
-        binder(T* obj) : obj(obj){}
 
-        auto invoke(auto&&invoker, auto&&... args)
+        binder(T* obj) : obj(obj) {}
+
+        auto invoke(auto&& invoker, auto&& ... args)
         {
             return invoker(obj, std::forward<decltype(args)>(args)...);
         }
 
         template<typename FuncT>
-        auto convert(){
+        auto convert()
+        {
             return *this;
         }
     };
 
-    template<typename ObjectBinder,auto Memfunc,typename T, typename Ret, typename... Args>
+    template<typename ObjectBinder, auto Memfunc, typename T, typename Ret, typename... Args>
     struct member_func_wrapper : ObjectBinder
     {
-        member_func_wrapper(ObjectBinder&& obj) : ObjectBinder(std::move(obj)){}
+        member_func_wrapper(ObjectBinder&& obj) : ObjectBinder(std::move(obj)) {}
+
         Ret operator()(Args... args)
         {
-            return this->invoke([](auto&& ptr, Args... args_){
-                auto o = static_cast<T*>(ptr);
-                return (o->*Memfunc)(std::forward<Args>(args_)...);
-            }, std::forward<Args>(args)...);
+            return this->invoke([](auto&& ptr, Args... args_)
+                                {
+                                    auto o = static_cast<T*>(ptr);
+                                    return (o->*Memfunc)(std::forward<Args>(args_)...);
+                                }, std::forward<Args>(args)...);
         }
     };
 
     template<auto Memfunc>
-    struct bind_memfn_impl{};
+    struct bind_memfn_impl {};
 
     template<auto Memfunc>
     inline constexpr bind_memfn_impl<Memfunc> bind_memfn;
 
     template<std::derived_from<object_binder_tag> ObjectBinder, auto Memfunc>
-    auto operator | (ObjectBinder&& b_obj, bind_memfn_impl<Memfunc>)
+    auto operator|(ObjectBinder&& b_obj, bind_memfn_impl<Memfunc>)
     {
+        using namespace details;
         using function_type = function_traits<decltype(Memfunc)>::decay_function_type;
         using object_type = function_traits<decltype(Memfunc)>::class_type;
-        return [&]<typename Ret, typename... Args>(function_traits<Ret(Args...)>){
-            return []<typename Binder>(Binder&& obj){
+        return [&]<typename Ret, typename... Args>(function_traits<Ret(Args...)>)
+        {
+            return []<typename Binder>(Binder&& obj)
+            {
                 using binder_t = std::decay_t<Binder>;
                 return member_func_wrapper<
-                    binder_t,
-                    Memfunc,
-                    object_type,
-                    Ret,
-                    Args...
+                        binder_t,
+                        Memfunc,
+                        object_type,
+                        Ret,
+                        Args...
                 >{std::forward<Binder>(obj)};
             }(b_obj.template convert<Ret(Args...)>());
         }(function_traits<function_type>());
     };
 
-    template<typename ObjectBinder,typename Lambda,typename T, typename Ret, typename... Args>
+    template<typename ObjectBinder, typename Lambda, typename T, typename Ret, typename... Args>
     struct bind_into_lambda_warpper : ObjectBinder
     {
         Lambda lambda;
+
         bind_into_lambda_warpper(ObjectBinder&& obj, Lambda&& lambda)
-                : ObjectBinder(std::move(obj)), lambda(std::move(lambda)){}
+                : ObjectBinder(std::move(obj)), lambda(std::move(lambda)) {}
+
         Ret operator()(Args... args)
         {
             // return ObjectBinder::invoke(lambda, std::forward<decltype(args)>(args)...);
-            return ObjectBinder::invoke([&](auto&& ptr,Args...args){
-                auto o = static_cast<T*>(ptr);
-                return lambda(*o, std::forward<Args>(args)...);
-            }, std::forward<decltype(args)>(args)...);
+            return ObjectBinder::invoke([&](auto&& ptr, Args...args)
+                                        {
+                                            auto o = static_cast<T*>(ptr);
+                                            return lambda(*o, std::forward<Args>(args)...);
+                                        }, std::forward<decltype(args)>(args)...);
         }
     };
 
     template<typename Lambda>
-    struct bind_into_lambda{
+    struct bind_into_lambda
+    {
         Lambda lambda;
-        bind_into_lambda(Lambda&& lambda) : lambda(std::forward<Lambda>(lambda)){}
+
+        bind_into_lambda(Lambda&& lambda) : lambda(std::forward<Lambda>(lambda)) {}
     };
 
     template<typename Lambda>
     bind_into_lambda(Lambda&&) -> bind_into_lambda<std::decay_t<Lambda>>;
 
     template<std::derived_from<object_binder_tag> ObjectBinder, typename Lambda>
-    auto operator | (ObjectBinder&& b_obj, bind_into_lambda<Lambda> b_lambda)
+    auto operator|(ObjectBinder&& b_obj, bind_into_lambda<Lambda> b_lambda)
     {
+        using namespace details;
         using object_type = std::decay_t<ObjectBinder>::type;
         using function_type = function_traits<decltype(&Lambda::template operator()<object_type&>)>::decay_function_type;
-        return [&]<typename Ret,typename _T_, typename... Args>(function_traits<Ret(_T_,Args...)>){
-            return [&]<typename Binder>(Binder&& obj){
+        return [&]<typename Ret, typename _T_, typename... Args>(function_traits<Ret(_T_, Args...)>)
+        {
+            return [&]<typename Binder>(Binder&& obj)
+            {
                 using binder_t = std::decay_t<Binder>;
                 return bind_into_lambda_warpper<
-                    binder_t,
-                    Lambda,
-                    object_type,
-                    Ret,
-                    Args...
+                        binder_t,
+                        Lambda,
+                        object_type,
+                        Ret,
+                        Args...
                 >{std::forward<Binder>(obj), std::move(b_lambda.lambda)};
             }(b_obj.template convert<Ret(Args...)>());
         }(function_traits<function_type>());
@@ -578,17 +638,23 @@ namespace auto_delegate
     template<typename Callable, typename Ret, typename... Args>
     struct unique_handled_wrapper
     {
-        struct empty_t{};
+        struct empty_t {};
+
         [[no_unique_address]]
         union copy_wrapper_t
         {
             Callable functor;
             empty_t _;
-            copy_wrapper_t(Callable&& functor):functor(std::move(functor)){}
-            copy_wrapper_t():_(){}
-            copy_wrapper_t(copy_wrapper_t&& other): functor(std::move(other.functor)){}
-            ~copy_wrapper_t(){functor.~Callable();}
-        }copy_wrapper;
+
+            copy_wrapper_t(Callable&& functor) : functor(std::move(functor)) {}
+
+            copy_wrapper_t() : _() {}
+
+            copy_wrapper_t(copy_wrapper_t&& other) : functor(std::move(other.functor)) {}
+
+            ~copy_wrapper_t() { functor.~Callable(); }
+        } copy_wrapper;
+
         unique_delegate_handle_ref inv_handle;
 
         unique_handled_wrapper(Callable&& functor) : copy_wrapper(std::forward<Callable>(functor)), inv_handle() {}
@@ -597,13 +663,17 @@ namespace auto_delegate
 
         unique_handled_wrapper(unique_handled_wrapper&&) = default;
 
-        Ret operator()(Args... args) { auto& functor = copy_wrapper.functor; return functor(std::forward<Args>(args)...); }
+        Ret operator()(Args... args)
+        {
+            auto& functor = copy_wrapper.functor;
+            return functor(std::forward<Args>(args)...);
+        }
 
         template<typename Container>
         auto on_bind(Container* container)
         {
             auto& functor = copy_wrapper.functor;
-            if constexpr(requires {functor.on_bind(container);})
+            if constexpr (requires { functor.on_bind(container); })
                 functor.on_bind(container);
             return unique_delegate_handle_lambda(container, &inv_handle, [](void* container, delegate_handle_ref* inv)
             {
@@ -613,33 +683,36 @@ namespace auto_delegate
         }
     };
 
-    struct bind_handle_t{};
+    struct bind_handle_t {};
     inline constexpr bind_handle_t bind_handle;
 
     template<typename Callable>
-    auto operator | (Callable&& callable, bind_handle_t)
+    auto operator|(Callable&& callable, bind_handle_t)
     {
+        using namespace details;
         using func_traits = function_traits<decltype(&Callable::operator())>;
-        return [&]<typename Ret, typename... Args>(function_traits<Ret(Args...)>){
+        return [&]<typename Ret, typename... Args>(function_traits<Ret(Args...)>)
+        {
             using callable_t = std::decay_t<Callable>;
             return unique_handled_wrapper<callable_t, Ret, Args...>{std::forward<Callable>(callable)};
         }(func_traits());
     }
 
 
-
-
     template<typename T, typename FuncT>
     struct weak_binder_impl;
+
     template<typename T, typename Ret, typename... Args>
-    struct weak_binder_impl<T,Ret(Args...)>
+    struct weak_binder_impl<T, Ret(Args...)>
     {
         std::weak_ptr<T> obj;
         void* container;
+
         Ret (* on_expired)(weak_binder_impl* self, Args... args);
 
-        template<typename T_ptr> 
-        explicit weak_binder_impl(const T_ptr& obj) : obj(obj),container(nullptr),on_expired(nullptr) {}
+        template<typename T_ptr>
+        explicit weak_binder_impl(const T_ptr& obj) : obj(obj), container(nullptr), on_expired(nullptr) {}
+
         template<typename Container>
         void on_bind(Container* c)
         {
@@ -654,7 +727,7 @@ namespace auto_delegate
         {
             if (obj.expired()) return on_expired(this, std::forward<Args>(args)...);
             auto shared = obj.lock();
-            return invoker(shared.get() ,std::forward<Args>(args)...);
+            return invoker(shared.get(), std::forward<Args>(args)...);
         }
     };
 
@@ -663,7 +736,8 @@ namespace auto_delegate
     {
         using type = std::pointer_traits<std::decay_t<T_Ptr>>::element_type;
         const T_Ptr& ptr;
-        weak_binder(const T_Ptr& ptr): ptr(ptr) {}
+
+        weak_binder(const T_Ptr& ptr) : ptr(ptr) {}
 
         template<typename FuncT>
         decltype(auto) convert()
@@ -675,15 +749,18 @@ namespace auto_delegate
 
     template<typename T, typename FuncT>
     struct shared_binder_impl;
+
     template<typename T, typename Ret, typename... Args>
-    struct shared_binder_impl<T,Ret(Args...)>
+    struct shared_binder_impl<T, Ret(Args...)>
     {
         std::shared_ptr<T> obj;
         void* container;
+
         Ret (* on_expired)(shared_binder_impl* self, Args... args);
 
-        template<typename T_ptr> 
+        template<typename T_ptr>
         explicit shared_binder_impl(const T_ptr& obj) : obj(obj) {}
+
         template<typename Container>
         void on_bind(Container* c)
         {
@@ -697,7 +774,7 @@ namespace auto_delegate
         Ret invoke(auto&& invoker, Args... args)
         {
             assert(obj);
-            return invoker(obj.get() ,std::forward<Args>(args)...);
+            return invoker(obj.get(), std::forward<Args>(args)...);
         }
     };
 
@@ -705,8 +782,9 @@ namespace auto_delegate
     struct shared_binder : object_binder_tag
     {
         using type = T;
-        const std::shared_ptr<T>&  ptr;
-        shared_binder(const std::shared_ptr<T>& ptr): ptr(ptr) {}
+        const std::shared_ptr<T>& ptr;
+
+        shared_binder(const std::shared_ptr<T>& ptr) : ptr(ptr) {}
 
         template<typename FuncT>
         decltype(auto) convert()
@@ -717,5 +795,6 @@ namespace auto_delegate
 
 
 }
+
 
 #undef no_unique_address
