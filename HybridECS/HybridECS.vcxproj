@@ -139,10 +139,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="test\test_archetype_registry.cpp" />
+    <ClCompile Include="test\test_cross_query.cpp" />
     <ClCompile Include="test\test_query_api.cpp" />
     <ClCompile Include="test\_TEST_main.cpp" />
     <ClInclude Include="src\container\ankerl\unordered_dense.h" />
     <ClInclude Include="src\container\bit_set.h" />
+    <ClInclude Include="src\container\container_config.h" />
     <ClInclude Include="src\container\entt\dense_set.h" />
     <ClCompile Include="src\HybridECS.cpp" />
     <ClCompile Include="src\pch.cpp">
@@ -197,6 +199,7 @@
     <ClInclude Include="src\ecs\cross_archetype_storage.h" />
     <ClInclude Include="src\ecs\cross_query.h" />
     <ClInclude Include="src\ecs\data_registry.h" />
+    <ClInclude Include="src\ecs\debug_util.h" />
     <ClInclude Include="src\ecs\dense_map.h" />
     <ClInclude Include="src\ecs\entity.h" />
     <ClInclude Include="src\ecs\hybrid_component_storage.h" />

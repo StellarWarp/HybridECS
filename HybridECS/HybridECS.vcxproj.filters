@@ -10,6 +10,7 @@
     <ClCompile Include="test\_TEST_main.cpp" />
     <ClCompile Include="test\test_archetype_registry.cpp" />
     <ClCompile Include="test\test_query_api.cpp" />
+    <ClCompile Include="test\test_cross_query.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\container\ankerl\unordered_dense.h" />
@@ -123,5 +124,7 @@
     <ClInclude Include="src\ecs\system_callable_invoker.h" />
     <ClInclude Include="src\ecs\table.h" />
     <ClInclude Include="test\ut.hpp" />
+    <ClInclude Include="src\container\container_config.h" />
+    <ClInclude Include="src\ecs\debug_util.h" />
   </ItemGroup>
 </Project>
