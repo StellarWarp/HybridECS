@@ -146,7 +146,6 @@
     <ClInclude Include="src\container\bit_set.h" />
     <ClInclude Include="src\container\container_config.h" />
     <ClInclude Include="src\container\entt\dense_set.h" />
-    <ClCompile Include="src\HybridECS.cpp" />
     <ClCompile Include="src\pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
@@ -204,13 +203,35 @@
     <ClInclude Include="src\ecs\entity.h" />
     <ClInclude Include="src\ecs\hybrid_component_storage.h" />
     <ClInclude Include="src\ecs\query.h" />
+    <ClInclude Include="src\ecs\query\cross_query.h" />
+    <ClInclude Include="src\ecs\query\query.h" />
+    <ClInclude Include="src\ecs\query\query_api.h" />
+    <ClInclude Include="src\ecs\query\query_parser.h" />
+    <ClInclude Include="src\ecs\query\system_callable_invoker.h" />
     <ClInclude Include="src\ecs\query_condition.h" />
+    <ClInclude Include="src\ecs\registry\archetype_registry.h" />
+    <ClInclude Include="src\ecs\registry\archetype_registry_node.h" />
+    <ClInclude Include="src\ecs\registry\query_condition.h" />
     <ClInclude Include="src\ecs\sparse_table.h" />
     <ClInclude Include="src\ecs\static_data_registry.h" />
+    <ClInclude Include="src\ecs\storage\archetype_storage.h" />
+    <ClInclude Include="src\ecs\storage\component_storage.h" />
+    <ClInclude Include="src\ecs\storage\cross_archetype_storage.h" />
+    <ClInclude Include="src\ecs\storage\entity_map.h" />
+    <ClInclude Include="src\ecs\storage\hybrid_component_storage.h" />
+    <ClInclude Include="src\ecs\storage\sparse_table.h" />
+    <ClInclude Include="src\ecs\storage\storage_key.h" />
+    <ClInclude Include="src\ecs\storage\storage_key_registry.h" />
+    <ClInclude Include="src\ecs\storage\table.h" />
+    <ClInclude Include="src\ecs\storage\tag_archetype_storage.h" />
     <ClInclude Include="src\ecs\storage_key_registry.h" />
     <ClInclude Include="src\ecs\system_callable_invoker.h" />
     <ClInclude Include="src\ecs\table.h" />
     <ClInclude Include="src\ecs\tag_archetype_storage.h" />
+    <ClInclude Include="src\ecs\type\archetype.h" />
+    <ClInclude Include="src\ecs\type\component.h" />
+    <ClInclude Include="src\ecs\type\component_group.h" />
+    <ClInclude Include="src\ecs\type\entity.h" />
     <ClInclude Include="src\meta\assertion.h" />
     <ClInclude Include="src\meta\meta_utils.h" />
     <ClInclude Include="src\meta\operator_test.h" />
@@ -222,6 +243,9 @@
     <ClInclude Include="src\test_type.h" />
     <ClInclude Include="src\utils\utils.h" />
     <ClInclude Include="test\ut.hpp" />
+    <ClInclude Include="test_util\managed_object_tester.h" />
+    <ClInclude Include="test_util\memleak_detect.h" />
+    <ClInclude Include="test_util\ut.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\container\container.h" />
