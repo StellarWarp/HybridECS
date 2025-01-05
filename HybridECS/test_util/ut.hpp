@@ -1,3 +1,5 @@
+#include "memleak_detect.h"
+
 //
 // Copyright (c) 2019-2021 Kris Jusiak (kris at jusiak dot net)
 //
@@ -1708,6 +1710,7 @@ class reporter_junit {
   ~reporter_junit() { std::cout.rdbuf(cout_save); }
 
   auto on(events::run_begin run) {
+    MemoryLeakExempt
     ::boost::ut::detail::cfg::parse_arg_with_fallback(run.argc, run.argv);
 
     if (detail::cfg::show_reporters) {
@@ -1746,6 +1749,7 @@ class reporter_junit {
   }
 
   auto on(events::test_begin test_event) -> void {  // starts outermost test
+    MemoryLeakExempt
     check_for_scope(test_event.name);
 
     if (report_type_ == CONSOLE) {
@@ -1756,6 +1760,7 @@ class reporter_junit {
   }
 
   auto on(events::test_end test_event) -> void {
+    MemoryLeakExempt
     if (active_scope_->fails > 0) {
       reset_printer();
     } else {
@@ -1788,6 +1793,7 @@ class reporter_junit {
   }
 
   auto on(events::test_skip test_event) -> void {
+    MemoryLeakExempt
     ss_out_.clear();
     if (!active_scope_->nested_tests->contains(std::string(test_event.name))) {
       check_for_scope(test_event.name);
@@ -1805,6 +1811,7 @@ class reporter_junit {
 
   template <class TMsg>
   auto on(events::log<TMsg> log) -> void {
+    MemoryLeakExempt
     ss_out_ << log.msg;
     if (report_type_ == CONSOLE) {
       lcout_ << log.msg;
@@ -1812,6 +1819,7 @@ class reporter_junit {
   }
 
   auto on(events::exception exception) -> void {
+    MemoryLeakExempt
     active_scope_->fails++;
     if (!active_test_.empty()) {
       active_scope_->report_string += color_.fail;
@@ -1842,6 +1850,7 @@ class reporter_junit {
 
   template <class TExpr>
   auto on(events::assertion_fail<TExpr> assertion) -> void {
+    MemoryLeakExempt
     TPrinter ss{};
     ss << ss_out_.str();
     if (report_type_ == CONSOLE) {
@@ -1870,6 +1879,7 @@ class reporter_junit {
   auto on(events::fatal_assertion) -> void { active_scope_->fails++; }
 
   auto on(events::summary) -> void {
+    MemoryLeakExempt
     std::cout.flush();
     std::cout.rdbuf(cout_save);
     std::ofstream maybe_of;
@@ -1889,6 +1899,7 @@ class reporter_junit {
 
  protected:
   void print_duration(auto& printer) const noexcept {
+    MemoryLeakExempt
     if (detail::cfg::show_duration) {
       std::int64_t time_ms =
           std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -1902,6 +1913,7 @@ class reporter_junit {
 
   void print_console_summary(std::ostream& out_stream,
                              std::ostream& err_stream) {
+    MemoryLeakExempt
     for (const auto& [suite_name, suite_result] : results_) {
       if (suite_result.fails) {
         err_stream
@@ -1930,6 +1942,7 @@ class reporter_junit {
   }
 
   void print_junit_summary(std::ostream& stream) {
+    MemoryLeakExempt
     // aggregate results
     size_t n_tests = 0, n_fails = 0;
     double total_time = 0.0;
@@ -1973,6 +1986,7 @@ class reporter_junit {
   }
   void print_result(std::ostream& stream, const std::string& suite_name,
                     std::string indent, const test_result& parent) {
+    MemoryLeakExempt
     for (const auto& [name, result] : *parent.nested_tests) {
       stream << indent;
       stream << "<testcase classname=\"" << result.suite_name << '\"';
@@ -3326,6 +3340,18 @@ using operators::operator/;
 using operators::operator>>;
 }  // namespace boost::inline ext::ut::inline v2_1_0
 
+
+inline void MemoryLeakDetector::reportFailure(int64_t unfreedBytes)
+{
+  boost::ut::expect(unfreedBytes == 0) << "Memory leak of " << unfreedBytes << " byte(s) detected.";
+  // assert(unfreedBytes == 0);
+}
+
+inline void MemoryLeakDetector::reportDiff()
+{
+  boost::ut::log << "Memory difference detected but no leaks found.\n";
+}
+
 #if (defined(__GNUC__) || defined(__clang__) || defined(__INTEL_COMPILER)) && \
     !defined(__EMSCRIPTEN__)
 __attribute__((constructor(101))) inline void cmd_line_args(
@@ -3343,3 +3369,5 @@ __attribute__((constructor(101))) inline void cmd_line_args(
 #endif
 
 #endif
+
+

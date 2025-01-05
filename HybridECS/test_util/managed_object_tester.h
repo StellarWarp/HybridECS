@@ -4,16 +4,20 @@
 #include "ut.hpp"
 
 template<
-        auto IDENT,
-        bool AllowMultiDestroy = false,
-        auto NewObjectCallback = nullptr,
-        auto DestroyObjectCallback = nullptr>
+    auto IDENT,
+    bool AllowMultiDestroy = false,
+    auto NewObjectCallback = nullptr,
+    auto DestroyObjectCallback = nullptr>
 struct managed_object_tester
 {
     static constexpr bool has_new_object = !std::is_same_v<std::decay_t<decltype(NewObjectCallback)>, nullptr_t>;
     static constexpr bool has_destroy_object = !std::is_same_v<std::decay_t<decltype(DestroyObjectCallback)>, nullptr_t>;
 
     static inline size_t object_counter = 0;
+    static inline size_t from_default_counter = 0;
+    static inline size_t from_custom_counter = 0;
+    static inline size_t from_copy_counter = 0;
+    static inline size_t from_move_counter = 0;
     static inline size_t construct_call = 0;
     static inline size_t move_call = 0;
     static inline size_t copy_call = 0;
@@ -38,10 +42,15 @@ struct managed_object_tester
     static void check_log()
     {
         boost::ut::log << "object_counter: " << object_counter << "\n"
-                       << "construct_call: " << construct_call << "\n"
-                       << "move_call: " << move_call << "\n"
-                       << "copy_call: " << copy_call << "\n"
-                       << "destroy_call: " << destroy_call << "\n";
+                << "from_default_counter: " << from_default_counter << "\n"
+                << "from_custom_counter: " << from_custom_counter << "\n"
+                << "from_copy_counter: " << from_copy_counter << "\n"
+                << "from_move_counter: " << from_move_counter << "\n"
+                << "construct_call: " << construct_call << "\n"
+                << "move_call: " << move_call << "\n"
+                << "copy_call: " << copy_call << "\n"
+                << "destroy_call: " << destroy_call << "\n";
+        fflush(stdout);
     }
 
     void new_object_callback()
@@ -59,23 +68,25 @@ struct managed_object_tester
     int a, b, c, d;
     size_t id;
     state_flags flags = none;
-    friend state_flags& operator|=(state_flags& lhs, state_flags rhs )
+
+    friend state_flags& operator|=(state_flags& lhs, state_flags rhs)
     {
         return lhs = static_cast<state_flags>(static_cast<int>(lhs) | static_cast<int>(rhs));
     }
 
-    friend state_flags operator|(state_flags lhs, state_flags rhs )
+    friend state_flags operator|(state_flags lhs, state_flags rhs)
     {
         return static_cast<state_flags>(static_cast<int>(lhs) | static_cast<int>(rhs));
     }
 
     managed_object_tester()
-    : a(0), b(0), c(0), d(0)
+        : a(0), b(0), c(0), d(0)
     {
         id = id_counter++;
         object_counter++;
         construct_call++;
         flags |= default_construct;
+        from_default_counter++;
         new_object_callback();
     }
 
@@ -85,6 +96,7 @@ struct managed_object_tester
         object_counter++;
         construct_call++;
         flags |= construct_from_custom;
+        from_custom_counter++;
         new_object_callback();
     }
 
@@ -94,6 +106,7 @@ struct managed_object_tester
         object_counter++;
         copy_call++;
         flags |= construct_from_copy;
+        from_copy_counter++;
         new_object_callback();
     }
 
@@ -103,7 +116,7 @@ struct managed_object_tester
         object_counter++;
         if constexpr (!hyecs::DESTROY_MOVED_COMPONENTS)
         {
-            if(hyecs::generic::g_debug_dynamic_move_signature)
+            if (hyecs::generic::g_debug_dynamic_move_signature)
             {
                 object_counter--;
                 other.flags |= moved_dynamic;
@@ -112,6 +125,7 @@ struct managed_object_tester
         move_call++;
         flags |= construct_from_move;
         other.flags |= moved;
+        from_move_counter++;
         new_object_callback();
     }
 
@@ -133,13 +147,21 @@ struct managed_object_tester
         if (flags & destroyed)
         {
             flags |= multiple_destroyed;
-            if(!AllowMultiDestroy)
+            if (!AllowMultiDestroy)
                 assert(false);
         }
         flags |= destroyed;
         a = b = c = d = 0;
         object_counter--;
         destroy_call++;
+        if (flags & default_construct)
+            from_default_counter--;
+        else if (flags & construct_from_custom)
+            from_custom_counter--;
+        else if (flags & construct_from_copy)
+            from_copy_counter--;
+        else if (flags & construct_from_move)
+            from_move_counter--;
         destroy_object_callback();
     }
 

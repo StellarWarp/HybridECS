@@ -16,83 +16,84 @@ namespace hyecs
 
         scope_output_color(const char* color)
         {
-            std::cout << color;
+            printf("%s", color);
         }
+
         ~scope_output_color()
         {
-            std::cout << "\033[0m";
-            std::cout.flush();
+            printf("\033[0m");
         }
     };
 
-    inline std::ostream& operator<<(std::ostream& os, const component_type_index& index)
+    inline std::string to_string(const component_type_index& index)
     {
-        std::string_view name = index.name();
-        os << name.substr(7);
-        return os;
+        int off = std::string_view(index.name()).find("::");
+        return std::string(index.name() + off + 2);
     }
 
-    inline std::ostream& operator<<(std::ostream& os, const archetype_index& index)
+    inline std::string to_string(const archetype_index& index)
     {
+        std::string result;
         const auto& arch = index.get_info();
         for (size_t i = 0; i < arch.component_count(); i++)
         {
             const auto& comp = arch[i];
-            os << comp;
+            result += to_string(comp);
             if (i != arch.component_count() - 1)
             {
-                os << " ";
+                result += " ";
             }
         }
-        return os;
+        return result;
     }
 
-    inline std::ostream& operator<<(std::ostream& os, const query_condition& condition)
+    inline std::string to_string(const query_condition& condition)
     {
+        std::string result;
         if (!condition.all().empty())
         {
-            os << "[";
-            for (size_t i = 0; i < condition.all().size(); i++) {
+            result += "[";
+            for (size_t i = 0; i < condition.all().size(); i++)
+            {
                 auto comp = condition.all()[i];
-                os << comp;
+                result += to_string(comp);
                 if (i == condition.all().size() - 1) break;
-                os << " ";
+                result += " ";
             }
-            os << "]";
+            result += "]";
         }
         if (!condition.anys().empty())
         {
-            os << "( ";
+            result += "( ";
             for (size_t i = 0; i < condition.anys().size(); i++)
             {
                 auto& any = condition.anys()[i];
-                os << "(";
+                result += "(";
                 for (size_t j = 0; j < any.size(); j++)
                 {
                     auto comp = any[j];
-                    os << comp;
+                    result += to_string(comp);
                     if (j == any.size() - 1) break;
-                    os << "|";
+                    result += "|";
                 }
-                os << ")";
+                result += ")";
                 if (i == condition.anys().size() - 1) break;
-                os << "|";
+                result += "|";
             }
-            os << " )";
+            result += " )";
         }
         if (!condition.none().empty())
         {
-            os << " - (";
-            for (size_t i = 0; i < condition.none().size(); i++) {
+            result += " - (";
+            for (size_t i = 0; i < condition.none().size(); i++)
+            {
                 auto comp = condition.none()[i];
-                os << comp;
+                result += to_string(comp);
                 if (i == condition.none().size() - 1) break;
-                os << " ";
+                result += " ";
             }
-            os << ")";
+            result += ")";
         }
-        return os;
+        return result;
     }
-
-
 }
