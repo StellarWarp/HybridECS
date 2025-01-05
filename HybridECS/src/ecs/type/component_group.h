@@ -171,6 +171,15 @@ namespace hyecs
 	class ecs_rtti_context
 	{
 	public:
+		bool constructed = false;
+		ecs_rtti_context()
+		{
+			constructed = true;
+		}
+		~ecs_rtti_context()
+		{
+			constructed = false;
+		}
 		struct component_register_info
 		{
 			generic::type_index type;
@@ -235,11 +244,11 @@ namespace hyecs
 	{
 		static ecs_rtti_context& register_context()
         {
-            static ecs_rtti_context context;
+			static ecs_rtti_context context;
+			assert(context.constructed);
             return context;
         }
 	};
-
 
 
     template<typename T, component_group_id GroupId, bool IsTag = default_is_tag<T>()>

@@ -1,4 +1,7 @@
 ﻿#include "pch.h"
 
-int main(){};
+int main()
+{
+
+};
 

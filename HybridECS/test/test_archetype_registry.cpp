@@ -1,10 +1,10 @@
 #include "pch.h"
 
+#include "../test_util/memleak_detect.h"
 #include "ecs/static_data_registry.h"
 #include "ecs/type/component_group.h"
-#include "../test_util/ut.hpp"
 #include "../test_util/managed_object_tester.h"
-#include "../test_util/memleak_detect.h"
+#include "../test_util/ut.hpp"
 
 using namespace hyecs;
 

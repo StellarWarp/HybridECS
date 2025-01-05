@@ -104,22 +104,29 @@ namespace hyecs
                         group_count++;
                     }
                 group_division.reserve(group_count * 2 + 1);
-                group_division.push_back(0);
                 uint32_t index = 0;
-                bool tag_section = false;
+                bool tag_section = true;
+                prev_group = component_group_id{};
                 for (const auto& comp: sorted_components)
                 {
-                    if (!tag_section && comp.is_tag())
+                    if (comp.group().id() != prev_group)
+                    {
+                        prev_group = comp.group().id();
+                        if (!tag_section)
+                            group_division.push_back(index);
+                        else
+                            tag_section = false;
+                        group_division.push_back(index);
+                    }
+                    else if (!tag_section && comp.is_tag())
                     {
                         tag_section = true;
                         group_division.push_back(index);
                     }
-                    else if (tag_section && !comp.is_tag())
-                    {
-                        tag_section = false;
-                        group_division.push_back(index);
-                    }
+                    index ++;
                 }
+                if (!tag_section)
+                    group_division.push_back(access_list.size());
                 group_division.push_back(access_list.size());
             }
         };

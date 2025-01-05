@@ -112,7 +112,7 @@ namespace hyecs
                                                sorted_sequence_cref(storages),
                                                m_storage_key_registry.get_group_key_accessor());
 #if defined(DEBUG_PRINT)
-            std::cout << "add untag archetype " << arch << std::endl;
+            printf("add untag archetype %s\n", to_string(arch).c_str());
 #endif
         }
 
@@ -132,7 +132,7 @@ namespace hyecs
             }
             m_tag_archetypes_storage.emplace_value(arch.hash(), arch, base_storage, sorted_sequence_cref(tag_storages));
 #if defined(DEBUG_PRINT)
-            std::cout << "add tag archetype " << arch << std::endl;
+            printf("add tag archetype %s\n", to_string(arch).c_str());
 #endif
         }
 
@@ -172,13 +172,13 @@ namespace hyecs
                 table_query.notify_partial_convert();
             };
 #if defined(DEBUG_PRINT)
-            std::cout << "add table query [" << base_archetype_index << "] + " << tag_condition;
+            printf("add table query [%s] + %s", to_string(base_archetype_index).c_str(), to_string(tag_condition).c_str());
             if (is_full_set)
-                if (is_direct_set) std::cout << " direct set";
-                else std::cout << " full set";
-            else std::cout << " partial set";
+                if (is_direct_set) printf(" direct set");
+                else printf(" full set");
+            else printf(" partial set");
 
-            std::cout << std::endl;
+            printf("\n");
 #endif
         }
 
@@ -194,14 +194,14 @@ namespace hyecs
                 table_tag_query* table_query = &m_table_queries.at(table_query_index);
                 q.notify_table_query_add(table_query);
 #if defined(DEBUG_PRINT)
-                std::cout << "query::" << q.condition_debug()
-                        << " add table query " << "[" << table_query->base_archetype() << "] "
-                        << table_query->tag_condition()
-                        << std::endl;
+                printf("query::%s add table query [%s] %s\n",
+                    to_string(q.condition_debug()).c_str(),
+                    to_string(table_query->base_archetype()).c_str(),
+                    to_string(table_query->tag_condition()).c_str());
 #endif
             };
 #if defined(DEBUG_PRINT)
-            std::cout << "add query " << info.condition << std::endl;
+            printf("add query %s\n", to_string(info.condition).c_str());
 #endif
         }
 
@@ -309,16 +309,17 @@ namespace hyecs
                               sequence_cref<entity> entities,
                               sorted_sequence_cref<generic::constructor> constructors)
         {
-            if (arch.component_count() == 1)
-            {
-                auto& storage = m_component_storages.at(arch[0].hash());
-                auto component_accessor = storage.allocate(entities);
-                for (void* addr: component_accessor)
-                {
-                    constructors[0](addr);
-                }
-            }
-            else
+            //fixme: needed this? this cause single component query not working
+            // if (arch.component_count() == 1)
+            // {
+            //     auto& storage = m_component_storages.at(arch[0].hash());
+            //     auto component_accessor = storage.allocate(entities);
+            //     for (void* addr: component_accessor)
+            //     {
+            //         constructors[0](addr);
+            //     }
+            // }
+            // else
             {
                 auto construct_process = [&](auto&& allocate_accessor)
                 {
@@ -421,6 +422,7 @@ namespace hyecs
                 }
             }
             all_group_range.push_back(cond_all.size());
+            assert(groups.size()>1);// do not use cross query when in-group query is enough
             //ensure all none cond exist in the group
             ASSERTION_CODE(
                 for (auto comp: cond_none)
@@ -654,48 +656,8 @@ namespace hyecs
                 if (auto iter = m_data_registry->m_storage_key_registry.find(e); iter != m_data_registry->m_storage_key_registry.end())
                 {
                     auto st_key = iter->second;
-                    //todo build the fast table
                     auto* table = m_data_registry->m_storage_key_registry.find_table(st_key.get_table_index());
                     //base part
-
-                    //todo component index cache ?
-
-                    // uint32_t table_cache_index = std::numeric_limits<uint32_t>::max();
-                    // for (auto idx: acc_info.table_indices_cache.table_index)
-                    // {
-                    //     if (idx == table_index)
-                    //     {
-                    //         table_cache_index = idx;
-                    //     }
-                    // }
-                    //
-                    // if (table_cache_index == std::numeric_limits<uint32_t>::max())
-                    // {
-                    //
-                    //     auto all_indices = table->get_all_component_indices();
-                    //
-                    //     uint32_t index = 0;
-                    //     table->components_addresses(st_key,
-                    //                                 tag_begin_idx - comp_begin_idx,
-                    //                                 [&]()
-                    //                                 {
-                    //                                     const auto& elem = *comp_begin;
-                    //                                     assert(elem >= all_indices[index]);
-                    //                                     while (elem != all_indices[index])
-                    //                                         index++;
-                    //                                 },
-                    //                                 [&](void* addr)
-                    //                                 {
-                    //                                     addresses_cache[comp_begin_idx] = addr;
-                    //                                     ++comp_begin;
-                    //                                     ++comp_begin_idx;
-                    //                                 }
-                    // }
-                    // else
-                    // {
-                    //     auto& indices = acc_info.table_indices_cache.component_indices[table_cache_index];
-                    //     table->components_addresses(st_key, indices, addresses);
-                    // }
 
                     auto all_indices = table->get_all_component_indices();
 

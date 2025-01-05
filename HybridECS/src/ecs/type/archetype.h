@@ -68,6 +68,7 @@ namespace hyecs
 
 		void hash_collision_assertion() const
 		{
+			MemoryLeakExempt
 			//full part assertion
 			if (auto it = debug_archetype_hash.find(m_hash); it != debug_archetype_hash.end()) {
 				assert(it->second == m_component_mask);// hash collision
